@@ -1,0 +1,32 @@
+Phy-World (World4) - Copyright 2026 QUASAR. Licensed under the Apache License 2.0.
+
+Third-party material used, not vendored unless stated:
+
+- world4/core/l0.py transcribes the World3-03 equations from pydynamo
+  (gitlab.telecom-paris.fr/software/pydynamo, Unlicense / public domain).
+- tests/reference/world3_03_vensim.csv holds the Vensim World3-03 output published in
+  WorldDynamics.jl test/world3_03.jl (MIT, Copyright (c) 2022 Emanuele Natale,
+  Pierluigi Crescenzi, Paulo Bruno Serafim). Vendored, with its SHA-256 in the header.
+- world4/core/l1_atlas is the Atlas del Sistema-Mundo (QU01/Reproducible-Research-Project-2,
+  commit 9e96f6b), ported with mechanical import/path changes only.
+- The Atlas DATA are not included. They are installed from the Atlas repository and checked
+  against world4/data/atlas_manifest.json. Their upstream sources and licences are listed in
+  world4/data/sources.json; several are unverified and one (EM-DAT) is not redistributable.
+- pyworld3 (CeCILL 2.1) is neither used nor copied.
+- F1 (population sector) reads United Nations, Department of Economic and Social Affairs,
+  Population Division (2024). World Population Prospects 2024 (CC BY 3.0 IGO), through the R
+  package PPgp/wpp2024. Not vendored: downloaded by `world4_cli.py --install-wpp` and checked
+  against world4/data/wpp_manifest.json.
+- F4 (climate) depends on the FaIR package v2.2.4 (https://github.com/OMS-NetZero/FAIR,
+  Apache-2.0, Copyright (c) Chris Smith, Nicholas Leach and contributors).
+  world4/sectors/_fair_step.py is DERIVED from fair/fair.py (FAIR.run): the main loop is split
+  into prepare() + step(i) so that emissions can be written year by year; the changes are listed
+  in that file's header. Cite Leach et al. (2021), GMD 14, 3007-3036.
+- F4 reads the FaIR calibration data 1.6.0 (C. Smith, Zenodo 10.5281/zenodo.18828694, CC BY
+  4.0; method: Smith et al. 2024, GMD 17, 8569-8592) and HadCRUT5 5.1.0.0 (Met Office Hadley
+  Centre and Climatic Research Unit, Open Government Licence v3). Not vendored: downloaded by
+  `world4_cli.py --install-climate` and checked against world4/data/climate_manifest.json.
+- F5 (food) reads FAOSTAT (FAO, CC BY 4.0 with the FAO Statistical Database Terms of Use; source:
+  FAO. FAOSTAT. Rome, https://www.fao.org/faostat, accessed 2026-10-12) and World Bank WDI water
+  withdrawals (CC BY 4.0, from FAO AQUASTAT). Not vendored: downloaded by
+  `world4_cli.py --install-food` and checked against world4/data/food_manifest.json.

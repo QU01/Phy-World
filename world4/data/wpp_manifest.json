@@ -1,0 +1,11 @@
+{
+ "source": "UN World Population Prospects 2024, R package PPgp/wpp2024 (branch main), CC BY 3.0 IGO",
+ "url": "https://raw.githubusercontent.com/PPgp/wpp2024/main/data/",
+ "downloaded": "2026-10-12",
+ "files": {
+  "popAge1dt.rda": {"sha256": "232b0a9c2a5a5b524e95dd11353ad27fbfa82560a831b34525a59bf05523a2a8"},
+  "mx5dt.rda": {"sha256": "30a58cd3030eebdff5c72c4dbdfa7c4d10a1da6b776652f09f1f0e3ca61d457c"},
+  "percentASFR5dt.rda": {"sha256": "77159a855bde6c039df33b196d1458c60c54da13da279b8386f86237e620cb1a"},
+  "sexRatio1dt.rda": {"sha256": "88bab48c8c80e8116ba53b967e2965dcfbeaef458b33ecd44067d54cb23bebe8"}
+ }
+}

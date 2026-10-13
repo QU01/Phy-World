@@ -1,0 +1,43 @@
+{
+ "source": "FaIR calibration data 1.6.0 (Smith, Zenodo record 18828694, concept 7112539, CC BY 4.0) for fair==2.2.4; HadCRUT5 5.1.0.0",
+ "downloaded": "2026-10-12",
+ "files": {
+  "calibrated_constrained_parameters.csv": {
+   "sha256": "42d20eec39567ebba037dd4710e278ba899bdda9670e911be215fa4772194f37",
+   "source": "Zenodo 10.5281/zenodo.18828694 (FaIR calibration data 1.6.0, CC BY 4.0)"
+  },
+  "species_configs_properties.csv": {
+   "sha256": "42943c5c670f068cc31f5bbffeda44b25817925a50140242add82d1344b2d648",
+   "source": "Zenodo 10.5281/zenodo.18828694 (FaIR calibration data 1.6.0, CC BY 4.0)"
+  },
+  "historical_emissions_1750-2023_cmip7.csv": {
+   "sha256": "5bca252fb402a79715d277dec9c3a3b25ce51f938136f9baf3b6d3ac687afe7d",
+   "source": "Zenodo 10.5281/zenodo.18828694 (FaIR calibration data 1.6.0, CC BY 4.0)"
+  },
+  "solar_forcing_timebounds_cmip7.csv": {
+   "sha256": "d9b7b487ca672b7f2dc80700cbc7f53715b87af7aafde3ec8e96c90a3e49be17",
+   "source": "Zenodo 10.5281/zenodo.18828694 (FaIR calibration data 1.6.0, CC BY 4.0)"
+  },
+  "volcanic_forcing_timebounds_cmip7.csv": {
+   "sha256": "c3f8b266e74fb99bb65859a00eeb23626dc58ec56fc8f0002efe0c2e279d20e6",
+   "source": "Zenodo 10.5281/zenodo.18828694 (FaIR calibration data 1.6.0, CC BY 4.0)"
+  },
+  "land_use_forcing_timebounds_cmip7.csv": {
+   "sha256": "436a6b5212bccb4134fcc5447b4ce9d557189d92576cfbf441195690264ba86c",
+   "source": "Zenodo 10.5281/zenodo.18828694 (FaIR calibration data 1.6.0, CC BY 4.0)"
+  },
+  "irrigation_forcing_timebounds_cmip7.csv": {
+   "sha256": "a6859b4ea5c0c84251e5914005e21b0408ebcaf2db39ae600db299c525495efe",
+   "source": "Zenodo 10.5281/zenodo.18828694 (FaIR calibration data 1.6.0, CC BY 4.0)"
+  },
+  "warming_baselines.csv": {
+   "sha256": "e23017b5eab3c88200ebe0507df1edd9a1903df849d3201b48c2c7070ee4116e",
+   "source": "Zenodo 10.5281/zenodo.18828694 (FaIR calibration data 1.6.0, CC BY 4.0)"
+  },
+  "hadcrut5_global_annual.csv": {
+   "sha256": "f5747520f993708ac4caa692ad1df89a4524329554c6dc6dd736dd28c77a3c8d",
+   "sha256_scope": "rows 1850-2023 only (the file is updated monthly)",
+   "source": "HadCRUT 5.1.0.0 global annual summary series (Met Office Hadley Centre / CRU, Open Government Licence v3)"
+  }
+ }
+}

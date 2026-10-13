@@ -1,0 +1,8 @@
+{
+ "source": "OWID energy-data (Energy Institute Statistical Review of World Energy, EIA, Ember) at commit f8de88a4f6f9cab44f1cf606047cbd6c4414042c (2026-10-01); UN regions from WPP 2024 UNlocations.txt",
+ "downloaded": "2026-10-12",
+ "files": {
+  "owid-energy-data.csv": {"sha256": "266f2e2baad7975351bc9bb4aa061d22b1da9fe4c47d51d2ac6071e01e171f76"},
+  "UNlocations.txt": {"sha256": "9d8cc77383c4dbd368a4c2cbbeeeff9dfc7037ace7c8ecb709ff17a0786be6eb"}
+ }
+}

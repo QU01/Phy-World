@@ -1,0 +1,425 @@
+{
+ "_doc": [
+  "World4 data-source registry (criterion W12).",
+  "mark: [V] verified by reading the licence or release note IN THIS SESSION; [S] assumed (prior knowledge or an agent report, source not opened); [?] unknown.",
+  "redistributable: true/false/null. null = unknown, which World4 treats as NO.",
+  "lag_years: years between the end of a data year and its publication. known_time(year) = 1 July of (year + lag_years). An assumption [S] unless stated; it stops a backtest from using what had not been published yet.",
+  "World4 vendors no third-party data: the Atlas files are installed from the Atlas repo (see atlas_manifest.json) and only their provenance is recorded here."
+ ],
+ "sources": {
+  "pwt": {
+   "name": "Penn World Table 10.01",
+   "license": "CC BY 4.0",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "10.01 (2023)",
+   "lag_years": 3,
+   "used_in": [
+    "panel",
+    "acciones",
+    "elites",
+    "comercio"
+   ]
+  },
+  "wdi": {
+   "name": "World Bank World Development Indicators",
+   "license": "CC BY 4.0",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "several (2021-12, 2023-10, 2025-07, 2026-04, 2026-07)",
+   "lag_years": 1,
+   "used_in": [
+    "panel",
+    "acciones",
+    "elites",
+    "comercio",
+    "clima",
+    "geopolitica",
+    "recursos"
+   ]
+  },
+  "ucdp": {
+   "name": "UCDP/PRIO Armed Conflict Dataset (via peacesciencer)",
+   "license": "CC BY 4.0",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "peacesciencer (CRAN)",
+   "lag_years": 1,
+   "used_in": [
+    "panel",
+    "geopolitica"
+   ]
+  },
+  "vdem": {
+   "name": "V-Dem v14",
+   "license": "CC BY-SA 4.0",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "v14 (2024-03)",
+   "lag_years": 1,
+   "used_in": [
+    "panel",
+    "demografia",
+    "geopolitica"
+   ]
+  },
+  "wid": {
+   "name": "World Inequality Database",
+   "license": "CC BY 4.0",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "bulk dump (copy at github.com/sandravizz/Global-Inequality-Data)",
+   "lag_years": 2,
+   "used_in": [
+    "elites"
+   ]
+  },
+  "swiid": {
+   "name": "SWIID 9.6 / 9.92 (Solt 2020)",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "9.6, 9.92",
+   "lag_years": 2,
+   "used_in": [
+    "elites",
+    "acciones"
+   ]
+  },
+  "barro_lee": {
+   "name": "Barro & Lee v3 (2021)",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "v3 2021",
+   "lag_years": 5,
+   "used_in": [
+    "elites"
+   ]
+  },
+  "wpp": {
+   "name": "UN World Population Prospects 2024",
+   "license": "CC BY 3.0 IGO",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "2024-07",
+   "lag_years": 1,
+   "used_in": [
+    "demografia",
+    "population (F1)"
+   ],
+   "note": "Years 2024+ are a PROJECTION published 2024-07, not data: known_time of all of them is 2024-07-11. F1 also reads the age-sex files of the R package PPgp/wpp2024 (wpp_manifest.json); their 1950-2023 estimates are revised history (revision leak not measured)."
+  },
+  "epr": {
+   "name": "Ethnic Power Relations 2021",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "2021",
+   "lag_years": 2,
+   "used_in": [
+    "demografia"
+   ]
+  },
+  "icow": {
+   "name": "ICOW Colonial History 1.1",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "1.1",
+   "lag_years": 0,
+   "used_in": [
+    "demografia"
+   ]
+  },
+  "peacesciencer_misc": {
+   "name": "CREG, HIEF, rivalries (via peacesciencer)",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "CRAN",
+   "lag_years": 2,
+   "used_in": [
+    "demografia"
+   ]
+  },
+  "wvs": {
+   "name": "WVS/EVS via OWID",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "OWID",
+   "lag_years": 3,
+   "used_in": [
+    "demografia"
+   ]
+  },
+  "owid_co2": {
+   "name": "OWID co2-data (Global Carbon Project 2024)",
+   "license": "CC BY 4.0 (OWID's; the underlying data keeps its own)",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "GCP 2024",
+   "lag_years": 1,
+   "used_in": [
+    "clima"
+   ]
+  },
+  "owid_energy": {
+   "name": "OWID energy-data (Energy Institute Statistical Review; EIA)",
+   "license": "CC BY 4.0 (OWID's); Energy Institute licence not verifiable",
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "OWID",
+   "lag_years": 1,
+   "used_in": [
+    "clima",
+    "recursos",
+    "energy (F3)"
+   ],
+   "note": "F3 pins OWID energy-data at commit f8de88a (energy_manifest.json): primary energy by source, Energy Institute breakdown for 79 countries, the rest imputed from electricity generation. Not vendored."
+  },
+  "emdat": {
+   "name": "EM-DAT (CRED/UCLouvain), public extract",
+   "license": "EM-DAT own terms",
+   "mark": "[S]",
+   "redistributable": false,
+   "vintage": "public extract",
+   "lag_years": 0,
+   "used_in": [
+    "clima"
+   ],
+   "note": "EM-DAT terms do not allow redistributing the data. Neither World4 nor the Atlas should publish it; see the F0 report."
+  },
+  "gfn": {
+   "name": "Global Footprint Network NFA 2018 / 2025",
+   "license": "CC BY-SA 4.0 (Public Data Package, per research report 02)",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "NFA 2018, NFA 2025",
+   "lag_years": 3,
+   "used_in": [
+    "clima"
+   ],
+   "note": "Share-alike: validation target only, in a separate directory."
+  },
+  "bhm_udel": {
+   "name": "Burke, Hsiang and Miguel (2015) replication data; U. Delaware v3.01",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "2015",
+   "lag_years": 2,
+   "used_in": [
+    "clima"
+   ]
+  },
+  "faostat_temp": {
+   "name": "FAOSTAT Temperature change on land (NASA GISTEMP)",
+   "license": "CC BY 4.0",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "FAOSTAT",
+   "lag_years": 1,
+   "used_in": [
+    "clima"
+   ]
+  },
+  "era5": {
+   "name": "Copernicus ERA5 via OWID",
+   "license": "Copernicus licence",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "OWID",
+   "lag_years": 1,
+   "used_in": [
+    "clima"
+   ]
+  },
+  "ndgain": {
+   "name": "Notre Dame ND-GAIN",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "",
+   "lag_years": 2,
+   "used_in": [
+    "clima"
+   ]
+  },
+  "gapminder": {
+   "name": "Gapminder fasttrack / open-numbers (UNEP-IRP; Hickel 2020; Harvard Growth Lab; WDI)",
+   "license": "CC BY 4.0 (Gapminder's); the underlying data keeps its own",
+   "mark": "[S]",
+   "redistributable": null,
+   "vintage": "open-numbers",
+   "lag_years": 2,
+   "used_in": [
+    "clima",
+    "comercio"
+   ]
+  },
+  "cow_trade": {
+   "name": "Correlates of War Dyadic Trade 4.0",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "4.0 (data to 2014)",
+   "lag_years": 3,
+   "used_in": [
+    "comercio"
+   ]
+  },
+  "growth_lab": {
+   "name": "Harvard Growth Lab (ECI)",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "",
+   "lag_years": 2,
+   "used_in": [
+    "comercio"
+   ]
+  },
+  "owid_fiscal": {
+   "name": "ICTD/UNU-WIDER GRD, IMF Public Finances in Modern History, OECD SOCX + Lindert, Tanzi and Schuknecht (via OWID)",
+   "license": "CC BY 4.0 (OWID's); the underlying data keeps its own",
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "OWID",
+   "lag_years": 2,
+   "used_in": [
+    "acciones"
+   ]
+  },
+  "sipri": {
+   "name": "SIPRI Military Expenditure Database via OWID",
+   "license": "SIPRI own terms",
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "OWID",
+   "lag_years": 1,
+   "used_in": [
+    "acciones"
+   ]
+  },
+  "macro_fin": {
+   "name": "Global Macro Database, IMF HPDD, Laeven-Valencia, Jorda-Schularick-Taylor",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "",
+   "lag_years": 1,
+   "used_in": [
+    "finanzas"
+   ]
+  },
+  "geopol": {
+   "name": "Powell and Thyne (coups), V-Dem RoW, Archigos, ATOP, WDI ODA",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "Powell-Thyne 2023-09",
+   "lag_years": 1,
+   "used_in": [
+    "geopolitica"
+   ]
+  },
+  "resources": {
+   "name": "OWID energy, reserves, giant fields, World Bank rents, nationalisations (Atlas curated table)",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "",
+   "lag_years": 1,
+   "used_in": [
+    "recursos"
+   ]
+  },
+  "fair_calibration": {
+   "name": "FaIR calibration data 1.6.0 (calibrated, constrained ensemble; CMIP7 historical emissions and forcings)",
+   "license": "CC BY 4.0",
+   "mark": "[V]",
+   "redistributable": true,
+   "vintage": "1.6.0 (2026-03-02), Zenodo 18828694",
+   "lag_years": 1,
+   "used_in": [
+    "climate (F4)"
+   ],
+   "note": "Licence read from the Zenodo record metadata in the F4 session (all versions of concept 7112539 are CC BY 4.0; resolves H17). The posterior was constrained with observed GMST up to 2023: climate parameters are in sample for any hindcast. Not vendored (climate_manifest.json)."
+  },
+  "hadcrut5": {
+   "name": "HadCRUT5 5.1.0.0 global annual mean surface temperature (Met Office Hadley Centre / CRU)",
+   "license": "Open Government Licence v3",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "5.1.0.0 (updated monthly; rows 1850-2023 pinned by SHA-256)",
+   "lag_years": 0,
+   "used_in": [
+    "climate (F4) validation"
+   ],
+   "note": "Truth for GMST in W3/W4. Not vendored (climate_manifest.json)."
+  },
+  "fair_package": {
+   "name": "FaIR simple climate model, Python package 2.2.4",
+   "license": "Apache-2.0",
+   "mark": "[V]",
+   "redistributable": true,
+   "vintage": "2.2.4 (PyPI)",
+   "lag_years": 0,
+   "used_in": [
+    "climate (F4)"
+   ],
+   "note": "Licence read from the installed package metadata in the F4 session. Software dependency (extra 'climate'); world4/sectors/_fair_step.py is derived from fair/fair.py (see NOTICE)."
+  },
+  "faostat_f5": {
+   "name": "FAOSTAT bulk files: QCL, RL, RFN, ESB, GT, FBSH, FBS",
+   "license": "CC BY 4.0 complemented by the FAO Statistical Database Terms of Use (no use in promoting a commercial enterprise)",
+   "mark": "[V]",
+   "redistributable": true,
+   "vintage": "bulk files downloaded 2026-10-12 (FAO update dates in food_manifest.json)",
+   "lag_years": 1,
+   "used_in": [
+    "food (F5)"
+   ],
+   "note": "Licence read on fao.org (Statistical Database Terms of Use) in the F5 session. FAOSTAT revises its history and replaces the bulk files without versions: the manifest pins SHA-256 and a different file is a different vintage. Not vendored."
+  },
+  "wdi_water": {
+   "name": "World Bank WDI ER.H2O.FWTL.K3 and ER.H2O.FWAG.ZS (from FAO AQUASTAT)",
+   "license": "CC BY 4.0",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "WDI 2026-10-08",
+   "lag_years": 2,
+   "used_in": [
+    "food (F5) water"
+   ],
+   "note": "Agricultural freshwater withdrawals; sparse (AQUASTAT reports every ~5 years). Not vendored."
+  }
+ },
+ "reference_models": {
+  "vensim_world3_03": {
+   "name": "Output of the Vensim World3-03 model (scenario 1), 5 variables, 1900-2100",
+   "via": "WorldDynamics.jl test/world3_03.jl @ 7315afe",
+   "license": "MIT (WorldDynamics.jl file)",
+   "mark": "[V]",
+   "redistributable": true,
+   "file": "tests/reference/world3_03_vensim.csv"
+  },
+  "pydynamo_world3_03": {
+   "name": "World3-03 equations in DYNAMO syntax (pydynamo)",
+   "via": "gitlab.telecom-paris.fr/software/pydynamo",
+   "license": "Unlicense (public domain)",
+   "mark": "[V]",
+   "redistributable": true,
+   "note": "Source of the L0 transcription. Its SIMULATION departs from Vensim by up to 12 % (DYNAMO .j timing and a >= switch in 1940), so it is NOT a numerical reference."
+  },
+  "pyworld3": {
+   "name": "pyworld3",
+   "license": "CeCILL 2.1",
+   "mark": "[V]",
+   "redistributable": null,
+   "note": "1974 version with different parameters and structure per its README. Neither used nor copied."
+  }
+ }
+}

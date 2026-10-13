@@ -1,0 +1,176 @@
+{
+ "commit": "9e96f6b9f470ca990213cd977762da6f440b283b",
+ "files": {
+  "data/processed/panel.csv": {
+   "bytes": 2480517,
+   "generated": false,
+   "sha256": "dcf39de704d8daf8cdafd816e05440c272bee15833864df7a4d5ec623c303bf9"
+  },
+  "data/processed/panel_full.csv": {
+   "bytes": 31641637,
+   "generated": true,
+   "sha256": "af82dfd187b15e35ea3e6106e4372b30063c0b90db4432471d82497ec87b1e5d"
+  },
+  "data/processed/sources/acciones.csv": {
+   "bytes": 3365329,
+   "generated": false,
+   "sha256": "35cb46b47a0f1d2735d58fb37e6d23e66c9573efc4f390f95ca87966440c7cce"
+  },
+  "data/processed/sources/acciones_dict.json": {
+   "bytes": 27937,
+   "generated": false,
+   "sha256": "07a12238b34ea02b73dd4ba8abfbf43ae81e310f8082a293273b4b43664ee7b4"
+  },
+  "data/processed/sources/clima.csv": {
+   "bytes": 9293272,
+   "generated": false,
+   "sha256": "aff5d6742d1a79e55e2a5864259f08457346db28325c0efedc47fd7a669d75ab"
+  },
+  "data/processed/sources/clima_dict.json": {
+   "bytes": 34401,
+   "generated": false,
+   "sha256": "d06207ff631675f35d4edde526cc76ad6e83b0d3008acbf611cfa08fcf864a44"
+  },
+  "data/processed/sources/clima_world.csv": {
+   "bytes": 72945,
+   "generated": false,
+   "sha256": "0d9a74a35bb4044352a9e276f30b8ffda475e3b95800afe1e52f60fc19600b79"
+  },
+  "data/processed/sources/comercio.csv": {
+   "bytes": 2640520,
+   "generated": false,
+   "sha256": "1b39c3b6f438e7098adb25918811b772cbae241a07472e3ae369b05f8a51c53d"
+  },
+  "data/processed/sources/comercio_dict.json": {
+   "bytes": 15613,
+   "generated": false,
+   "sha256": "10cbc4ab681496fba6b2cbce5205cdaededb5dfbfb1e3459b8c7077012629365"
+  },
+  "data/processed/sources/comercio_dyadic.csv.gz": {
+   "bytes": 4083718,
+   "generated": false,
+   "sha256": "3a1f8096fc97a906b367ca8bf087a284ca49b4447b78ac0ff398260293839a36"
+  },
+  "data/processed/sources/demografia.csv": {
+   "bytes": 6789690,
+   "generated": false,
+   "sha256": "2cdcadb9881238fc26d9153686077518a6e562fa83180093944873e72d73faf4"
+  },
+  "data/processed/sources/demografia_dict.json": {
+   "bytes": 15075,
+   "generated": false,
+   "sha256": "b4d280baf0cf38095ef412a38e6fbf07fd1a9d51c7a484a6cb62e83ca243ac87"
+  },
+  "data/processed/sources/elites.csv": {
+   "bytes": 2423181,
+   "generated": false,
+   "sha256": "b59b3a1e0abae51622c6269f695de4818e2b1c7bf903d8b8f809653574cc17b9"
+  },
+  "data/processed/sources/elites_dict.json": {
+   "bytes": 15805,
+   "generated": false,
+   "sha256": "2fe5eca621ec2a96bb696b617d865d928ca1caf2cda25a200d841f52b730f0ed"
+  },
+  "data/processed/sources/finanzas.csv": {
+   "bytes": 3360535,
+   "generated": false,
+   "sha256": "4b4dd5045cef93cece876e4e644135b98aa8c206cfe757834bd213081d4ca3de"
+  },
+  "data/processed/sources/finanzas_dict.json": {
+   "bytes": 11358,
+   "generated": false,
+   "sha256": "c67fd144586ea4f0c9060e42b455b5c71eae7f87c1cf409297fab7451f6558cb"
+  },
+  "data/processed/sources/finanzas_world.csv": {
+   "bytes": 13863,
+   "generated": false,
+   "sha256": "f351f067444ea771c0c1556bbeaaa37b22b7347dbd9c6393aef4bb478bf66387"
+  },
+  "data/processed/sources/geopolitica.csv": {
+   "bytes": 5857013,
+   "generated": false,
+   "sha256": "280da33afafd0276482588f6bcd32405c56fe2912eb395588214ca6e84e4256d"
+  },
+  "data/processed/sources/geopolitica_dict.json": {
+   "bytes": 22581,
+   "generated": false,
+   "sha256": "d3bfcce4c1f8bee4078b237cd3b512f9c968b0a94e390339aff1368fbc621dda"
+  },
+  "data/processed/sources/geopolitica_world.csv": {
+   "bytes": 25981,
+   "generated": false,
+   "sha256": "49c8d30f17351a762da4bda0fba729ef1e1a59187678e6c28d597e04a89dd035"
+  },
+  "data/processed/sources/recursos.csv": {
+   "bytes": 5331454,
+   "generated": false,
+   "sha256": "336030dfda94373b9cd8642cc30ee5a0e347b38b7c6cbce3d1f0a8589ac22e91"
+  },
+  "data/processed/sources/recursos_dict.json": {
+   "bytes": 33073,
+   "generated": false,
+   "sha256": "9b516ca201fd56a4648685e1d8883a865e3d5720388fa55f29aa8944ec0c152e"
+  },
+  "data/processed/sources/recursos_hubbert.csv": {
+   "bytes": 28691,
+   "generated": false,
+   "sha256": "6f39ed7b15509dfb13761f24ec50f3fb009f22621c673ba6b803763c0b14d737"
+  },
+  "data/processed/sources/recursos_world.csv": {
+   "bytes": 107286,
+   "generated": false,
+   "sha256": "a3b6d4efdfef5e534d87a63e41eff4d88309c1f6c3b78518c13de920846e44ce"
+  },
+  "data/processed/world_full.csv": {
+   "bytes": 224360,
+   "generated": false,
+   "sha256": "5edf74fe55852b5c2d12e3324555ef898539c65e0bfb6351d6aaa3bee4172c55"
+  },
+  "results/calibration.json": {
+   "bytes": 5610,
+   "generated": false,
+   "sha256": "dfcefc40932d7910ebebc67e7c1703dab652174e7f3cb7186db701c7ae17aafe"
+  },
+  "results/irl.json": {
+   "bytes": 4782,
+   "generated": false,
+   "sha256": "dc67bddd5e3443570a0a18b24d86f80ccf1c94fafb25be750bb4a74e71706813"
+  },
+  "results/rolling/params_1970.json": {
+   "bytes": 5007,
+   "generated": false,
+   "sha256": "ea400928d5087130653f4ab997473e47781b594a6bbdd408cc83292fccd434da"
+  },
+  "results/rolling/params_1980.json": {
+   "bytes": 5595,
+   "generated": false,
+   "sha256": "ad4bf01fd05d722089076bf218f0426b8f17924ae4f319b1ac6b30b647128ddc"
+  },
+  "results/rolling/params_1990.json": {
+   "bytes": 5660,
+   "generated": false,
+   "sha256": "0c4c5eed76a8fa08bce6b3eba4c357e56a7e608c547a12fecdcf5dbfb7bbe514"
+  },
+  "results/rolling/params_2000.json": {
+   "bytes": 5631,
+   "generated": false,
+   "sha256": "afb5f48183f2a118b9e44e13e14cd93376c550cebe76632d0b0298fb5633f58c"
+  },
+  "results/rolling/params_2010.json": {
+   "bytes": 5646,
+   "generated": false,
+   "sha256": "6685d4f5c27c5d9c72c1615e0e3fdc140095898c60e6136f80146cfdfb575874"
+  },
+  "results/summary.json": {
+   "bytes": 139435,
+   "generated": false,
+   "sha256": "64f20ae0f1f06ac28cc150da05eb1b6aa395907d8443938d357a9103da17381b"
+  },
+  "results/validation.json": {
+   "bytes": 30715,
+   "generated": false,
+   "sha256": "f71a0e70e711aa17bad843be6828537197a61fb2d2d8f9cde55f30e6976b836b"
+  }
+ },
+ "repo": "https://github.com/QU01/Reproducible-Research-Project-2"
+}

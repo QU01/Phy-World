@@ -1,0 +1,612 @@
+diff --git a/backend/app/services/prime_radiant/pipeline.py b/backend/app/services/prime_radiant/pipeline.py
+index 51f4f13..a779891 100644
+--- a/backend/app/services/prime_radiant/pipeline.py
++++ b/backend/app/services/prime_radiant/pipeline.py
+@@ -34,6 +34,7 @@ from .schemas import (
+     value_bin,
+ )
+ from .systemone import SystemOne, SystemOneError
++from .structural import runner as structural_runner
+ 
+ _logger = logging.getLogger(__name__)
+ # Re-asks an analyst whose answer cites evidence IDs that do not exist, before giving up.
+@@ -162,6 +163,7 @@ def create_question(
+     *,
+     numeric: dict | None = None,
+     conditions: list | None = None,
++    structural: dict | None = None,
+ ) -> dict:
+     """``options`` makes a multiple-choice question; ``numeric`` ({"unit", "edges"}) a numeric
+     one over ordered intervals; ``conditions`` ([{"question_id", "outcome"}]) a conditional one."""
+@@ -189,6 +191,7 @@ def create_question(
+             closes_at=closes_at,
+             created_at=now(),
+             conditions=_conditions(conditions),
++            structural=structural,
+             **kind,
+         )
+         Ledger(directory()).append("question_created", question.model_dump(mode="json"))
+@@ -555,6 +558,15 @@ async def forecast(
+             simulation_fields["distribution_simulation" if is_choice else "p_simulation"] = (
+                 simulation["frequencies"] if is_choice else simulation["frequencies"]["yes"]
+             )
++    # World4 (F0.5): estimador estructural experimental. Nunca aborta la corrida y ni los analistas
++    # ni Delphi lo ven; sólo d1 en una llamada contrafactual aparte (ver structural/__init__.py).
++    structural = None
++    structural_fields: dict = {}
++    structural_exp = None
++    if q.structural is not None and structural_runner.enabled():
++        step("structural")
++        structural, structural_fields = await structural_runner.estimate(q, as_of)
++        partial["structural"] = structural_fields.get("structural_diagnostics")
+     windows = [
+         [d.model_dump(mode="json") for d in docs if d.known_time >= as_of - timedelta(days=a.evidence_window_days)]
+         for a in config.analysts
+@@ -743,6 +755,22 @@ async def forecast(
+             warning = {"code": "sim_budget" if isinstance(exc, BudgetExceeded) else "sim_counterfactual_failed", "message": safe_text(exc)}
+             partial["simulation"]["failures"].append(warning)
+             simulation_fields["simulation_diagnostics"]["failures"] = partial["simulation"]["failures"]
++    if structural:
++        reference = baseline or decision
++        try:
++            budget.reserve(config.d1_runs * quote(d1_ref, d1=True, pricing=getattr(decision_engine, "pricing", None)))
++            structural_exp = await decision_engine.ensemble(
++                {**state, "structural": structural_runner.decision_input(structural)}, config.d1_runs,
++                **({"options": [(o.id, o.label + ": " + dump(definition)["options"][o.id]) for o in q.options]}
++                   if is_choice else {}),
++            )
++            if structural_exp["resolved_model"] != reference["resolved_model"]:
++                raise ValueError("d1 model changed between counterfactual calls")
++        except Exception as exc:
++            structural_exp = None
++            structural_fields["structural_diagnostics"]["counterfactual_failure"] = {
++                "code": "structural_budget" if isinstance(exc, BudgetExceeded) else "structural_counterfactual_failed",
++                "message": safe_text(exc)}
+     signature = digest(
+         {
+             "swarm_config_hash": config.fingerprint(simulation_feeds_d1=True),
+@@ -765,6 +793,11 @@ async def forecast(
+         **({"calibrator_guard": guard} if guard else {}),
+         **({"conditions": [c.model_dump(mode="json") for c in q.conditions], "premises": premises} if premises else {}),
+     }
++    if structural_exp is not None:
++        structural_fields["distribution_withstructural" if is_choice else "p_final_withstructural"] = (
++            structural_exp["distribution"] if is_choice else baseline_calibrator.apply(structural_exp["p"])
++        )
++        structural_fields["d1_withstructural"] = structural_exp
+     if baseline:
+         simulation_fields["distribution_nosim" if is_choice else "p_final_nosim"] = (
+             baseline["distribution"] if is_choice else baseline_calibrator.apply(baseline["p"])
+@@ -804,6 +837,7 @@ async def forecast(
+             "pipeline_version": "1.1",
+             **long_range,
+             **simulation_fields,
++            **structural_fields,
+         }
+     result = {
+         "question_id": q.id,
+@@ -828,6 +862,7 @@ async def forecast(
+         "pipeline_version": "1.0",
+         **long_range,
+         **simulation_fields,
++        **structural_fields,
+     }
+     return result
+ 
+diff --git a/backend/app/services/prime_radiant/schemas.py b/backend/app/services/prime_radiant/schemas.py
+index 17ef66f..ffe3fc5 100644
+--- a/backend/app/services/prime_radiant/schemas.py
++++ b/backend/app/services/prime_radiant/schemas.py
+@@ -44,6 +44,18 @@ def value_bin(edges: list[float], value: float) -> str:
+     return "b" + str(index)
+ 
+ 
++STRUCTURAL_EVENTS = ("conflict", "coup", "crisis", "democracy")
++STRUCTURAL_NUMERIC = ("gdp_pc_growth", "debt_gdp")
++
++
++class StructuralBinding(StrictModel):
++    """Enlace determinista con un observable de World4 (F0.5). Lo declara quien crea la pregunta;
++    ningún LLM lo propone en la v1. Ver ``structural/__init__.py``."""
++
++    variable: Literal["conflict", "coup", "crisis", "democracy", "gdp_pc_growth", "debt_gdp"]
++    region: str = Field(pattern=r"^[A-Z]{3}$")
++
++
+ class Question(StrictModel):
+     id: str
+     text: str = Field(min_length=5, max_length=4000)
+@@ -58,10 +70,20 @@ class Question(StrictModel):
+     edges: list[float] | None = None
+     # Conjunction of premises; the question is void when any of them fails (ADR 0014).
+     conditions: list[Condition] = Field(default_factory=list, max_length=2)
++    structural: StructuralBinding | None = None
+     outcome: Literal[0, 1] | str | None = None
+     outcome_value: float | None = Field(default=None, allow_inf_nan=False)
+     resolved_at: AwareDatetime | None = None
+ 
++    @model_validator(mode="after")
++    def consistent_structural(self):
++        if self.structural is not None:
++            numeric = self.structural.variable in STRUCTURAL_NUMERIC
++            if self.kind == "choice" or numeric != (self.kind == "numeric"):
++                raise ValueError("El enlace estructural no corresponde al tipo de pregunta: los eventos van en "
++                                 "binarias y las variables numéricas en numéricas.")
++        return self
++
+     @model_validator(mode="after")
+     def consistent_kind(self):
+         if len({c.question_id for c in self.conditions}) != len(self.conditions):
+diff --git a/backend/app/services/prime_radiant/evaluation.py b/backend/app/services/prime_radiant/evaluation.py
+index 2c6063a..79071fd 100644
+--- a/backend/app/services/prime_radiant/evaluation.py
++++ b/backend/app/services/prime_radiant/evaluation.py
+@@ -30,7 +30,8 @@ def ablation(rows: list[dict]) -> dict:
+     if not rows:
+         return {"n": 0, "models": {}, "note": "Sin preguntas resueltas."}
+     output = {}
+-    for name in ("p_final", "p_d1", "aggregate", "base_rate", "market", "p_simulation", "p_final_nosim", "p_final_withsim"):
++    for name in ("p_final", "p_d1", "aggregate", "base_rate", "market", "p_simulation", "p_final_nosim", "p_final_withsim",
++                 "p_structural", "base_rate_data", "p_final_withstructural"):
+         paired = [(r[name], r["outcome"]) for r in rows if r.get(name) is not None]
+         if paired:
+             output[name] = metrics([p for p, _ in paired], [y for _, y in paired])
+@@ -42,7 +43,8 @@ def ablation(rows: list[dict]) -> dict:
+     for name, pairs in analysts.items():
+         output["analyst:" + name] = metrics([p for p, _ in pairs], [y for _, y in pairs])
+     comparisons = {}
+-    for name in ("p_d1", "aggregate", "base_rate", "market", "p_simulation", "p_final_nosim", "p_final_withsim"):
++    for name in ("p_d1", "aggregate", "base_rate", "market", "p_simulation", "p_final_nosim", "p_final_withsim",
++                 "p_structural", "base_rate_data", "p_final_withstructural"):
+         paired = [r for r in rows if r.get("p_final") is not None and r.get(name) is not None]
+         if paired:
+             differences = np.asarray(
+diff --git a/backend/app/services/prime_radiant/choice.py b/backend/app/services/prime_radiant/choice.py
+index 70ae018..ea68df2 100644
+--- a/backend/app/services/prime_radiant/choice.py
++++ b/backend/app/services/prime_radiant/choice.py
+@@ -247,6 +247,8 @@ _ESTIMATORS = {
+     "p_simulation": "distribution_simulation",
+     "p_final_nosim": "distribution_nosim",
+     "p_final_withsim": "distribution_withsim",
++    "p_structural": "distribution_structural",
++    "p_final_withstructural": "distribution_withstructural",
+ }
+ 
+ 
+@@ -278,7 +280,8 @@ def ablation(rows: list[dict]) -> dict:
+         return sum((p - (1.0 if k == outcome else 0.0)) ** 2 for k, p in dist.items())
+ 
+     comparisons = {}
+-    for name in ("p_d1", "aggregate", "base_rate", "p_simulation", "p_final_nosim", "p_final_withsim"):
++    for name in ("p_d1", "aggregate", "base_rate", "p_simulation", "p_final_nosim", "p_final_withsim",
++                 "p_structural", "p_final_withstructural"):
+         field = _ESTIMATORS[name]
+         paired = [r for r in rows if r.get("distribution") and r.get(field)]
+         if paired:
+diff --git a/backend/app/routers/prime_radiant.py b/backend/app/routers/prime_radiant.py
+index a6a636e..1d9cac6 100644
+--- a/backend/app/routers/prime_radiant.py
++++ b/backend/app/routers/prime_radiant.py
+@@ -37,6 +37,12 @@ class ConditionRequest(BaseModel):
+     outcome: Literal[0, 1] | str
+ 
+ 
++class StructuralRequest(BaseModel):
++    # Enlace con World4 (F0.5): evento en binarias, variable en numéricas; región ISO3.
++    variable: Literal["conflict", "coup", "crisis", "democracy", "gdp_pc_growth", "debt_gdp"]
++    region: str = Field(pattern=r"^[A-Z]{3}$")
++
++
+ class QuestionRequest(BaseModel):
+     text: str = Field(min_length=5, max_length=4000)
+     rules: str = Field(min_length=5, max_length=12000)
+@@ -45,6 +51,7 @@ class QuestionRequest(BaseModel):
+     options: list[OptionRequest] | None = Field(default=None, max_length=12)
+     numeric: NumericRequest | None = None
+     conditions: list[ConditionRequest] | None = Field(default=None, max_length=2)
++    structural: StructuralRequest | None = None
+ 
+ 
+ class LaunchRequest(BaseModel):
+@@ -94,6 +101,7 @@ def create(body: QuestionRequest):
+         pipeline.create_question, body.text, body.rules, body.closes_at, options,
+         numeric=body.numeric.model_dump() if body.numeric else None,
+         conditions=[c.model_dump() for c in body.conditions] if body.conditions else None,
++        structural=body.structural.model_dump() if body.structural else None,
+     )
+ 
+ 
+diff --git a/backend/app/services/prime_radiant/structural/__init__.py b/backend/app/services/prime_radiant/structural/__init__.py
+new file mode 100644
+index 0000000..2e384fa
+--- /dev/null
++++ b/backend/app/services/prime_radiant/structural/__init__.py
+@@ -0,0 +1,19 @@
++"""Estimador estructural World4 / Phy-World para Prime Radiant (F0.5, borrador de ADR 0016).
++
++World4 es la "capa cliodinámica" que el ADR 0013 dejaba fuera. Entra en el circuito con el
++mismo patrón que el simulador de actores:
++
++* Etapa ``structural`` después de la evidencia. Sólo corre si la bandera
++  ``QUASAR_PR_STRUCTURAL_ENABLED=1`` está puesta y la pregunta trae un enlace explícito
++  (``Question.structural``). En la v1 el enlace no lo propone ningún LLM.
++* Los analistas y Delphi NO la reciben. d1 se ejecuta otra vez CON el bloque y se guarda como
++  ``p_final_withstructural``; el pronóstico publicado sigue siendo el de sin bloque.
++* ``validation.gate()`` decide si alguna vez alimenta a d1 (W9b); en F0.5 devuelve siempre falso.
++* World4 corre en su propio entorno (versiones fijadas para su paridad bit a bit) y se llama
++  por subproceso: ``QUASAR_PR_WORLD4_PYTHON`` y ``QUASAR_PR_WORLD4_DIR``.
++* Un fallo de World4 nunca aborta la corrida: queda en ``structural_diagnostics``.
++
++Por qué la configuración no entra en ``SwarmConfig``: su huella identifica al calibrador y se
++recalcula para normalizar filas antiguas del ledger. Mientras World4 no alimente a d1 no cambia
++la procedencia del estimador publicado, y meterla ahí cambiaría todas las huellas existentes.
++"""
+diff --git a/backend/app/services/prime_radiant/structural/runner.py b/backend/app/services/prime_radiant/structural/runner.py
+new file mode 100644
+index 0000000..2bc4ba9
+--- /dev/null
++++ b/backend/app/services/prime_radiant/structural/runner.py
+@@ -0,0 +1,117 @@
++"""Llamada a World4 por subproceso y traducción de su respuesta al circuito de Prime Radiant."""
++
++from __future__ import annotations
++
++import asyncio
++import json
++import os
++import subprocess
++import time
++from datetime import datetime
++from pathlib import Path
++
++DIAGNOSTICS = {
++    "unbound": "structural_unbound",
++    "out_of_domain": "structural_out_of_domain",
++    "asof_violation": "structural_asof_violation",
++    "unavailable": "structural_unavailable",
++    "timeout": "structural_timeout",
++    "error": "structural_unavailable",
++}
++
++
++def enabled() -> bool:
++    return os.environ.get("QUASAR_PR_STRUCTURAL_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
++
++
++def settings() -> dict:
++    return {
++        "python": os.environ.get("QUASAR_PR_WORLD4_PYTHON", ""),
++        "dir": os.environ.get("QUASAR_PR_WORLD4_DIR", ""),
++        "timeout_s": float(os.environ.get("QUASAR_PR_WORLD4_TIMEOUT_S", "120")),
++    }
++
++
++def request_for(q, as_of: datetime) -> dict:
++    b = q.structural
++    req = {"variable": b.variable, "region": b.region, "as_of": as_of.date().isoformat(),
++           "closes_at": q.closes_at.date().isoformat(), "kind": "numeric" if q.kind == "numeric" else "binary"}
++    if q.kind == "numeric":
++        req["edges"] = list(q.edges or [])
++    return req
++
++
++def _call(req: dict, cfg: dict) -> dict:
++    py, root = cfg["python"], cfg["dir"]
++    if not py or not root or not Path(py).is_file() or not (Path(root) / "world4_cli.py").is_file():
++        return {"status": "unavailable",
++                "message": "World4 not configured: set QUASAR_PR_WORLD4_PYTHON and QUASAR_PR_WORLD4_DIR"}
++    try:
++        proc = subprocess.run(
++            [py, str(Path(root) / "world4_cli.py"), "--structural", "-"],
++            input=json.dumps(req), capture_output=True, text=True, encoding="utf-8",
++            timeout=cfg["timeout_s"], cwd=root,
++        )
++    except subprocess.TimeoutExpired:
++        return {"status": "timeout", "message": f"World4 took more than {cfg['timeout_s']:g} s"}
++    lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
++    try:
++        out = json.loads(lines[-1])
++    except (IndexError, json.JSONDecodeError):
++        return {"status": "error", "message": f"World4 exit {proc.returncode}: {proc.stderr[-500:]}"}
++    if not isinstance(out, dict) or "status" not in out:
++        return {"status": "error", "message": "World4 answered without a status"}
++    return out
++
++
++def _valid(out: dict, q) -> str | None:
++    """Comprueba la forma de un bloque 'ok' antes de dejarlo entrar en el resultado."""
++    if q.kind == "numeric":
++        dist = out.get("distribution")
++        ids = q.option_ids()
++        if not isinstance(dist, dict) or set(dist) != set(ids):
++            return "distribution does not match the question's intervals"
++        if any(not 0 <= v <= 1 for v in dist.values()) or abs(sum(dist.values()) - 1) > 1e-6:
++            return "invalid distribution"
++    else:
++        p = out.get("p")
++        if not isinstance(p, (int, float)) or not 0 <= p <= 1:
++            return "invalid probability"
++    return None
++
++
++async def estimate(q, as_of: datetime) -> tuple[dict | None, dict]:
++    """(bloque o None, campos para el resultado). Nunca lanza: el circuito sigue sin World4."""
++    t = time.monotonic()
++    if q.kind == "choice":
++        out = {"status": "unbound", "message": "World4 answers binary and numeric questions only"}
++    else:
++        out = await asyncio.to_thread(_call, request_for(q, as_of), settings())
++    seconds = round(time.monotonic() - t, 2)
++    status = out.get("status", "error")
++    if status == "ok":
++        problem = _valid(out, q)
++        if problem:
++            status, out = "error", {"status": "error", "message": problem}
++    diag = {"status": status, "code": None if status == "ok" else DIAGNOSTICS.get(status, "structural_unavailable"),
++            "message": out.get("message"), "seconds": seconds, "feeds_d1": False}
++    if status != "ok":
++        return None, {"structural_diagnostics": diag}
++    fields = {"structural": out, "structural_diagnostics": diag, "structural_feeds_d1": False}
++    if q.kind == "numeric":
++        fields["distribution_structural"] = out["distribution"]
++    else:
++        fields["p_structural"] = float(out["p"])
++        if out.get("base_rate_data"):
++            fields["base_rate_data"] = float(out["base_rate_data"]["p_window"])
++    return out, fields
++
++
++def decision_input(block: dict) -> dict:
++    """Lo que ve d1: la estimación, su dominio y sus límites; nunca la procedencia interna."""
++    keep = ("variable", "what", "region", "window", "origin", "k", "exploratory", "caveats", "p", "p_raw",
++            "distribution", "quantiles", "unit", "calibrator", "base_rate_data")
++    out = {k: block[k] for k in keep if k in block}
++    out["note"] = ("Structural model (World4 / Phy-World): an agent-based world-system model, recalibrated on "
++                   "past questions known at as_of. Treat it as one more estimator, not as evidence.")
++    return out
+diff --git a/backend/app/services/prime_radiant/structural/validation.py b/backend/app/services/prime_radiant/structural/validation.py
+new file mode 100644
+index 0000000..838524d
+--- /dev/null
++++ b/backend/app/services/prime_radiant/structural/validation.py
+@@ -0,0 +1,35 @@
++"""W9b: la compuerta que decidiría si World4 alimenta a d1. En F0.5 nunca abre.
++
++Mismo contrato que ``simulation/validation.gate``: se recalcula desde las filas resueltas, nunca
++desde una bandera guardada. Abriría con N >= 30 preguntas resueltas que tengan d1 con y sin el
++bloque estructural y un IC95 bootstrap de la diferencia de Brier enteramente negativo. Aunque
++abriera, F0.5 no lo usa: alimentar a d1 exige meter World4 en la huella de calibración (F11).
++"""
++
++from __future__ import annotations
++
++import numpy as np
++
++MIN_N = 30
++
++
++def assess(rows: list[dict]) -> dict:
++    pairs = [(r["p_final_withstructural"], r["p_final"], r["outcome"]) for r in rows
++             if r.get("p_final_withstructural") is not None and r.get("p_final") is not None
++             and r.get("outcome") in (0, 1)]
++    out = {"n": len(pairs), "min_n": MIN_N, "passed": False}
++    if len(pairs) < MIN_N:
++        out["reason"] = f"W9b needs >= {MIN_N} resolved questions with d1 with and without World4; has {len(pairs)}"
++        return out
++    d = np.asarray([(w - y) ** 2 - (p - y) ** 2 for w, p, y in pairs])
++    rng = np.random.default_rng(42)
++    samples = [float(d[rng.integers(0, len(d), len(d))].mean()) for _ in range(2000)]
++    ci = np.quantile(samples, [0.025, 0.975]).tolist()
++    out.update(brier_delta=float(d.mean()), delta_ci95=ci, passed=bool(ci[1] < 0))
++    out["reason"] = "CI excludes 0" if out["passed"] else "CI includes 0"
++    return out
++
++
++def gate(rows: list[dict] | None = None) -> bool:
++    """F0.5: siempre False. ``assess`` informa; la promoción es una decisión de F11."""
++    return False
+diff --git a/backend/tests/test_prime_radiant_structural.py b/backend/tests/test_prime_radiant_structural.py
+new file mode 100644
+index 0000000..16e8e77
+--- /dev/null
++++ b/backend/tests/test_prime_radiant_structural.py
+@@ -0,0 +1,198 @@
++"""F0.5: estimador estructural World4 en Prime Radiant (borrador de ADR 0016)."""
++import asyncio
++import json
++import os
++import sys
++import textwrap
++from datetime import timedelta
++from pathlib import Path
++
++import pytest
++
++from app.services.prime_radiant import evaluation, pipeline
++from app.services.prime_radiant.clock import now
++from app.services.prime_radiant.schemas import Question, StructuralBinding
++from app.services.prime_radiant.structural import runner, validation
++from tests.test_prime_radiant_pipeline import setup  # noqa: F401  (fixture con proveedores falsos)
++
++BLOCK = {"status": "ok", "variable": "conflict", "what": "armed conflict", "region": "COL", "kind": "binary",
++         "as_of": "2026-10-11", "window": [2027, 2028], "origin": 2019, "k": [8, 9], "live": True,
++         "exploratory": True, "caveats": ["origin 2019"], "p_raw": 0.66, "p": 0.71,
++         "calibrator": {"kind": "isotonic", "n": 900},
++         "base_rate_data": {"status": "ok", "p_window": 0.9, "p_year": 0.69, "reference_class": "COL"},
++         "provenance": {"model_revision": 1}}
++
++
++def fake_world4(tmp_path, answer: dict | str, sleep: float = 0.0) -> Path:
++    root = tmp_path / "w4"
++    root.mkdir()
++    payload = answer if isinstance(answer, str) else json.dumps(answer)
++    (root / "world4_cli.py").write_text(textwrap.dedent(f"""
++        import json, sys, time
++        req = json.loads(sys.stdin.read())
++        time.sleep({sleep})
++        open(r"{(root / 'last_request.json').as_posix()}", "w").write(json.dumps(req))
++        print({payload!r})
++    """), encoding="utf-8")
++    return root
++
++
++@pytest.fixture
++def world4(tmp_path, monkeypatch):
++    def configure(answer, sleep=0.0, timeout=30):
++        root = fake_world4(tmp_path, answer, sleep)
++        monkeypatch.setenv("QUASAR_PR_STRUCTURAL_ENABLED", "1")
++        monkeypatch.setenv("QUASAR_PR_WORLD4_PYTHON", sys.executable)
++        monkeypatch.setenv("QUASAR_PR_WORLD4_DIR", str(root))
++        monkeypatch.setenv("QUASAR_PR_WORLD4_TIMEOUT_S", str(timeout))
++        return root
++    return configure
++
++
++def question(**kw):
++    base = dict(id="s" * 32, text="Will there be armed conflict in Colombia?", rules="UCDP/PRIO counts.",
++                closes_at=now() + timedelta(days=800), created_at=now())
++    return Question(**{**base, **kw})
++
++
++# ------------------------------------------------------------------ enlace
++def test_binding_must_match_question_kind():
++    question(structural={"variable": "conflict", "region": "COL"})
++    with pytest.raises(ValueError):
++        question(structural={"variable": "gdp_pc_growth", "region": "COL"})
++    with pytest.raises(ValueError):
++        StructuralBinding(variable="conflict", region="col")
++
++
++def test_old_questions_without_binding_still_load():
++    assert question().structural is None
++
++
++# ------------------------------------------------------------------ runner
++def test_unconfigured_world4_is_a_diagnostic_not_an_error(monkeypatch):
++    monkeypatch.delenv("QUASAR_PR_WORLD4_PYTHON", raising=False)
++    block, fields = asyncio.run(runner.estimate(question(structural={"variable": "conflict", "region": "COL"}), now()))
++    assert block is None and fields["structural_diagnostics"]["code"] == "structural_unavailable"
++
++
++def test_ok_block_becomes_estimators(world4):
++    root = world4(BLOCK)
++    q = question(structural={"variable": "conflict", "region": "COL"})
++    block, fields = asyncio.run(runner.estimate(q, now()))
++    assert block["p"] == 0.71 and fields["p_structural"] == 0.71 and fields["base_rate_data"] == 0.9
++    assert fields["structural_feeds_d1"] is False
++    sent = json.loads((root / "last_request.json").read_text())
++    assert sent["variable"] == "conflict" and sent["region"] == "COL" and sent["kind"] == "binary"
++
++
++@pytest.mark.parametrize("status,code", [("out_of_domain", "structural_out_of_domain"),
++                                         ("asof_violation", "structural_asof_violation"),
++                                         ("unbound", "structural_unbound")])
++def test_world4_refusals_are_named(world4, status, code):
++    world4({"status": status, "message": "why"})
++    block, fields = asyncio.run(runner.estimate(question(structural={"variable": "conflict", "region": "COL"}), now()))
++    assert block is None and fields["structural_diagnostics"]["code"] == code
++
++
++def test_malformed_answers_rejected(world4):
++    world4({**BLOCK, "p": 1.7})
++    block, fields = asyncio.run(runner.estimate(question(structural={"variable": "conflict", "region": "COL"}), now()))
++    assert block is None and fields["structural_diagnostics"]["status"] == "error"
++
++
++def test_timeout(world4):
++    world4(BLOCK, sleep=3, timeout=0.5)
++    block, fields = asyncio.run(runner.estimate(question(structural={"variable": "conflict", "region": "COL"}), now()))
++    assert block is None and fields["structural_diagnostics"]["code"] == "structural_timeout"
++
++
++def test_numeric_distribution_must_match_the_intervals(world4):
++    edges = [0.0, 2.0, 4.0]
++    from app.services.prime_radiant.schemas import bin_options
++    q = question(kind="numeric", unit="%", edges=edges, options=bin_options(edges, "%"),
++                 structural={"variable": "gdp_pc_growth", "region": "COL"})
++    world4({**BLOCK, "kind": "numeric", "distribution": {"b0": 0.2, "b1": 0.3, "b2": 0.5}})   # falta b3
++    block, fields = asyncio.run(runner.estimate(q, now()))
++    assert block is None and fields["structural_diagnostics"]["status"] == "error"
++
++
++def test_decision_input_hides_provenance():
++    shown = runner.decision_input(BLOCK)
++    assert "provenance" not in shown and shown["p"] == 0.71 and "note" in shown
++
++
++# ------------------------------------------------------------------ circuito completo
++def test_pipeline_keeps_published_forecast_and_records_counterfactual(setup, world4):  # noqa: F811
++    config, captured = setup
++    world4(BLOCK)
++    q = question(structural={"variable": "conflict", "region": "COL"})
++    result = asyncio.run(pipeline.forecast(q, config, now()))
++    assert result["p_final"] == 0.6                          # lo publicado no cambia (la compuerta no abre)
++    assert result["p_structural"] == 0.71 and result["base_rate_data"] == 0.9
++    assert result["p_final_withstructural"] == 0.6 and result["d1_withstructural"]["resolved_model"] == "d1-resolved"
++    d1_states = [data for role, _, data in captured if role == "d1"]
++    assert len(d1_states) == 2 and "structural" not in d1_states[0] and "structural" in d1_states[1]
++    for role, _, data in captured:
++        if role in ("analyst", "delphi", "redteam"):
++            assert "structural" not in json.dumps(data, default=str)
++    assert result["structural_diagnostics"]["feeds_d1"] is False
++
++
++def test_pipeline_survives_world4_failure(setup, monkeypatch):  # noqa: F811
++    config, captured = setup
++    monkeypatch.setenv("QUASAR_PR_STRUCTURAL_ENABLED", "1")
++    monkeypatch.delenv("QUASAR_PR_WORLD4_PYTHON", raising=False)
++    result = asyncio.run(pipeline.forecast(question(structural={"variable": "conflict", "region": "COL"}), config, now()))
++    assert result["p_final"] == 0.6 and "p_structural" not in result
++    assert result["structural_diagnostics"]["code"] == "structural_unavailable"
++    assert sum(1 for role, *_ in captured if role == "d1") == 1
++
++
++def test_flag_off_means_no_stage(setup, world4, monkeypatch):  # noqa: F811
++    config, captured = setup
++    world4(BLOCK)
++    monkeypatch.setenv("QUASAR_PR_STRUCTURAL_ENABLED", "0")
++    result = asyncio.run(pipeline.forecast(question(structural={"variable": "conflict", "region": "COL"}), config, now()))
++    assert "structural_diagnostics" not in result
++
++
++def test_create_question_stores_binding(setup):  # noqa: F811
++    q = pipeline.create_question("Will there be armed conflict in Colombia?", "UCDP/PRIO counts.",
++                                 now() + timedelta(days=400), structural={"variable": "conflict", "region": "COL"})
++    assert q["structural"] == {"variable": "conflict", "region": "COL"}
++    assert pipeline.get_question(q["id"]).structural.region == "COL"
++
++
++# ------------------------------------------------------------------ evaluación y compuerta
++def test_gate_never_opens_in_f05():
++    rows = [{"p_final_withstructural": 0.1, "p_final": 0.9, "outcome": 0}] * 50
++    assert validation.assess(rows)["passed"] is True
++    assert validation.gate(rows) is False
++
++
++def test_assess_needs_thirty():
++    assert validation.assess([{"p_final_withstructural": 0.1, "p_final": 0.2, "outcome": 0}] * 5)["passed"] is False
++
++
++def test_ablation_reports_structural_estimators():
++    rows = [{"p_final": 0.6, "p_structural": 0.7, "base_rate_data": 0.5, "p_final_withstructural": 0.65,
++             "outcome": 1, "analysts": []}] * 3
++    out = evaluation.ablation(rows)
++    assert {"p_structural", "base_rate_data", "p_final_withstructural"} <= set(out["models"])
++
++
++# ------------------------------------------------------------------ integración con el World4 real
++W4_DIR = Path(os.environ.get("W4_TEST_DIR", r"C:\Users\nickv\projects\Proyectos\World4\Quasar-World4"))
++W4_PY = W4_DIR / ".venv" / "Scripts" / "python.exe"
++
++
++@pytest.mark.skipif(not (W4_PY.is_file() and (W4_DIR / "data_cache" / "structural" / "store_v1.npz").is_file()),
++                    reason="World4 real no instalado en esta máquina")
++def test_real_world4_answers(monkeypatch):
++    monkeypatch.setenv("QUASAR_PR_STRUCTURAL_ENABLED", "1")
++    monkeypatch.setenv("QUASAR_PR_WORLD4_PYTHON", str(W4_PY))
++    monkeypatch.setenv("QUASAR_PR_WORLD4_DIR", str(W4_DIR))
++    q = question(closes_at=now().replace(year=2027, month=12, day=31), structural={"variable": "conflict", "region": "COL"})
++    block, fields = asyncio.run(runner.estimate(q, now()))
++    assert fields["structural_diagnostics"]["status"] == "ok", fields
++    assert 0 < block["p"] < 1 and block["origin"] == 2019 and block["exploratory"] in (True, False)

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quasar-phy-world"
+version = "0.0.1"
+description = "Phy-World (World4): World3-03 biophysical core + 180-country world-system agents, with declared limits"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.11"
+# Versiones fijadas: la paridad W2 con el Atlas es bit a bit y depende de ellas.
+dependencies = [
+  "numpy==2.4.6",
+  "scipy==1.17.1",
+  "pandas==3.0.6",
+  "statsmodels==0.15.0",
+  "phycore @ git+https://github.com/QU01/Quasar-Phycore.git@c92a6e13eafc21ce24227e33dce7e610ade60df9",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+# F1: convertir los .rda de WPP 2024 por edad y sexo (--install-wpp); leer el .npz no lo necesita
+wpp = ["rdata==1.1.0"]
+# F4: el modelo de clima FaIR (Apache-2.0); con su conjunto calibrado 1.6.0 (--install-climate)
+climate = ["fair==2.2.4"]
+# F8 (opcional): EMA Workbench (BSD-3, verificada en su LICENSE) como referencia de PRIM; World4 trae el suyo
+dmdu = ["ema_workbench==2.5.3"]
+# F8 (opcional): el PPO anclado del Atlas (recommend.py, rl.py); World4 sólo usa su problema inverso
+rl = ["autograd==1.7.0"]
+# reconstruir el panel del Atlas desde las fuentes (no forma parte de F0)
+rebuild = ["rdata==1.1.0", "country_converter==1.3.2", "pycountry==26.2.16", "openpyxl==3.1.5"]
+
+[project.scripts]
+world4 = "world4.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["world4*"]
+
+[tool.setuptools.package-data]
+"world4.data" = ["*.json", "reference/*"]
+"world4" = ["models/*.npz"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

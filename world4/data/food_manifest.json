@@ -1,0 +1,60 @@
+{
+ "source": "FAOSTAT (QCL, RL, RFN, ESB, GT, FBSH, FBS) and WDI water withdrawals",
+ "downloaded": "2026-10-12",
+ "files": {
+  "Production_Crops_Livestock_E_All_Data_(Normalized).zip": {
+   "sha256": "c5835418c18f9322e7decbd6800f93a216eaae3cdfa31acb08f0518c0c6d6853",
+   "dataset": "QCL",
+   "fao_date_update": "2025-12-31",
+   "source": "FAOSTAT bulk download (CC BY 4.0 + FAO database terms)"
+  },
+  "Inputs_LandUse_E_All_Data_(Normalized).zip": {
+   "sha256": "39b739fbfb694971207a2efa572c41e8de2386fc5cb33caaf2a188e9c9a6ca3f",
+   "dataset": "RL",
+   "fao_date_update": "2026-10-02",
+   "source": "FAOSTAT bulk download (CC BY 4.0 + FAO database terms)"
+  },
+  "Inputs_FertilizersNutrient_E_All_Data_(Normalized).zip": {
+   "sha256": "6cf684dd5366d96fd8554b626dd3a60d57f8ac5c8a7775394334d52ec3a498ae",
+   "dataset": "RFN",
+   "fao_date_update": "2026-07-30",
+   "source": "FAOSTAT bulk download (CC BY 4.0 + FAO database terms)"
+  },
+  "Environment_Cropland_nutrient_budget_E_All_Data_(Normalized).zip": {
+   "sha256": "b2013fdafb1a35ef8b467abea45bc4d195a9a7559e78d183059ca98db5b6111e",
+   "dataset": "ESB",
+   "fao_date_update": "2025-12-05",
+   "source": "FAOSTAT bulk download (CC BY 4.0 + FAO database terms)"
+  },
+  "Emissions_Totals_E_All_Data_(Normalized).zip": {
+   "sha256": "d2c47e116553711f7c2fd6b62437db511038fd9bd9ec77815fa69ff7a18a89a9",
+   "dataset": "GT",
+   "fao_date_update": "2025-10-28",
+   "source": "FAOSTAT bulk download (CC BY 4.0 + FAO database terms)"
+  },
+  "FoodBalanceSheetsHistoric_E_All_Data_(Normalized).zip": {
+   "sha256": "925bac969ea3904eca1a33f0b3d7ea4416bbac79d14db50b0db43cd2a77a3adb",
+   "dataset": "FBSH",
+   "fao_date_update": "2023-03-10",
+   "source": "FAOSTAT bulk download (CC BY 4.0 + FAO database terms)"
+  },
+  "FoodBalanceSheets_E_All_Data_(Normalized).zip": {
+   "sha256": "26200855ed5da3d0805e34219124e241d0e0bc6959d0995ebc77a10dd84cbaf1",
+   "dataset": "FBS",
+   "fao_date_update": "2025-10-28",
+   "source": "FAOSTAT bulk download (CC BY 4.0 + FAO database terms)"
+  },
+  "wdi_ER.H2O.FWAG.ZS.json": {
+   "sha256": "000d8b8d7c66f3f5e977dfd427983749291a14e8d0a41df0da08413b94c98f4b",
+   "indicator": "ER.H2O.FWAG.ZS",
+   "wdi_lastupdated": "2026-10-08",
+   "source": "World Bank WDI API (CC BY 4.0), from AQUASTAT"
+  },
+  "wdi_ER.H2O.FWTL.K3.json": {
+   "sha256": "597cc9ea296f19c4c2f2a3be3be4b5a1a35ecc50c20960f10ee4d7b0e4496da7",
+   "indicator": "ER.H2O.FWTL.K3",
+   "wdi_lastupdated": "2026-10-08",
+   "source": "World Bank WDI API (CC BY 4.0), from AQUASTAT"
+  }
+ }
+}
