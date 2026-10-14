@@ -1,0 +1,3742 @@
+diff --git a/Phy-Models/manifests/world4.json b/Phy-Models/manifests/world4.json
+new file mode 100644
+--- /dev/null
++++ b/Phy-Models/manifests/world4.json
+@@ -0,0 +1,141 @@
++{
++  "id": "world4",
++  "nombre": "Phy-World (World4)",
++  "descripcion": "World3-03 biophysical core + 180 countries acting as agents of the world-system: policy scenarios and robust policy search with declared limits, explorable on a 3D globe",
++  "domain": "society.world_system",
++  "dir": "World4",
++  "cli": "world4_cli.py",
++  "api_base": "/api/phy-models/world4",
++  "repo": "https://github.com/QU01/Quasar-World4.git",
++  "branch": "main",
++  "convention": "submodule",
++  "convention_note": "F10 (2026-10-13): the repo QU01/Quasar-World4 is not published yet. On the founder's machine Phy-Models/World4 is a directory junction to Proyectos/World4/Quasar-World4 (excluded in .git/info/exclude, never committed); `git submodule add` happens when the repo is published.",
++  "modules": [
++    "world4.studio_compat",
++    "world4.explorer"
++  ],
++  "modules_note": "Everything lives under the world4. namespace and there is no physics_core.py at the root, so World4 cannot collide in sys.modules with the rest of the family (roadmap §5.5).",
++  "physics_module": "world4.studio_compat",
++  "optimizer_module": null,
++  "engine": "phycore",
++  "engine_note": "The robust search is world4.scenarios.robust.design = phycore.Designer (NSGA-II) over the L0 ensemble. It runs with the phycore pinned by Studio's requirements.txt (measured 2026-10-13: 120 L0 ensemble evaluations, 42 verified policies).",
++  "fidelities": [
++    "L0",
++    "L1",
++    "L2"
++  ],
++  "fidelity_table": {
++    "L0": "L0",
++    "L1": "L1",
++    "L2": "L2"
++  },
++  "fidelity_labels": {
++    "L0": "L0 — regional core to 2100",
++    "L1": "L1 — + 180 country agents (2019-2029)",
++    "L2": "L2 — emulators"
++  },
++  "excluded_fidelities": {
++    "L2": "World4 has no separate L2: its emulators (FaIR v2.2.4, the crop equations) are already coupled inside the L1 since F4/F5. The CLI degrades --fidelity L2 to L1 with a notice; Studio does not offer it."
++  },
++  "budgets": {
++    "quick": {
++      "n_init": 40,
++      "rounds": 2,
++      "batch_size": 40
++    },
++    "full": {
++      "n_init": 60,
++      "rounds": 3,
++      "batch_size": 40
++    }
++  },
++  "budgets_note": "Only the design family uses the budget (phycore.Designer: n_init + rounds x 40 L0 ensemble evaluations; batch_size is the 40 verified per round, declared for the cost estimator). A scenario run is one ensemble evaluation plus PRIM and the explorer data.",
++  "families": [
++    "scenario",
++    "design"
++  ],
++  "spec_fields": {
++    "scenario": [
++      {"name": "carbon_price", "label": "Carbon price (world, revenue recycled)", "type": "number", "unit": "USD/tCO2", "default": 0.0},
++      {"name": "renewables", "label": "Public investment in non-fossil deployment", "type": "number", "unit": "share of GDP", "default": 0.0},
++      {"name": "efficiency", "label": "Energy-efficiency investment", "type": "number", "unit": "share of GDP", "default": 0.0},
++      {"name": "agri_rd", "label": "Agricultural R&D and extension", "type": "number", "unit": "share of GDP", "default": 0.0},
++      {"name": "aid", "label": "Aid NAM, EUR, OPA -> SSA, SAS (as capital; half arrives)", "type": "number", "unit": "share of donor GDP", "default": 0.0},
++      {"name": "fertility", "label": "Girls' education and family planning in SSA, SAS, MEA", "type": "number", "unit": "share of GDP", "default": 0.0},
++      {"name": "consolidation", "label": "Fiscal consolidation (costs public investment)", "type": "number", "unit": "fraction of the deficit", "default": 0.0},
++      {"name": "members", "label": "States of the world in the ensemble (--sow)", "type": "number", "unit": "members", "default": 200}
++    ],
++    "design": [
++      {"name": "members", "label": "States of the world in the ensemble", "type": "number", "unit": "members", "default": 100},
++      {"name": "land_limit", "label": "Land cap (no lever moves cropland in the L0: a WALL)", "type": "choice", "unit": "", "default": "report", "choices": ["report", "constrain"]}
++    ],
++    "common": [
++      {"name": "narrative", "label": "Narrative (SSP-like parameter set, not a trajectory)", "type": "choice", "unit": "", "default": "ssp2", "choices": ["ssp1", "ssp2", "ssp3", "ssp4", "ssp5"]},
++      {"name": "l1_members", "label": "L1 ensemble members for the country agents (L1 only)", "type": "number", "unit": "members", "default": 32}
++    ]
++  },
++  "capabilities": [
++    "evaluate_theta",
++    "cancel_run",
++    "report"
++  ],
++  "capabilities_note": "No `trace`: the World explorer (globe, run graph, ask) is World4's view of a run; the optimizer tree of the family has nothing to show for a policy ensemble. No `geometry`: World4 builds no parts.",
++  "requirements": {
++    "python": [
++      {"package": "fair", "requirements_file": "backend/requirements-world4.txt"},
++      {"package": "pandas", "requirements_file": "backend/requirements-world4.txt"},
++      {"package": "phycore", "requirements_file": "backend/requirements.txt"}
++    ]
++  },
++  "trace": {
++    "source": "result",
++    "fidelity_ladder": ["L0", "L1"],
++    "markers": {
++      "l1_ok": ["world4(L0+L1)"]
++    }
++  },
++  "slots": [
++    {
++      "kind": "choice_family",
++      "title": "Mode",
++      "field": "family",
++      "stage": "spec",
++      "choices": [
++        {"value": "scenario", "label": "Policy scenario (--theta)", "available": true},
++        {"value": "design", "label": "Robust policy search (--design)", "available": true}
++      ],
++      "note": "scenario = one policy over the ensemble of states of the world, with its vulnerabilities (PRIM); design = the robust search over the seven levers with the declared limits."
++    },
++    {
++      "kind": "world_explorer",
++      "title": "World explorer",
++      "stage": "explorer",
++      "note": "Countries as agents on a 3D globe (state, the six decision channels, events), the world-system flows (trade and unequal-exchange drain), the L0 regions to 2100, the graph of a run and questions to QUO and Prime Radiant."
++    }
++  ],
++  "provenance": [
++    {
++      "title": "Data (W12: SHA-256, licence and known_time per series)",
++      "sources": [
++        "Atlas del Sistema-Mundo panel 1950-2019 (QU01/Reproducible-Research-Project-2 @ 9e96f6b; PWT, WDI, UCDP/PRIO, V-Dem…)",
++        "UN WPP 2024 by single age and sex",
++        "Energy Institute Statistical Review via OWID",
++        "FaIR v2.2.4 with the calibrated, constrained ensemble 1.6.0 (CC BY 4.0)",
++        "FAOSTAT (CC BY 4.0)",
++        "Natural Earth 1:110m (world-atlas) for the globe"
++      ],
++      "note": "World4 vendors no third-party data: `world4_cli.py --install-*` installs each set and checks its SHA-256. Without them the card stays available but a run fails with the remedy."
++    }
++  ],
++  "release_blocked": {
++    "version": "v0.1 (quasar-phy-world 0.0.1; campaign F9: W4, W8 and W9a RED with cause)",
++    "criteria": [
++      "W4 — free hindcast of world aggregates: RED, energy and CO2 inside the band only 30 % of the years from a pre-1990 calibration (the 1975-1990 oil-shock bias does not persist).",
++      "W8 — band calibration: RED, coverage 78-82 % in the 10 cells but KS distance 0.03-0.11 (4/10 cells at D <= 0.05).",
++      "W9a — structural estimator against base rates: RED, beats the base rate in conflict and crisis, ties in coups and loses in democracy (honest origin 3 years behind)."
++    ]
++  },
++  "honesty_note": "Projections with bands calibrated up to 10 years; beyond that, exploratory scenarios. No figure is a prediction of the future. The L0 to 2100 is a behaviour mode under deep uncertainty; the country agents' bands are the raw L1 ensemble (the W8-recalibrated bands live in api.query); lever effects are [M] assumptions. Inside Studio World4 runs on Studio's numpy/scipy/pandas, not the versions it pins for its bit-for-bit parity with the Atlas (W2 is measured in the standalone package).",
++  "geometry": null,
++  "search": null
++}
+diff --git a/backend/requirements-world4.txt b/backend/requirements-world4.txt
+new file mode 100644
+--- /dev/null
++++ b/backend/requirements-world4.txt
+@@ -0,0 +1,23 @@
++# requirements-world4.txt — dependencias de Phy-World (World4) en Studio, F10 de su hoja de ruta.
++#
++# ⚠️  `fair` NO es opcional aquí, aunque en el paquete independiente sea el extra `climate`:
++#     el L0 regional lee el CO2 fósil observado a través de `world4.data.climate`, que importa
++#     FaIR. Sin él no corre ni el L0 (medido 2026-10-13), así que el registry lo comprueba y la
++#     card sale `dependency_missing` con este archivo como remedio.
++#
++#     `pandas`, `numpy` y `scipy` ya los fija `requirements.txt` de Studio. World4 fija numpy
++#     2.4.6 / scipy 1.17.1 / pandas 3.0.6 para su paridad bit a bit con el Atlas (W2); Studio
++#     corre con las suyas y lo declara (honesty_note del manifest): W2 se mide en el paquete
++#     independiente, no dentro de Studio. `statsmodels` sólo hace falta para RECONSTRUIR el
++#     panel del Atlas desde sus fuentes, que Studio no hace.
++#
++#     Sin jax (prohibido en el backend): el motor de referencia de World4 es NumPy.
++#
++# Instalación (sólo AÑADE fair, pooch y xarray; no cambia ninguna versión existente,
++# comprobado con `pip install --dry-run` el 2026-10-13):
++#     backend/venv/Scripts/python -m pip install -r requirements-world4.txt
++#
++# Pin exacto, el mismo que el venv de World4 (D-04: deps versionadas).
++fair==2.2.4
++xarray==2026.9.0
++pooch==1.9.0
+diff --git a/backend/app/services/phy_models/models/world4.py b/backend/app/services/phy_models/models/world4.py
+new file mode 100644
+--- /dev/null
++++ b/backend/app/services/phy_models/models/world4.py
+@@ -0,0 +1,138 @@
++"""Adaptador de Phy-World (World4) — F10 de su hoja de ruta (§5).
++
++World4 no es un modelo de diseño de piezas: θ son las 7 palancas de política de F8, las familias son los dos
++modos de su CLI que Studio ofrece (``scenario`` = ``--theta``, ``design`` = ``--design``) y la corrida devuelve,
++además del resultado, los datos del explorador (``world.json``: los países como agentes y los flujos;
++``geo.json``; ``graph.json``: el grafo de la corrida) que pinta el slot ``world_explorer``.
++
++Toda la lógica vive en el paquete (``world4.studio_compat.run_studio``, probada allí); aquí sólo se traduce el
++cfg del genérico y se declara lo que Studio necesita. Nada escribe fuera del run dir (C-1, D-111).
++"""
++from __future__ import annotations
++
++from pathlib import Path
++from types import SimpleNamespace
++
++from app.services.phy_models.models._base import HONESTY, PhyModelAdapter
++
++FAMILIES = ("scenario", "design")
++NARRATIVES = ("ssp1", "ssp2", "ssp3", "ssp4", "ssp5")
++
++
++def _num(value, default=None):
++    if value is None or value == "":
++        return default
++    return float(value)
++
++
++class World4Adapter(PhyModelAdapter):
++    model_id = "world4"
++
++    def prepare_namespace(self, ns: SimpleNamespace) -> SimpleNamespace:
++        ns.OUT_KEYS = list(ns.physics.OUT_KEYS)
++        return ns
++
++    # ── Spec ──────────────────────────────────────────────────────────────────
++
++    def build_spec(self, ns: SimpleNamespace, cfg: dict):
++        """World4 no tiene ``DesignSpec``: el spec ES el cfg traducido (lo valida ``run_studio``)."""
++        return self._cfg(ns, cfg)
++
++    def _cfg(self, ns: SimpleNamespace, cfg: dict) -> dict:
++        family = str(cfg.get("family") or FAMILIES[0])
++        out = {"family": family, "fidelity": str(cfg.get("fidelity") or "L0"),
++               "narrative": str(cfg.get("narrative") or "ssp2"), "seed": cfg.get("seed")}
++        for k in ("members", "l1_members", "rounds", "n_init"):
++            if cfg.get(k) not in (None, ""):
++                out[k] = int(float(cfg[k]))
++        if family == "scenario":
++            for name in ns.VAR_NAMES[family]:
++                out[name] = _num(cfg.get(name), 0.0)
++        else:
++            out["land_reported"] = str(cfg.get("land_limit") or "report") != "constrain"
++        return out
++
++    def spec_fields(self, ns: SimpleNamespace) -> list[dict]:
++        return [{**row, **({} if fam == "common" else {"family": fam})}
++                for fam, rows in (self.manifest.get("spec_fields") or {}).items() for row in rows]
++
++    def extra_schema(self, ns: SimpleNamespace) -> dict:
++        with ns.isolation.activate():
++            from world4.scenarios import levers, narratives
++            rows = levers.describe()
++            narr = {k: v["what"] for k, v in narratives.NARRATIVES.items()}
++        dv = [{"name": r["name"], "lo": float(r["box"][0]), "hi": float(r["box"][1]), "unit": r["unit"],
++               "what": r["what"]} for r in rows]
++        return {"design_vars": {f: dv for f in FAMILIES}, "narratives": narr,
++                "explorer": {"artifacts": ["world.json", "geo.json", "graph.json", "policy.json", "design.json"],
++                             "schema": "world4-explorer-1"}}
++
++    def validate(self, ns: SimpleNamespace, cfg: dict) -> list[dict]:
++        errs: list[dict] = []
++        family = cfg.get("family") or FAMILIES[0]
++        if cfg.get("narrative") not in (None, "") and cfg["narrative"] not in NARRATIVES:
++            errs.append({"campo": "narrative", "regla": "choice", "mensaje": f"narrative debe ser una de {list(NARRATIVES)}"})
++        for k in ("members", "l1_members"):
++            v = cfg.get(k)
++            if v in (None, ""):
++                continue
++            try:
++                ok = float(v) == int(float(v)) and int(float(v)) >= (8 if k == "l1_members" else 20)
++            except (TypeError, ValueError):
++                ok = False
++            if not ok:
++                errs.append({"campo": k, "regla": "entero_minimo",
++                             "mensaje": f"{k} debe ser un entero ≥ {8 if k == 'l1_members' else 20}"})
++        if family == "scenario":
++            lo = dict(zip(ns.VAR_NAMES["scenario"], ns.physics.BOUNDS_LO["scenario"]))
++            hi = dict(zip(ns.VAR_NAMES["scenario"], ns.physics.BOUNDS_HI["scenario"]))
++            for name in ns.VAR_NAMES["scenario"]:
++                try:
++                    v = _num(cfg.get(name), 0.0)
++                except (TypeError, ValueError):
++                    errs.append({"campo": name, "regla": "numero", "mensaje": f"{name} debe ser un número"})
++                    continue
++                if not (lo[name] - 1e-12 <= v <= hi[name] + 1e-12):
++                    errs.append({"campo": name, "regla": "caja_palanca",
++                                 "mensaje": f"{name} fuera de su caja [{lo[name]:g}, {hi[name]:g}] "
++                                            f"{ns.physics.UNITS[name]}"})
++        if cfg.get("land_limit") not in (None, "", "report", "constrain"):
++            errs.append({"campo": "land_limit", "regla": "choice", "mensaje": "land_limit: report | constrain"})
++        return errs
++
++    # ── Corrida ───────────────────────────────────────────────────────────────
++
++    def run_design(self, ns: SimpleNamespace, spec, cfg: dict,
++                   checkpoint_path: str | None, log) -> dict:
++        outdir = Path(checkpoint_path).parent if checkpoint_path else Path.cwd()
++        spec = dict(spec or self._cfg(ns, cfg))
++        spec["fidelity"] = str(cfg.get("fidelity") or spec.get("fidelity") or "L0")
++        with ns.isolation.activate():
++            return ns.physics.run_studio(spec, outdir, log=log)
++
++    def deliverables(self, ns: SimpleNamespace, result: dict, outdir: Path, cfg: dict) -> dict:
++        return {k: v for k, v in (result.get("deliverables") or {}).items() if (Path(outdir) / v).is_file()}
++
++    def normalize_result(self, result: dict, outdir: Path, cfg: dict) -> Path | None:
++        return None
++
++    # ── Evaluación puntual ────────────────────────────────────────────────────
++
++    def evaluate_theta(self, ns: SimpleNamespace, theta: list[float], *,
++                       fidelity: str = "L0", family: str | None = None) -> dict:
++        fam = family or FAMILIES[0]
++        with ns.isolation.activate():
++            rec = ns.physics.evaluate(theta, fidelity=fidelity, family=fam)
++        source = str(rec.get("source", ""))
++        return {"family": fam, "theta": dict(zip(ns.VAR_NAMES[fam], (float(v) for v in theta))),
++                "record": {k: v for k, v in rec.items() if isinstance(v, (int, float, str, bool))},
++                "source": source, "degraded": False, "honesty": HONESTY}
++
++    def reference_theta(self, ns: SimpleNamespace, family: str | None = None) -> list[float]:
++        """La referencia de World4 es NO hacer nada (θ = 0), no el centro de la caja."""
++        return [0.0] * len(ns.VAR_NAMES[family or FAMILIES[0]])
++
++
++ADAPTER = World4Adapter()
++
++__all__ = ["ADAPTER", "World4Adapter"]
+diff --git a/backend/app/services/phy_models/costs/world4_fidelity_costs.json b/backend/app/services/phy_models/costs/world4_fidelity_costs.json
+new file mode 100644
+--- /dev/null
++++ b/backend/app/services/phy_models/costs/world4_fidelity_costs.json
+@@ -0,0 +1,25 @@
++{
++  "budget": "seed=71 n_init=40 rounds=2 batch_size=40 (preset quick: 40 + 2 x 40 = 120 L0 ensemble evaluations of the design family)",
++  "timeout_s": 900,
++  "note": "Measured on the founder's machine (Windows, Ryzen 5700X) on 2026-10-13 through GenericPhyService.launch_run in thread mode with Studio's own venv (numpy 2.5.1, scipy 1.18.0, pandas 3.0.5, fair 2.2.4), narrative ssp2, 100 states of the world, the whole run: search + the compromise policy with PRIM + explorer data (world, geo, graph) + the HTML report. L0 = the regional L0 to 2100 only; L1 = the same plus the 180 country agents of the L1 F1-F5 2019-2029 with 32 members (about 8 s more). The scenario family does not use the budget: one policy over 200 states of the world took 3.0 s at L0 and 13.0 s at L1 (same machine, same day). L2 is not offered: its emulators are already inside the L1 (manifest excluded_fidelities).",
++  "fidelities": [
++    {
++      "fidelity": "L0",
++      "wall_clock_s": 56.03,
++      "status": "completed",
++      "n_evals": 120,
++      "source_tags": {"world4(L0)": 22},
++      "degraded": 0,
++      "note": "22 policies on the verified front, 0 feasible: the land cap is a WALL in the L0 (no lever moves cropland), reported, not constraining."
++    },
++    {
++      "fidelity": "L1",
++      "wall_clock_s": 64.61,
++      "status": "completed",
++      "n_evals": 120,
++      "source_tags": {"world4(L0+L1)": 22},
++      "degraded": 0,
++      "note": "Same search as L0 (the levers act on the L0) plus the country agents for the globe."
++    }
++  ]
++}
+diff --git a/backend/tests/test_model_world4.py b/backend/tests/test_model_world4.py
+new file mode 100644
+--- /dev/null
++++ b/backend/tests/test_model_world4.py
+@@ -0,0 +1,242 @@
++"""Phy-World (World4) como addon de Studio — F10 de su hoja de ruta (§5).
++
++Entra con UN manifest (``Phy-Models/manifests/world4.json``) y UN adaptador (``models/world4.py``); toda la
++lógica de la corrida vive en el paquete (``world4.studio_compat.run_studio``). Lo distinto de este modelo:
++
++  - θ son las 7 palancas de política de F8 y las familias son ``scenario`` (``--theta``) y ``design``
++    (``--design``, la búsqueda robusta con ``phycore.Designer``).
++  - L2 se declara y NO se ofrece (sus emuladores ya están dentro del L1); L0 y L1 con coste MEDIDO.
++  - La corrida deja los datos del explorador (``world.json``, ``geo.json``, ``graph.json``) que pinta el slot
++    ``world_explorer``, y todos pasan la auditoría de honestidad W11 del propio World4.
++  - ``fair`` es requisito real (hasta el L0 lee el CO2 observado con él): sin él, ``dependency_missing``.
++  - QUO pregunta con ``world4_read`` (las mismas funciones puras que el servidor MCP de World4).
++
++Los tests de corrida necesitan los datos de World4 instalados (``world4_cli.py --install-*``); sin ellos se
++saltan con la razón. Lo que pasa de unos segundos va marcado ``slow``.
++"""
++
++from __future__ import annotations
++
++import json
++import time
++from pathlib import Path
++
++import pytest
++
++MODEL_ID = "world4"
++LEVERS = ["carbon_price", "renewables", "efficiency", "agri_rd", "aid", "fertility", "consolidation"]
++
++
++@pytest.fixture
++def ws(monkeypatch, tmp_path):
++    monkeypatch.setenv("QUASAR_WORKSPACE_DIR", str(tmp_path / "ws"))
++    from app.services import workspace_service
++
++    workspace_service.reset_workspace_dir()
++    yield tmp_path / "ws"
++    workspace_service.reset_workspace_dir()
++
++
++def _svc():
++    from app.services.phy_models import registry, services
++
++    row = {r["id"]: r for r in registry.list_models()}.get(MODEL_ID)
++    if row is None or not row.get("available"):
++        pytest.skip(f"World4 no está en Phy-Models/World4 o le faltan dependencias: {row and row.get('reason')}")
++    return services.get_service(MODEL_ID)
++
++
++def _data_or_skip(svc):
++    ns = svc._ns
++    with ns.isolation.activate():
++        from world4.data import atlas, climate, energy, food, wpp
++
++        missing = [n for n, m in (("climate", climate), ("energy", energy), ("food", food), ("wpp", wpp))
++                   if not m.available()]
++        try:
++            atlas.require()
++        except Exception:
++            missing.append("atlas")
++    if missing:
++        pytest.skip(f"datos de World4 sin instalar: {missing} (world4_cli.py --install-*)")
++
++
++def _wait(svc, rid, timeout=600, until=lambda s: s["status"] != "running"):
++    t0 = time.time()
++    while time.time() - t0 < timeout:
++        snap = svc.get_run(rid)
++        if until(snap):
++            return snap
++        time.sleep(0.2)
++    raise AssertionError(f"la corrida {rid} no terminó en {timeout} s")
++
++
++# ── Registro, Protocol y disponibilidad ──────────────────────────────────────────
++
++def test_manifest_y_protocol():
++    from app.services.phy_models.protocol import PhyService
++
++    svc = _svc()
++    assert isinstance(svc, PhyService)
++    assert svc.capabilities == frozenset({"evaluate_theta", "cancel_run", "report"})
++    m = svc.manifest
++    assert m["domain"] == "society.world_system" and m["geometry"] is None
++    assert "No figure is a prediction" in m["honesty_note"]
++    kinds = [s["kind"] for s in m["slots"]]
++    assert kinds == ["choice_family", "world_explorer"]
++
++
++def test_sin_fair_dependency_missing(monkeypatch):
++    """Sin ``fair`` la card sale ``dependency_missing`` con el ``pip install -r`` de su requirements."""
++    import importlib.util
++
++    from app.services.phy_models import registry
++
++    real = importlib.util.find_spec
++    monkeypatch.setattr(importlib.util, "find_spec", lambda name, *a, **k: None if name == "fair" else real(name, *a, **k))
++    row = registry.availability(registry.load_manifest(MODEL_ID))
++    if row["state"] == "source_missing":
++        pytest.skip("World4 no está en Phy-Models/World4")
++    assert row["state"] == "dependency_missing"
++    assert "requirements-world4.txt" in (row["remedy_command"] or "")
++
++
++def test_schema_familias_palancas_y_fidelidades():
++    svc = _svc()
++    sch = svc.spec_schema()
++    names = {(f["name"], f.get("family")) for f in sch["fields"]}
++    assert {(n, "scenario") for n in LEVERS} <= names
++    assert ("narrative", None) in names and ("land_limit", "design") in names
++    assert [d["name"] for d in sch["design_vars"]["scenario"]] == LEVERS
++    opts = {o["value"]: o for o in sch["fidelity"]["options"]}
++    assert opts["L0"]["available"] and opts["L1"]["available"]            # coste medido (catálogo)
++    assert not opts["L2"]["available"] and "already coupled" in opts["L2"]["reason"]
++    assert set(sch["narratives"]) == {"ssp1", "ssp2", "ssp3", "ssp4", "ssp5"}
++
++
++def test_validacion_caja_y_narrativa():
++    svc = _svc()
++    errs = svc.validate_config({"family": "scenario", "fidelity": "L0", "carbon_price": 500, "narrative": "ssp9"})
++    campos = {e["campo"] for e in errs}
++    assert {"carbon_price", "narrative"} <= campos
++    assert svc.validate_config({"family": "scenario", "fidelity": "L0", "carbon_price": 100}) == []
++    assert any(e["campo"] == "fidelity" for e in svc.validate_config({"family": "scenario", "fidelity": "L2"}))
++
++
++def test_evaluate_theta_y_referencia():
++    svc = _svc()
++    _data_or_skip(svc)
++    assert svc.reference_theta("scenario") == [0.0] * 7               # la referencia es NO hacer nada
++    out = svc.evaluate_theta([100, 0.01, 0, 0, 0, 0, 0], fidelity="L0", family="scenario")
++    rec = out["record"]
++    assert out["source"] == "world4(L0)" and rec["exploratory"] is True
++    assert {"neg_welfare_p10", "peak_gmst_p90", "food_floor", "land_cap", "debt_cap"} <= set(rec)
++    base = svc.evaluate_theta([0] * 7, fidelity="L0", family="scenario")["record"]
++    assert rec["peak_gmst_p90"] < base["peak_gmst_p90"]                 # el carbono baja el pico (W6, signo)
++
++
++# ── Corridas ─────────────────────────────────────────────────────────────────────
++
++def _audit(svc, payload):
++    with svc._ns.isolation.activate():
++        from world4 import honesty
++
++        return honesty.audit(payload)
++
++
++def test_corrida_escenario_L0_y_datos_del_explorador(ws):
++    svc = _svc()
++    _data_or_skip(svc)
++    rid = svc.launch_run({"family": "scenario", "fidelity": "L0", "carbon_price": 100, "members": 40, "seed": 3})
++    snap = _wait(svc, rid, 300)
++    assert snap["status"] == "done", snap.get("error")
++    res = snap["result"]
++    assert res["fidelity_reached"] == "L0" and res["family"] == "scenario"
++    run_dir = svc.run_dir(rid)
++    for name in ("world.json", "geo.json", "graph.json", "policy.json", "world4_report.html"):
++        assert (run_dir / name).is_file(), name
++    world = json.loads((run_dir / "world.json").read_text(encoding="utf-8"))
++    assert world["schema"] == "world4-explorer-1" and world["exploratory"] is True
++    assert world["l1"] is None and "L0 region" in world["l1_note"]       # L0: sin agentes, declarado
++    assert len(world["l0"]["regions"]) == 10 and world["l0"]["years"][-1] == 2100
++    assert _audit(svc, world) == []
++    graph = json.loads((run_dir / "graph.json").read_text(encoding="utf-8"))
++    ids = {n["id"] for n in graph["nodes"]}
++    assert all(e["source"] in ids and e["target"] in ids for e in graph["edges"])
++    assert {"agents", "l0", "levers", "objectives", "limits", "prime_radiant", "quo"} <= ids
++    assert next(n for n in graph["nodes"] if n["id"] == "agents")["status"] == "skipped"
++    assert graph["loops"]["links"] and graph["loops"]["dominant_by_decade"]
++    assert _audit(svc, graph) == []
++    geo = json.loads((run_dir / "geo.json").read_text(encoding="utf-8"))
++    assert len(geo["features"]) > 150 and all("centroid" in f["properties"] for f in geo["features"])
++    arts = {a["path"] for a in svc.list_artifacts(rid)}
++    assert {"world.json", "graph.json", "geo.json"} <= arts
++
++
++@pytest.mark.slow
++def test_corrida_escenario_L1_agentes_flujos_y_world4_read(ws):
++    svc = _svc()
++    _data_or_skip(svc)
++    rid = svc.launch_run({"family": "scenario", "fidelity": "L1", "members": 40, "l1_members": 8, "seed": 5})
++    snap = _wait(svc, rid, 600)
++    assert snap["status"] == "done", snap.get("error")
++    assert snap["result"]["fidelity_reached"] == "L1"
++    world = json.loads((svc.run_dir(rid) / "world.json").read_text(encoding="utf-8"))
++    l1 = world["l1"]
++    assert l1["origin"] == 2019 and l1["years"][-1] == 2029 and len(l1["countries"]) >= 170
++    assert l1["channels"]["names"] == ["k", "r", "m", "x", "f", "w"]
++    n = len(l1["countries"])
++    for kind in ("trade", "drain"):
++        rows = l1["flows"][kind]
++        assert len(rows) == len(l1["years"]) and rows[0]
++        assert all(0 <= a < n and 0 <= b < n and a != b and v > 0 for a, b, v in rows[0])
++    assert _audit(svc, world) == []
++    from app.services import platform_tools as pt
++
++    c = pt.world4_read("run_country", json.dumps({"run_id": rid, "iso3": "NGA"}))
++    assert c["iso3"] == "NGA" and c["region"] == "SSA" and len(c["channels"]["share"]) == len(l1["years"])
++    assert c["state"]["gdp_pc"]["unit"].startswith("2017 USD")
++    s = pt.world4_read("run_summary", json.dumps({"run_id": rid}))
++    assert s["world_2100"]["gmst"]["unit"] == "degC above 1850-1900"
++    assert "error" in pt.world4_read("run_country", json.dumps({"run_id": rid, "iso3": "XXX"}))
++
++
++@pytest.mark.slow
++def test_busqueda_se_cancela(ws):
++    svc = _svc()
++    _data_or_skip(svc)
++    rid = svc.launch_run({"family": "design", "fidelity": "L0", "n_init": 40, "rounds": 2, "batch_size": 40})
++    _wait(svc, rid, 120, until=lambda s: any("robust search" in ln for ln in s["progress"].get("log_tail") or []))
++    out = svc.cancel_run(rid)
++    assert out.get("ok") is not False
++    snap = _wait(svc, rid, 300)
++    assert snap["status"] == "cancelled"
++
++
++@pytest.mark.slow
++def test_corrida_L1_en_proceso_aparte_con_cancelacion(ws, monkeypatch):
++    """El camino de producción: ``run_process.spawn_child`` (proceso desacoplado) y ``cancel.flag``."""
++    monkeypatch.setenv("QUASAR_PHY_RUN_MODE", "process")
++    svc = _svc()
++    _data_or_skip(svc)
++    rid = svc.launch_run({"family": "scenario", "fidelity": "L1", "members": 40, "l1_members": 16})
++    snap = _wait(svc, rid, 300, until=lambda s: s["status"] != "running" or any(
++        "explorer: L1" in ln for ln in s["progress"].get("log_tail") or []))
++    assert snap.get("pid"), "la corrida debía ir en un proceso hijo"
++    svc.cancel_run(rid)
++    snap = _wait(svc, rid, 300)
++    assert snap["status"] == "cancelled", snap.get("error")
++
++
++def test_world4_read_lecturas():
++    svc = _svc()
++    _data_or_skip(svc)
++    from app.services import platform_tools as pt
++    from app.services.agents import permissions
++
++    assert permissions.is_allowed("quo", "world4_read")
++    assert not permissions.is_allowed("verification_agent", "world4_read")
++    lev = pt.world4_read("w4_levers")
++    assert [r["name"] for r in lev["levers"]] == LEVERS and lev["exploratory"] is True
++    assert "error" in pt.world4_read("w4_nope")
++    assert "error" in pt.world4_read("w4_levers", "{not json")
+diff --git a/frontend/src/lib/world4.ts b/frontend/src/lib/world4.ts
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/lib/world4.ts
+@@ -0,0 +1,223 @@
++// Datos del explorador de World4 (F10): los JSON que una corrida de `world4` deja en su run dir
++// (`world4.explorer` en el paquete). Se leen por el endpoint de entregables, que es público en local
++// (mismo camino que `fetchPhyArtifactBlobUrl`): `fetch` sin Authorization = sin preflight CORS.
++
++import { listPhyRuns, phyArtifactUrl, type PhyRunSnapshot } from "./phyModels";
++
++export const WORLD4_SCHEMA = "world4-explorer-1";
++
++/** p10/p50/p90 por país y año: `[país][año]` (null = sin dato). */
++export interface QuantileSeries {
++  label: string;
++  unit: string;
++  p10: (number | null)[][];
++  p50: (number | null)[][];
++  p90: (number | null)[][];
++}
++
++/** Frecuencia de un indicador 0/1 entre los miembros: `[país][año]`. */
++export interface FrequencySeries {
++  label: string;
++  unit: string;
++  mean: (number | null)[][];
++  band: string;
++}
++
++export type CountrySeries = QuantileSeries | FrequencySeries;
++
++export interface Band1D {
++  unit: string;
++  p10: (number | null)[];
++  p50: (number | null)[];
++  p90: (number | null)[];
++  baseline_p50?: (number | null)[];
++}
++
++export interface Flows {
++  /** Por año: `[origen, destino, valor]` con índices de `countries`. */
++  trade: [number, number, number][][];
++  drain: [number, number, number][][];
++  /** Por país y año, los mayores socios `[índice, valor]` en cada sentido (los países pequeños no salen en el top mundial). */
++  partners?: Record<"trade_out" | "trade_in" | "drain_out" | "drain_in", [number, number][][][]>;
++  unit?: string;
++  row_format?: string;
++  band?: string;
++  note?: string;
++}
++
++export interface World4Country {
++  iso3: string;
++  isonum: number;
++  region: string | null;
++}
++
++export interface World4L1 {
++  origin: number;
++  years: number[];
++  members: number;
++  sectors: string;
++  countries: World4Country[];
++  series: Record<string, CountrySeries>;
++  channels: {
++    names: string[];
++    labels: Record<string, string>;
++    unit: string;
++    share: (number | null)[][][];
++    band: string;
++    note: string;
++  };
++  flows: Flows;
++  world: Record<string, Band1D>;
++  caveats: string[];
++  horizon_note: string;
++}
++
++export interface World4Region {
++  name: string;
++  gdp_pc: Band1D;
++  population: Band1D;
++  debt_gdp: Band1D;
++  cereal_pc: Band1D;
++  nonfossil_share: Band1D;
++}
++
++export interface World4L0 {
++  years: number[];
++  /** País → región del L0 (también en corridas L0, para colorear el globo por región). */
++  countries: World4Country[];
++  world: Record<string, Band1D>;
++  regions: Record<string, World4Region>;
++  members: number;
++  narrative: string;
++  band: string;
++}
++
++export interface World4Payload {
++  schema: string;
++  model_revision: number;
++  narrative: string;
++  theta: Record<string, number>;
++  exploratory: boolean;
++  l0: World4L0;
++  l1: World4L1 | null;
++  l1_note?: string;
++}
++
++export interface GeoFeature {
++  type: "Feature";
++  id: number;
++  properties: { name: string; centroid: [number, number] };
++  geometry:
++    | { type: "Polygon"; coordinates: number[][][] }
++    | { type: "MultiPolygon"; coordinates: number[][][][] };
++}
++
++export interface GeoPayload {
++  type: "FeatureCollection";
++  features: GeoFeature[];
++  sha256?: string;
++}
++
++export interface GraphMetric {
++  label: string;
++  value: number | null;
++  unit: string;
++}
++
++export interface GraphNode {
++  id: string;
++  kind: string;
++  label: string;
++  description: string;
++  status: string;
++  metrics: GraphMetric[];
++  series?: { years: number[]; values: (number | null)[]; unit: string; label: string; band: string } | null;
++  caveats?: string[];
++  provenance?: Record<string, unknown>;
++}
++
++export interface GraphEdge {
++  id: string;
++  source: string;
++  target: string;
++  label: string;
++  kind: string;
++}
++
++export interface LoopsPayload {
++  stocks: string[];
++  links: { source: string; target: string; flow: string }[];
++  loops: string[];
++  dominant_by_decade: { year: number; loops: { loop: string; score: number }[] }[];
++  unit: string;
++  band: string;
++}
++
++export interface GraphPayload {
++  nodes: GraphNode[];
++  edges: GraphEdge[];
++  loops?: LoopsPayload;
++}
++
++export interface PolicyPayload {
++  theta: Record<string, number>;
++  narrative: string;
++  members: number;
++  objectives: Record<string, number>;
++  constraints: Record<string, number>;
++  baseline_objectives: Record<string, number>;
++  baseline_constraints: Record<string, number>;
++  feasible: boolean;
++  better_than_baseline_share: { welfare: number; peak_gmst: number };
++  units: Record<string, string>;
++  vulnerability?: Record<string, unknown>;
++}
++
++export interface World4RunData {
++  runId: string;
++  world: World4Payload;
++  geo: GeoPayload;
++  graph: GraphPayload | null;
++  policy: PolicyPayload | null;
++}
++
++async function fetchJson<T>(modelId: string, runId: string, path: string): Promise<T | null> {
++  try {
++    const res = await fetch(phyArtifactUrl(modelId, runId, path));
++    if (!res.ok) return null;
++    return (await res.json()) as T;
++  } catch {
++    return null;
++  }
++}
++
++/** Los datos del explorador de una corrida terminada; null si le falta `world.json` o `geo.json`. */
++export async function loadWorld4Run(modelId: string, runId: string): Promise<World4RunData | null> {
++  const [world, geo, graph, policy] = await Promise.all([
++    fetchJson<World4Payload>(modelId, runId, "world.json"),
++    fetchJson<GeoPayload>(modelId, runId, "geo.json"),
++    fetchJson<GraphPayload>(modelId, runId, "graph.json"),
++    fetchJson<PolicyPayload>(modelId, runId, "policy.json"),
++  ]);
++  if (!world || !geo || world.schema !== WORLD4_SCHEMA) return null;
++  return { runId, world, geo, graph, policy };
++}
++
++/** Corridas TERMINADAS del modelo, la más reciente primero. */
++export async function listWorld4Runs(modelId: string): Promise<PhyRunSnapshot[]> {
++  const runs = await listPhyRuns(modelId);
++  return runs
++    .filter((r) => r.status === "done")
++    .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
++}
++
++export function isFrequency(s: CountrySeries): s is FrequencySeries {
++  return (s as FrequencySeries).mean !== undefined;
++}
++
++/** Valor central de una serie por país y año (p50 o la frecuencia). */
++export function centralValue(s: CountrySeries, country: number, year: number): number | null {
++  const grid = isFrequency(s) ? s.mean : s.p50;
++  const v = grid[country]?.[year];
++  return typeof v === "number" && Number.isFinite(v) ? v : null;
++}
+diff --git a/frontend/src/lib/i18n/world4.ts b/frontend/src/lib/i18n/world4.ts
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/lib/i18n/world4.ts
+@@ -0,0 +1,472 @@
++// Fragmento del diccionario: explorador de World4 (F10, 2026-10-13).
++// `world4En` es la fuente (inglés, `as const`); `world4Es` debe tener EXACTAMENTE la misma forma (lo exige
++// `Widen`), así que una clave que falte o sobre es un error de `tsc`. Se monta en `en.ts` / `es.ts` como
++// `world4` → claves `world4.<grupo>.<clave>`.
++
++import type { Widen } from "./en";
++
++export const world4En = {
++  title: "World explorer",
++  subtitle: "180 countries acting as agents of the world-system, the flows between them and the regions to 2100",
++  honesty:
++    "Exploratory. Country bands are the raw L1 ensemble, 1-10 years from 2019; the L0 to 2100 is a behaviour mode, not a forecast. Lever effects are assumptions [M].",
++  run: "Run",
++  noRuns:
++    "No finished World4 run yet. Launch a policy scenario below: at L1 (about 13 s) the globe shows the 180 countries as agents; at L0 (about 3 s) it colours each country by its L0 region.",
++  loading: "Loading the run's explorer data…",
++  missing: "This run has no explorer data (world.json / geo.json). Runs from before F10 do not carry it: launch it again.",
++  refresh: "Refresh runs",
++  runLabel: "{family} · {fidelity} · {narrative} · {date}",
++  tabs: { label: "Explorer sections", globe: "Globe", graph: "Run graph", ask: "Ask" },
++  badges: {
++    exploratory: "exploratory",
++    l0only: "L0 only: no country agents",
++    members: "{n} members",
++    states: "{n} states of the world",
++  },
++  globe: {
++    layer: "Layer",
++    flows: "Flows",
++    flowsTrade: "Trade",
++    flowsDrain: "Value drain",
++    flowsNone: "None",
++    agents: "Agents",
++    events: "Events",
++    rotate: "Auto-rotate",
++    play: "Play",
++    pause: "Pause",
++    year: "Year",
++    legendRange: "{lo} … {hi} {unit}",
++    legendNote: "colour = p50 across countries (5th-95th percentile of all years); grey = not simulated",
++    regionNote: "L0 run: each country takes its L0 region's value",
++    hoverNoData: "not simulated",
++    webglMissing: "This machine cannot create a WebGL context, so the globe cannot be drawn. The run graph and the questions still work.",
++    flowsNote: "Arcs: the {n} largest {kind} links of the year. Trade = COW export shares (2014 network) x GDP x openness; drain = the L1's unequal-exchange rule.",
++    agentsNote: "Dots: countries sized by GDP and coloured by the decision channel they moved into this year (grey = no move of 0.2 points or more); rings: civil conflict in half the members, a crisis in a quarter or a coup in a tenth.",
++    growth: "GDP per person growth",
++    growthUnit: "% per year (p50 vs the year before)",
++  },
++  layers: {
++    gdp_pc: "GDP per person",
++    growth: "GDP per person growth",
++    population: "Population",
++    coreness: "Coreness (world-system position)",
++    asabiya: "Asabiya (collective solidarity)",
++    debt_gdp: "Public debt / GDP",
++    democracy: "Democracy (probability)",
++    conflict_hazard: "Conflict hazard",
++    conflict: "Civil conflict (share of members)",
++    crisis: "Financial crisis (share of members)",
++    coup: "Coup (share of members)",
++    drain: "Value drain (unequal exchange)",
++    net_rents: "Net rents received",
++    resource_rents: "Resource rents / GDP",
++    co2: "Fossil CO2 emissions",
++    primary_energy: "Primary energy",
++    food_supply: "Food supply",
++    l0_gdp_pc: "Region GDP per person (L0)",
++    l0_population: "Region population (L0)",
++    l0_debt_gdp: "Region public debt / GDP (L0)",
++    l0_cereal_pc: "Region cereal per person, 2019 = 1 (L0)",
++    l0_nonfossil_share: "Region non-fossil energy share (L0)",
++    world_gmst: "GMST (°C above 1850-1900)",
++    world_resource_rent_share: "World resource-rent share",
++    world_oil_price: "Oil price (USD 2019/bbl)",
++  },
++  nodes: {
++    data_atlas: { label: "Atlas panel 1950-2019", description: "the Atlas del Sistema-Mundo panel at the pinned commit (PWT, WDI, UCDP/PRIO, V-Dem…)" },
++    data_wpp: { label: "UN WPP 2024 (ages and sexes)", description: "population by single age and sex" },
++    data_energy: { label: "Energy Institute / OWID", description: "primary energy mix by source" },
++    data_climate: { label: "FaIR 1.6.0 + observed CO2", description: "calibrated, constrained FaIR ensemble" },
++    data_food: { label: "FAOSTAT", description: "cereals, land, N, irrigation, food supply" },
++    sec_population: { label: "F1 population and human capital", description: "cohorts by single age and sex (WPP 2024) and schooling by cohort, coupled to the L1" },
++    sec_resources: { label: "F2 world resource markets", description: "oil, gas, coal and metals markets with depletion: the world resource-rent share psi_t" },
++    sec_energy: { label: "F3 energy with EROI", description: "primary-energy mix by country (fossil, nuclear, hydro, wind + solar, other), EROI and net energy" },
++    sec_climate: { label: "F4 climate (FaIR v2.2.4)", description: "FaIR with the calibrated, constrained ensemble 1.6.0; emissions from F1-F3 and F5" },
++    sec_food: { label: "F5 food, land, N and water", description: "cereals, cropland, pasture, forest, mineral N, irrigation and calories per country" },
++    agents: { label: "L1 country agents", description: "the Atlas ABM: each country splits its income among six channels with the behaviour rule cloned from 1950-2019; world-system, structural-demographic and metaethnic-frontier layers" },
++    flows: { label: "World-system flows", description: "bilateral trade (COW shares) and the unequal-exchange drain from periphery to core" },
++    l0: { label: "L0 regional (10 regions, 112 stocks)", description: "the same structure as the L1 aggregated to 10 IAM-style regions; F7 posterior (cut-off 2019)" },
++    levers: { label: "Policy levers (theta)", description: "the seven levers act on the L0 from 2019 with a ramp; their effects are [M] assumptions" },
++    search: { label: "Robust policy search (phycore.Designer)", description: "NSGA-II over the L0 ensemble; limits as constraints (MORDM pattern)" },
++    objectives: { label: "Robust objectives", description: "minimised over the ensemble: minus p10 welfare, p90 peak GMST, minus p10 of the poorest region" },
++    limits: { label: "Declared limits", description: "food floor, land cap, debt cap (g <= 0 is inside)" },
++    prime_radiant: { label: "Prime Radiant (structural stage)", description: "World4's L1 answers structural questions (conflict, coup, crisis, democracy, growth, debt) in the d1 forecast, with the as-of cut respected" },
++    quo: { label: "QUO", description: "reads runs with phy_run_status and asks World4 with world4_read" },
++  },
++  pulse: {
++    title: "World pulse · {year}",
++    world: "World",
++    movers: "Agents acting this year",
++    moversNote: "largest shift of income among the six channels vs the year before (ensemble medians)",
++    events: "Events",
++    eventsNone: "No country crosses the event thresholds this year.",
++    eventConflict: "civil conflict in {p} of members",
++    eventCrisis: "financial crisis in {p} of members",
++    eventCoup: "coup in {p} of members",
++    l0Title: "Regions to 2100 (L0, policy vs no policy)",
++    gmst2100: "GMST 2100",
++    noPolicy: "no policy",
++    withPolicy: "this policy",
++    shiftIn: "+{pp} pp into {channel}",
++    shiftOut: "−{pp} pp out of {channel}",
++    pickHint: "Click a country on the globe to open it as an agent.",
++  },
++  agent: {
++    close: "Close",
++    region: "L0 region {region}",
++    state: "State in {year}",
++    band: "p10-p90",
++    trajectory: "{layer}, 2019-2029",
++    decisions: "Decisions: how the agent splits its income",
++    decisionsNote: "Ensemble medians of the six channels of the behaviour rule (observed until 2019, cloned rule after). Shares of national income.",
++    biggest: "Biggest move in {year}: {shift}",
++    noMove: "No notable move in {year}.",
++    partners: "Partners in {year}",
++    exportsTo: "Exports to",
++    importsFrom: "Imports from",
++    drainsTo: "Value drained to",
++    drainsFrom: "Value received from",
++    none: "—",
++    askQuo: "Ask QUO about {name}",
++    askPr: "Forecast with Prime Radiant",
++    notSimulated: "{name} is not among the countries the L1 simulates.",
++  },
++  channels: {
++    k: "Domestic capital",
++    r: "Own technology",
++    m: "Imports from the core",
++    x: "Own extraction",
++    f: "Resources abroad",
++    w: "Redistribution",
++  },
++  graph: {
++    modeFlow: "Information flow",
++    modeLoops: "Feedback loops",
++    flowHelp: "From the data (with SHA-256 and licence) to the sectors, the country agents, the L0, the levers and the search, and on to Prime Radiant and QUO. Every node carries the numbers of THIS run. Click a node.",
++    loopsHelp: "The world view of the L0: stocks (nodes) linked through their flows. The dominant loops change by decade (Loops that Matter score; + reinforcing, − balancing). Click a loop to trace it.",
++    pick: "Select a node to see its numbers, caveats and provenance.",
++    metrics: "Numbers of this run",
++    caveats: "Caveats",
++    provenance: "Provenance",
++    series: "Trajectory",
++    status: { ok: "ok", missing: "missing", skipped: "not run", violated: "violated" },
++    kinds: {
++      data: "Data",
++      sector: "Sector",
++      agents: "Agents",
++      flows: "Flows",
++      model: "Model",
++      policy: "Policy",
++      search: "Search",
++      objectives: "Objectives",
++      constraints: "Limits",
++      consumer: "Consumer",
++    },
++    decade: "Decade from {year}",
++    topLoops: "Dominant loops",
++    score: "score {s}",
++    noLoops: "This run carries no loop analysis.",
++    objectivesTitle: "This policy vs no policy",
++    feasible: "inside all declared limits",
++    infeasible: "violates at least one declared limit",
++    better: "better welfare in {w} of the worlds · lower peak warming in {g}",
++  },
++  ask: {
++    quoTitle: "Ask QUO",
++    quoHelp: "QUO reads this run with world4_read (run_summary, run_country) and can query World4 itself. The question goes to your active chat.",
++    placeholder: "Ask about this run, a country or a policy…",
++    send: "Send to QUO",
++    sending: "Sending…",
++    queued: "Queued: QUO is finishing another turn.",
++    streaming: "QUO is answering…",
++    openChat: "Open the full chat",
++    you: "You",
++    quo: "QUO",
++    empty: "The answer appears here.",
++    context: "Context sent with the question: run {run}, {family} at {fidelity}, narrative {narrative}{country}.",
++    contextCountry: ", country {name} ({iso3})",
++    suggestions: {
++      country: "Why does {name} move its income the way it does, and what drives its conflict risk?",
++      policy: "Compare this policy with doing nothing: where does it help, where does it fail (PRIM)?",
++      drain: "Which countries lose the most value to the core in this run, and to whom?",
++      limits: "Which declared limit binds, and is it a WALL?",
++    },
++    prTitle: "Ask Prime Radiant",
++    prHelp: "Create a forecasting question bound to a World4 observable. Its structural stage will use World4's L1 for that country; launching the forecast spends the swarm budget and is done from Prime Radiant.",
++    variable: "Observable",
++    country: "Country",
++    closes: "Closes at",
++    text: "Question",
++    rules: "Resolution rules",
++    edges: "Interval cuts ({unit})",
++    world4Says: "World4 in this run ({year}): {value}",
++    world4NoValue: "World4 has no value for this observable in this run.",
++    create: "Create the question",
++    creating: "Creating…",
++    created: "Question created ({id}).",
++    openPr: "Open Prime Radiant",
++    variables: {
++      conflict: "Civil conflict (yes/no)",
++      coup: "Successful coup (yes/no)",
++      crisis: "Financial crisis (yes/no)",
++      democracy: "Democracy at year end (yes/no)",
++      gdp_pc_growth: "GDP per person growth (%/year)",
++      debt_gdp: "Public debt (% of GDP)",
++    },
++    templates: {
++      conflict: "Will {name} have an armed conflict with at least 25 battle deaths in {year}?",
++      coup: "Will {name} have a successful coup in {year}?",
++      crisis: "Will {name} have a banking, currency or sovereign-debt crisis in {year}?",
++      democracy: "Will {name} be a democracy (V-Dem Regimes of the World ≥ 2) at the end of {year}?",
++      gdp_pc_growth: "What will {name}'s real GDP per person growth be in {year}?",
++      debt_gdp: "What will {name}'s gross public debt be at the end of {year}, as a share of GDP?",
++    },
++    rulesTemplates: {
++      conflict: "Resolves YES if UCDP/PRIO records at least 25 battle deaths in an armed conflict involving the government of {name} in calendar {year}.",
++      coup: "Resolves YES if the Powell and Thyne dataset records a successful coup in {name} in calendar {year}.",
++      crisis: "Resolves YES if Laeven-Valencia (or JST) records a banking, currency or sovereign-debt crisis starting or ongoing in {name} in {year}.",
++      democracy: "Resolves YES if V-Dem's Regimes of the World classifies {name} as electoral or liberal democracy (≥ 2) for {year}.",
++      gdp_pc_growth: "Resolves to the interval that contains the real GDP per person growth of {name} in {year} (PWT rgdpna/pop, or the IMF WEO when PWT has not covered the year).",
++      debt_gdp: "Resolves to the interval that contains {name}'s gross general-government debt / GDP at the end of {year} (IMF WEO / Global Macro Database).",
++    },
++    units: { gdp_pc_growth: "%/year", debt_gdp: "% of GDP" },
++    errors: {
++      edges: "Write 2 to 11 increasing cuts separated by commas.",
++      text: "The question and its rules need at least 5 characters.",
++    },
++  },
++} as const;
++
++export const world4Es: Widen<typeof world4En> = {
++  title: "Explorador del mundo",
++  subtitle: "180 países que actúan como agentes del sistema-mundo, los flujos entre ellos y las regiones hasta 2100",
++  honesty:
++    "Exploratorio. Las bandas por país son el ensemble crudo del L1, a 1-10 años desde 2019; el L0 hasta 2100 es un modo de comportamiento, no un pronóstico. Los efectos de las palancas son supuestos [M].",
++  run: "Corrida",
++  noRuns:
++    "Aún no hay ninguna corrida terminada de World4. Lanza abajo un escenario de política: a L1 (unos 13 s) el globo muestra los 180 países como agentes; a L0 (unos 3 s) colorea cada país con su región del L0.",
++  loading: "Cargando los datos del explorador de la corrida…",
++  missing: "Esta corrida no tiene datos del explorador (world.json / geo.json). Las corridas anteriores a F10 no los llevan: lánzala de nuevo.",
++  refresh: "Actualizar corridas",
++  runLabel: "{family} · {fidelity} · {narrative} · {date}",
++  tabs: { label: "Secciones del explorador", globe: "Globo", graph: "Grafo de la corrida", ask: "Preguntar" },
++  badges: {
++    exploratory: "exploratorio",
++    l0only: "sólo L0: sin países-agente",
++    members: "{n} miembros",
++    states: "{n} estados del mundo",
++  },
++  globe: {
++    layer: "Capa",
++    flows: "Flujos",
++    flowsTrade: "Comercio",
++    flowsDrain: "Drenaje de valor",
++    flowsNone: "Ninguno",
++    agents: "Agentes",
++    events: "Eventos",
++    rotate: "Rotación",
++    play: "Reproducir",
++    pause: "Pausa",
++    year: "Año",
++    legendRange: "{lo} … {hi} {unit}",
++    legendNote: "color = p50 entre países (percentiles 5-95 de todos los años); gris = no simulado",
++    regionNote: "Corrida L0: cada país toma el valor de su región del L0",
++    hoverNoData: "no simulado",
++    webglMissing: "Esta máquina no puede crear un contexto WebGL, así que el globo no se puede dibujar. El grafo de la corrida y las preguntas siguen funcionando.",
++    flowsNote: "Arcos: los {n} mayores enlaces de {kind} del año. Comercio = cuotas de exportación COW (red de 2014) x PIB x apertura; drenaje = la regla de intercambio desigual del L1.",
++    agentsNote: "Puntos: países con tamaño según su PIB y color según el canal de decisión hacia el que se movieron este año (gris = ningún movimiento de 0,2 puntos o más); anillos: conflicto civil en la mitad de los miembros, crisis en una cuarta parte o golpe en una décima.",
++    growth: "Crecimiento del PIB per cápita",
++    growthUnit: "% anual (p50 frente al año anterior)",
++  },
++  layers: {
++    gdp_pc: "PIB per cápita",
++    growth: "Crecimiento del PIB per cápita",
++    population: "Población",
++    coreness: "Centralidad (posición en el sistema-mundo)",
++    asabiya: "Asabiya (solidaridad colectiva)",
++    debt_gdp: "Deuda pública / PIB",
++    democracy: "Democracia (probabilidad)",
++    conflict_hazard: "Riesgo de conflicto",
++    conflict: "Conflicto civil (fracción de miembros)",
++    crisis: "Crisis financiera (fracción de miembros)",
++    coup: "Golpe de Estado (fracción de miembros)",
++    drain: "Drenaje de valor (intercambio desigual)",
++    net_rents: "Rentas netas recibidas",
++    resource_rents: "Rentas de recursos / PIB",
++    co2: "Emisiones fósiles de CO2",
++    primary_energy: "Energía primaria",
++    food_supply: "Suministro de alimentos",
++    l0_gdp_pc: "PIB per cápita de la región (L0)",
++    l0_population: "Población de la región (L0)",
++    l0_debt_gdp: "Deuda pública / PIB de la región (L0)",
++    l0_cereal_pc: "Cereal per cápita de la región, 2019 = 1 (L0)",
++    l0_nonfossil_share: "Cuota de energía no fósil de la región (L0)",
++    world_gmst: "GMST (°C sobre 1850-1900)",
++    world_resource_rent_share: "Cuota mundial de rentas de recursos",
++    world_oil_price: "Precio del petróleo (USD 2019/barril)",
++  },
++  nodes: {
++    data_atlas: { label: "Panel del Atlas 1950-2019", description: "el panel del Atlas del Sistema-Mundo en el commit fijado (PWT, WDI, UCDP/PRIO, V-Dem…)" },
++    data_wpp: { label: "UN WPP 2024 (edades y sexos)", description: "población por edad simple y sexo" },
++    data_energy: { label: "Energy Institute / OWID", description: "mezcla de energía primaria por fuente" },
++    data_climate: { label: "FaIR 1.6.0 + CO2 observado", description: "ensemble de FaIR calibrado y restringido" },
++    data_food: { label: "FAOSTAT", description: "cereales, tierras, N, riego y suministro de alimentos" },
++    sec_population: { label: "F1 población y capital humano", description: "cohortes por edad simple y sexo (WPP 2024) y escolaridad por cohorte, acopladas al L1" },
++    sec_resources: { label: "F2 mercados mundiales de recursos", description: "mercados de petróleo, gas, carbón y metales con agotamiento: la cuota mundial de rentas de recursos psi_t" },
++    sec_energy: { label: "F3 energía con EROI", description: "mezcla de energía primaria por país (fósil, nuclear, hidro, eólica + solar, otras), EROI y energía neta" },
++    sec_climate: { label: "F4 clima (FaIR v2.2.4)", description: "FaIR con el ensemble calibrado y restringido 1.6.0; emisiones desde F1-F3 y F5" },
++    sec_food: { label: "F5 alimentos, suelo, N y agua", description: "cereales, cultivos, pastos, bosque, N mineral, riego y calorías por país" },
++    agents: { label: "Países-agente del L1", description: "el ABM del Atlas: cada país reparte su renta entre seis canales con la regla de conducta clonada de 1950-2019; capas de sistema-mundo, estructural-demográfica y de frontera metaétnica" },
++    flows: { label: "Flujos del sistema-mundo", description: "comercio bilateral (cuotas COW) y el drenaje por intercambio desigual de la periferia al centro" },
++    l0: { label: "L0 regional (10 regiones, 112 stocks)", description: "la misma estructura que el L1 agregada a 10 regiones de estilo IAM; posterior de F7 (corte 2019)" },
++    levers: { label: "Palancas de política (theta)", description: "las siete palancas actúan sobre el L0 desde 2019 con una rampa; sus efectos son supuestos [M]" },
++    search: { label: "Búsqueda robusta de políticas (phycore.Designer)", description: "NSGA-II sobre el ensemble del L0; los límites como restricciones (patrón MORDM)" },
++    objectives: { label: "Objetivos robustos", description: "minimizados sobre el ensemble: menos el p10 del bienestar, el p90 del pico de GMST y menos el p10 de la región más pobre" },
++    limits: { label: "Límites declarados", description: "suelo de alimentos, techo de tierras y techo de deuda (g <= 0 es dentro)" },
++    prime_radiant: { label: "Prime Radiant (etapa estructural)", description: "el L1 de World4 responde preguntas estructurales (conflicto, golpe, crisis, democracia, crecimiento, deuda) en el pronóstico d1, respetando el corte as-of" },
++    quo: { label: "QUO", description: "lee las corridas con phy_run_status y pregunta a World4 con world4_read" },
++  },
++  pulse: {
++    title: "Pulso del mundo · {year}",
++    world: "Mundo",
++    movers: "Agentes que actúan este año",
++    moversNote: "mayor desplazamiento de la renta entre los seis canales frente al año anterior (medianas del ensemble)",
++    events: "Eventos",
++    eventsNone: "Ningún país cruza los umbrales de evento este año.",
++    eventConflict: "conflicto civil en el {p} de los miembros",
++    eventCrisis: "crisis financiera en el {p} de los miembros",
++    eventCoup: "golpe en el {p} de los miembros",
++    l0Title: "Regiones hasta 2100 (L0, política frente a no hacer nada)",
++    gmst2100: "GMST 2100",
++    noPolicy: "sin política",
++    withPolicy: "esta política",
++    shiftIn: "+{pp} pp hacia {channel}",
++    shiftOut: "−{pp} pp desde {channel}",
++    pickHint: "Haz clic en un país del globo para abrirlo como agente.",
++  },
++  agent: {
++    close: "Cerrar",
++    region: "Región L0 {region}",
++    state: "Estado en {year}",
++    band: "p10-p90",
++    trajectory: "{layer}, 2019-2029",
++    decisions: "Decisiones: cómo reparte el agente su renta",
++    decisionsNote: "Medianas del ensemble de los seis canales de la regla de conducta (observados hasta 2019, regla clonada después). Fracciones de la renta nacional.",
++    biggest: "Mayor movimiento en {year}: {shift}",
++    noMove: "Sin movimiento notable en {year}.",
++    partners: "Socios en {year}",
++    exportsTo: "Exporta a",
++    importsFrom: "Importa de",
++    drainsTo: "Valor drenado hacia",
++    drainsFrom: "Valor recibido de",
++    none: "—",
++    askQuo: "Preguntar a QUO sobre {name}",
++    askPr: "Pronosticar con Prime Radiant",
++    notSimulated: "{name} no está entre los países que simula el L1.",
++  },
++  channels: {
++    k: "Capital doméstico",
++    r: "Tecnología propia",
++    m: "Importar del centro",
++    x: "Extracción propia",
++    f: "Recursos fuera",
++    w: "Redistribución",
++  },
++  graph: {
++    modeFlow: "Flujo de información",
++    modeLoops: "Lazos de realimentación",
++    flowHelp: "De los datos (con SHA-256 y licencia) a los sectores, los países-agente, el L0, las palancas y la búsqueda, y de ahí a Prime Radiant y QUO. Cada nodo lleva los números de ESTA corrida. Haz clic en un nodo.",
++    loopsHelp: "La vista mundial del L0: stocks (nodos) unidos por sus flujos. Los lazos dominantes cambian por década (puntuación de Loops that Matter; + refuerzo, − equilibrio). Haz clic en un lazo para seguirlo.",
++    pick: "Elige un nodo para ver sus números, salvedades y procedencia.",
++    metrics: "Números de esta corrida",
++    caveats: "Salvedades",
++    provenance: "Procedencia",
++    series: "Trayectoria",
++    status: { ok: "ok", missing: "falta", skipped: "no corrido", violated: "violado" },
++    kinds: {
++      data: "Datos",
++      sector: "Sector",
++      agents: "Agentes",
++      flows: "Flujos",
++      model: "Modelo",
++      policy: "Política",
++      search: "Búsqueda",
++      objectives: "Objetivos",
++      constraints: "Límites",
++      consumer: "Consumidor",
++    },
++    decade: "Década desde {year}",
++    topLoops: "Lazos dominantes",
++    score: "puntuación {s}",
++    noLoops: "Esta corrida no trae análisis de lazos.",
++    objectivesTitle: "Esta política frente a no hacer nada",
++    feasible: "dentro de todos los límites declarados",
++    infeasible: "viola al menos un límite declarado",
++    better: "mejor bienestar en el {w} de los mundos · menor pico de calentamiento en el {g}",
++  },
++  ask: {
++    quoTitle: "Preguntar a QUO",
++    quoHelp: "QUO lee esta corrida con world4_read (run_summary, run_country) y puede consultar World4 por su cuenta. La pregunta va a tu chat activo.",
++    placeholder: "Pregunta sobre esta corrida, un país o una política…",
++    send: "Enviar a QUO",
++    sending: "Enviando…",
++    queued: "En cola: QUO está terminando otro turno.",
++    streaming: "QUO está respondiendo…",
++    openChat: "Abrir el chat completo",
++    you: "Tú",
++    quo: "QUO",
++    empty: "La respuesta aparece aquí.",
++    context: "Contexto enviado con la pregunta: corrida {run}, {family} a {fidelity}, narrativa {narrative}{country}.",
++    contextCountry: ", país {name} ({iso3})",
++    suggestions: {
++      country: "¿Por qué {name} reparte así su renta y qué impulsa su riesgo de conflicto?",
++      policy: "Compara esta política con no hacer nada: ¿dónde ayuda y dónde falla (PRIM)?",
++      drain: "¿Qué países pierden más valor hacia el centro en esta corrida, y hacia quién?",
++      limits: "¿Qué límite declarado es el que ata, y es un WALL?",
++    },
++    prTitle: "Preguntar a Prime Radiant",
++    prHelp: "Crea una pregunta de pronóstico ligada a un observable de World4. Su etapa estructural usará el L1 de World4 para ese país; lanzar el pronóstico gasta el presupuesto del enjambre y se hace desde Prime Radiant.",
++    variable: "Observable",
++    country: "País",
++    closes: "Cierra en",
++    text: "Pregunta",
++    rules: "Reglas de resolución",
++    edges: "Cortes de los intervalos ({unit})",
++    world4Says: "World4 en esta corrida ({year}): {value}",
++    world4NoValue: "World4 no tiene valor para este observable en esta corrida.",
++    create: "Crear la pregunta",
++    creating: "Creando…",
++    created: "Pregunta creada ({id}).",
++    openPr: "Abrir Prime Radiant",
++    variables: {
++      conflict: "Conflicto civil (sí/no)",
++      coup: "Golpe de Estado exitoso (sí/no)",
++      crisis: "Crisis financiera (sí/no)",
++      democracy: "Democracia al cierre del año (sí/no)",
++      gdp_pc_growth: "Crecimiento del PIB per cápita (%/año)",
++      debt_gdp: "Deuda pública (% del PIB)",
++    },
++    templates: {
++      conflict: "¿Tendrá {name} un conflicto armado con al menos 25 muertes en combate en {year}?",
++      coup: "¿Tendrá {name} un golpe de Estado exitoso en {year}?",
++      crisis: "¿Tendrá {name} una crisis bancaria, cambiaria o de deuda soberana en {year}?",
++      democracy: "¿Será {name} una democracia (Regimes of the World de V-Dem ≥ 2) al cierre de {year}?",
++      gdp_pc_growth: "¿Cuál será el crecimiento real del PIB per cápita de {name} en {year}?",
++      debt_gdp: "¿Cuál será la deuda pública bruta de {name} al cierre de {year}, como fracción del PIB?",
++    },
++    rulesTemplates: {
++      conflict: "Se resuelve SÍ si UCDP/PRIO registra al menos 25 muertes en combate en un conflicto armado en el que participe el gobierno de {name} en el año natural {year}.",
++      coup: "Se resuelve SÍ si la base de Powell y Thyne registra un golpe de Estado exitoso en {name} en el año natural {year}.",
++      crisis: "Se resuelve SÍ si Laeven-Valencia (o JST) registra una crisis bancaria, cambiaria o de deuda soberana que empiece o siga en {name} en {year}.",
++      democracy: "Se resuelve SÍ si Regimes of the World de V-Dem clasifica a {name} como democracia electoral o liberal (≥ 2) en {year}.",
++      gdp_pc_growth: "Se resuelve al intervalo que contiene el crecimiento real del PIB per cápita de {name} en {year} (PWT rgdpna/pop, o el WEO del FMI si la PWT aún no cubre el año).",
++      debt_gdp: "Se resuelve al intervalo que contiene la deuda bruta del gobierno general / PIB de {name} al cierre de {year} (WEO del FMI / Global Macro Database).",
++    },
++    units: { gdp_pc_growth: "%/año", debt_gdp: "% del PIB" },
++    errors: {
++      edges: "Escribe de 2 a 11 cortes crecientes separados por comas.",
++      text: "La pregunta y sus reglas necesitan al menos 5 caracteres.",
++    },
++  },
++};
+diff --git a/frontend/src/components/world4/AskPanel.tsx b/frontend/src/components/world4/AskPanel.tsx
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/components/world4/AskPanel.tsx
+@@ -0,0 +1,269 @@
++"use client";
++
++// Pestaña "Ask" del explorador de World4: preguntar a QUO (por el MISMO stream del chat activo) y crear una
++// pregunta de Prime Radiant ligada a un observable de World4 (el vínculo estructural de F0.5).
++//
++// QUO recibe la pregunta con una línea de contexto (corrida, familia, fidelidad, narrativa y país) para que
++// lea la corrida con `world4_read` (`run_summary` / `run_country`). La pregunta de Prime Radiant sólo se
++// CREA: lanzar el pronóstico gasta el presupuesto del enjambre y se hace desde Prime Radiant.
++
++import { useMemo, useState } from "react";
++import { ExternalLink, Send } from "lucide-react";
++
++import { agentSwitchView } from "@/lib/agent-events";
++import { useT } from "@/lib/i18n";
++import { prApi } from "@/lib/primeRadiant";
++import { centralValue, type World4RunData } from "@/lib/world4";
++import { useAgentStream } from "@/stores/agentStream";
++import { AgentMarkdown } from "@/components/agent/AgentMarkdown";
++import { Badge, inputStyle, labelStyle, monoStyle, Notice } from "@/components/phy/ui";
++
++import type { AskTarget } from "./GlobeView";
++import { fmt, growthGrid, pct } from "./scales";
++
++const VARIABLES = ["conflict", "coup", "crisis", "democracy", "gdp_pc_growth", "debt_gdp"] as const;
++type Variable = (typeof VARIABLES)[number];
++// Cortes por defecto de las preguntas numéricas (la unidad sale del diccionario: world4.ask.units).
++const NUMERIC: Partial<Record<Variable, { edges: string }>> = {
++  gdp_pc_growth: { edges: "-2, 0, 2, 4" },
++  debt_gdp: { edges: "40, 60, 80, 100" },
++};
++
++const card: React.CSSProperties = { background: "var(--surface-0)", border: "1px solid rgba(255,255,255,0.06)" };
++const primaryBtn: React.CSSProperties = {
++  background: "var(--electric)", color: "#0A0E14", fontFamily: "var(--quasar-font-mono)", fontSize: "12px",
++};
++const ghostBtn: React.CSSProperties = {
++  background: "transparent", color: "var(--ink-primary)", border: "1px solid rgba(255,255,255,0.18)",
++  fontFamily: "var(--quasar-font-mono)", fontSize: "12px",
++};
++
++export function AskPanel({ data, family, fidelity, focus }: {
++  data: World4RunData;
++  family: string;
++  fidelity: string;
++  focus: AskTarget | null;
++}) {
++  return (
++    <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))" }}>
++      {/* el foco (un país pedido desde el globo) remonta cada caja con su estado inicial */}
++      <QuoBox key={`quo-${focus?.target}-${focus?.iso3 ?? ""}`} data={data} family={family} fidelity={fidelity} focus={focus} />
++      <PrimeRadiantBox key={`pr-${focus?.iso3 ?? ""}`} data={data} focus={focus} />
++    </div>
++  );
++}
++
++// ── QUO ──────────────────────────────────────────────────────────────────────
++
++function QuoBox({ data, family, fidelity, focus }: { data: World4RunData; family: string; fidelity: string; focus: AskTarget | null }) {
++  const t = useT();
++  const messages = useAgentStream((s) => s.messages);
++  const streaming = useAgentStream((s) => s.isStreaming);
++  const [text, setText] = useState(() =>
++    focus?.target === "quo" && focus.name ? t("world4.ask.suggestions.country", { name: focus.name }) : "");
++  const [from, setFrom] = useState<number | null>(null);
++  const [state, setState] = useState<"idle" | "sending" | "queued">("idle");
++  const country = focus?.iso3 ? { iso3: focus.iso3, name: focus.name ?? focus.iso3 } : null;
++
++  const context = t("world4.ask.context", {
++    run: data.runId, family, fidelity, narrative: data.world.narrative,
++    country: country ? t("world4.ask.contextCountry", { name: country.name, iso3: country.iso3 }) : "",
++  });
++  const suggestions = [
++    ...(country ? [t("world4.ask.suggestions.country", { name: country.name })] : []),
++    t("world4.ask.suggestions.policy"),
++    ...(data.world.l1 ? [t("world4.ask.suggestions.drain")] : []),
++    t("world4.ask.suggestions.limits"),
++  ];
++
++  const send = async () => {
++    const q = text.trim();
++    if (!q) return;
++    setState("sending");
++    const store = useAgentStream.getState();
++    store.connect();
++    setFrom(store.messages.length);
++    const tool = country
++      ? `world4_read("run_country", {"run_id": "${data.runId}", "iso3": "${country.iso3}"})`
++      : `world4_read("run_summary", {"run_id": "${data.runId}"})`;
++    const r = await store.sendMessage(`${q}\n\n[${context} Read it with ${tool}.]`);
++    setState(r === "queued" ? "queued" : "idle");
++    setText("");
++  };
++
++  const thread = from === null ? [] : messages.slice(from);
++  return (
++    <div className="flex flex-col gap-3 rounded-lg p-4" style={card}>
++      <div className="flex items-center justify-between gap-2">
++        <span style={{ fontFamily: "var(--quasar-font-display)", fontSize: "16px", color: "var(--ink-primary)" }}>{t("world4.ask.quoTitle")}</span>
++        <button type="button" onClick={() => agentSwitchView("agente")} className="flex items-center gap-1 rounded-md px-2 py-1" style={ghostBtn}>
++          <ExternalLink size={12} /> {t("world4.ask.openChat")}
++        </button>
++      </div>
++      <span style={{ ...monoStyle, fontSize: "11px" }}>{t("world4.ask.quoHelp")}</span>
++      <div className="flex flex-wrap gap-1.5">
++        {suggestions.map((s) => (
++          <button key={s} type="button" onClick={() => setText(s)} className="rounded-full px-2.5 py-1 text-left"
++            style={{ ...monoStyle, fontSize: "11px", border: "1px solid rgba(255,255,255,0.12)", background: "var(--surface-1)" }}>
++            {s}
++          </button>
++        ))}
++      </div>
++      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={t("world4.ask.placeholder")}
++        style={{ ...inputStyle, resize: "vertical" }}
++        onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) void send(); }} />
++      <span style={{ ...monoStyle, fontSize: "10px", color: "var(--ink-dim)" }}>{context}</span>
++      <div className="flex items-center gap-2">
++        <button type="button" onClick={() => void send()} disabled={!text.trim() || state === "sending"}
++          className="flex items-center gap-1.5 rounded-md px-3 py-1.5" style={{ ...primaryBtn, opacity: text.trim() ? 1 : 0.5 }}>
++          <Send size={12} /> {state === "sending" ? t("world4.ask.sending") : t("world4.ask.send")}
++        </button>
++        {state === "queued" ? <Badge tone="dim">{t("world4.ask.queued")}</Badge> : null}
++        {streaming && from !== null ? <Badge tone="warn">{t("world4.ask.streaming")}</Badge> : null}
++      </div>
++      <div className="flex flex-col gap-2 overflow-auto rounded-md p-3" style={{ maxHeight: 420, background: "var(--surface-1)" }}>
++        {thread.length ? thread.map((m) => (
++          <div key={m.id} className="flex flex-col gap-1">
++            <span style={{ ...labelStyle, fontSize: "10px", color: m.role === "user" ? "var(--ink-dim)" : "var(--electric)" }}>
++              {m.role === "user" ? t("world4.ask.you") : t("world4.ask.quo")}
++            </span>
++            {m.role === "user"
++              ? <span style={{ ...monoStyle, fontSize: "12px", whiteSpace: "pre-wrap" }}>{m.content.split("\n\n[")[0]}</span>
++              : <div style={{ fontSize: "13px", color: "var(--ink-primary)" }}><AgentMarkdown>{m.content}</AgentMarkdown></div>}
++          </div>
++        )) : <span style={{ ...monoStyle, fontSize: "12px", color: "var(--ink-dim)" }}>{t("world4.ask.empty")}</span>}
++      </div>
++    </div>
++  );
++}
++
++// ── Prime Radiant ────────────────────────────────────────────────────────────
++
++function PrimeRadiantBox({ data, focus }: { data: World4RunData; focus: AskTarget | null }) {
++  const t = useT();
++  const countries = useMemo(() => {
++    const list = data.world.l1?.countries ?? data.world.l0.countries ?? [];
++    const names = new Map(data.geo.features.map((f) => [f.id, f.properties.name]));
++    return list.map((c) => ({ iso3: c.iso3, name: names.get(c.isonum) ?? c.iso3 }))
++      .sort((a, b) => a.name.localeCompare(b.name));
++  }, [data]);
++  const lastYear = data.world.l1?.years.at(-1) ?? 2029;
++  const nextYear = new Date().getUTCFullYear() + 1;
++  const [variable, setVariable] = useState<Variable>("conflict");
++  const [iso3, setIso3] = useState<string>(focus?.iso3 ?? countries[0]?.iso3 ?? "USA");
++  const [year, setYear] = useState<number>(nextYear);
++  const [busy, setBusy] = useState(false);
++  const [error, setError] = useState<string | null>(null);
++  const name = countries.find((c) => c.iso3 === iso3)?.name ?? iso3;
++  // Lo escrito por el usuario vale para UNA combinación (variable, país, año); al cambiarla vuelve la plantilla.
++  const key = `${variable}|${iso3}|${year}`;
++  const [edit, setEdit] = useState<{ key: string; text?: string; rules?: string; edges?: string; created?: string }>({ key });
++  const mine = edit.key === key ? edit : { key };
++  const patch = (p: Partial<typeof edit>) => setEdit({ ...mine, ...p, key });
++  const text = mine.text ?? t(`world4.ask.templates.${variable}`, { name, year });
++  const rules = mine.rules ?? t(`world4.ask.rulesTemplates.${variable}`, { name, year });
++  const edges = mine.edges ?? NUMERIC[variable]?.edges ?? "";
++  const created = mine.created ?? null;
++
++  // Lo que dice la corrida para ese país y año (si cae en el horizonte del L1).
++  const world4Says = useMemo(() => {
++    const l1 = data.world.l1;
++    if (!l1) return null;
++    const i = l1.countries.findIndex((c) => c.iso3 === iso3);
++    const k = l1.years.indexOf(Math.min(year, lastYear));
++    if (i < 0 || k < 0) return null;
++    const v = (key: string) => (l1.series[key] ? centralValue(l1.series[key], i, k) : null);
++    switch (variable) {
++      case "conflict": return v("conflict") !== null ? pct(v("conflict")) : null;
++      case "coup": return v("coup") !== null ? pct(v("coup")) : null;
++      case "crisis": return v("crisis") !== null ? pct(v("crisis")) : null;
++      case "democracy": return v("democracy") !== null ? pct(v("democracy")) : null;
++      case "debt_gdp": return v("debt_gdp") !== null ? `${fmt((v("debt_gdp") as number) * 100)} ${t("world4.ask.units.debt_gdp")}` : null;
++      case "gdp_pc_growth": {
++        const g = growthGrid(l1)[i]?.[k];
++        return g !== null && g !== undefined ? `${fmt(g)} ${t("world4.ask.units.gdp_pc_growth")}` : null;
++      }
++    }
++  }, [data, iso3, year, variable, lastYear, t]);
++
++  const create = async () => {
++    setError(null);
++    if (text.trim().length < 5 || rules.trim().length < 5) return setError(t("world4.ask.errors.text"));
++    const body: Record<string, unknown> = {
++      text: text.trim(), rules: rules.trim(), closes_at: `${year}-12-31T23:59:59Z`,
++      structural: { variable, region: iso3 },
++    };
++    if (NUMERIC[variable]) {
++      const cuts = edges.split(",").map((s) => Number(s.trim())).filter((x) => Number.isFinite(x));
++      const ok = cuts.length >= 2 && cuts.length <= 11 && cuts.every((x, i) => i === 0 || x > cuts[i - 1]);
++      if (!ok) return setError(t("world4.ask.errors.edges"));
++      body.numeric = { unit: t(`world4.ask.units.${variable}`), edges: cuts };
++    }
++    setBusy(true);
++    try {
++      const q = await prApi<{ id: string }>("/questions", "POST", body);
++      patch({ created: q.id });
++    } catch (e) {
++      setError(e instanceof Error ? e.message : String(e));
++    } finally {
++      setBusy(false);
++    }
++  };
++
++  const field = { display: "flex", flexDirection: "column" as const, gap: 4 };
++  return (
++    <div className="flex flex-col gap-3 rounded-lg p-4" style={card}>
++      <span style={{ fontFamily: "var(--quasar-font-display)", fontSize: "16px", color: "var(--ink-primary)" }}>{t("world4.ask.prTitle")}</span>
++      <span style={{ ...monoStyle, fontSize: "11px" }}>{t("world4.ask.prHelp")}</span>
++      <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr 110px" }}>
++        <label style={field}>
++          <span style={labelStyle}>{t("world4.ask.variable")}</span>
++          <select value={variable} onChange={(e) => setVariable(e.target.value as Variable)} style={inputStyle}>
++            {VARIABLES.map((v) => <option key={v} value={v}>{t(`world4.ask.variables.${v}`)}</option>)}
++          </select>
++        </label>
++        <label style={field}>
++          <span style={labelStyle}>{t("world4.ask.country")}</span>
++          <select value={iso3} onChange={(e) => setIso3(e.target.value)} style={inputStyle}>
++            {countries.map((c) => <option key={c.iso3} value={c.iso3}>{c.name} ({c.iso3})</option>)}
++          </select>
++        </label>
++        <label style={field}>
++          <span style={labelStyle}>{t("world4.ask.closes")}</span>
++          <input type="number" min={nextYear - 1} max={nextYear + 10} value={year} onChange={(e) => setYear(Number(e.target.value))} style={inputStyle} />
++        </label>
++      </div>
++      {NUMERIC[variable] ? (
++        <label style={field}>
++          <span style={labelStyle}>{t("world4.ask.edges", { unit: t(`world4.ask.units.${variable}`) })}</span>
++          <input value={edges} onChange={(e) => patch({ edges: e.target.value })} style={inputStyle} />
++        </label>
++      ) : null}
++      <label style={field}>
++        <span style={labelStyle}>{t("world4.ask.text")}</span>
++        <textarea value={text} onChange={(e) => patch({ text: e.target.value })} rows={2} style={{ ...inputStyle, resize: "vertical" }} />
++      </label>
++      <label style={field}>
++        <span style={labelStyle}>{t("world4.ask.rules")}</span>
++        <textarea value={rules} onChange={(e) => patch({ rules: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
++      </label>
++      <Notice tone="info">
++        {world4Says ? t("world4.ask.world4Says", { year: Math.min(year, lastYear), value: world4Says }) : t("world4.ask.world4NoValue")}
++      </Notice>
++      {error ? <Notice tone="err">{error}</Notice> : null}
++      <div className="flex flex-wrap items-center gap-2">
++        <button type="button" onClick={() => void create()} disabled={busy} className="rounded-md px-3 py-1.5" style={primaryBtn}>
++          {busy ? t("world4.ask.creating") : t("world4.ask.create")}
++        </button>
++        {created ? (
++          <>
++            <Badge tone="ok">{t("world4.ask.created", { id: created.slice(0, 8) })}</Badge>
++            <button type="button" onClick={() => agentSwitchView("prime-radiant")} className="flex items-center gap-1 rounded-md px-2 py-1" style={ghostBtn}>
++              <ExternalLink size={12} /> {t("world4.ask.openPr")}
++            </button>
++          </>
++        ) : null}
++      </div>
++    </div>
++  );
++}
+diff --git a/frontend/src/components/world4/Globe3D.tsx b/frontend/src/components/world4/Globe3D.tsx
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/components/world4/Globe3D.tsx
+@@ -0,0 +1,545 @@
++"use client";
++
++// Globo 3D del explorador de World4 (F10). three.js puro (ya es dependencia de Studio), sin globe.gl:
++//
++//   · los países se pintan en un CANVAS equirectangular que es la textura de la esfera: recolorear por capa
++//     o año es redibujar 177 polígonos, no retriangular nada en la esfera;
++//   · los flujos (comercio, drenaje) son arcos de círculo máximo elevados, en UN LineSegments con color por
++//     vértice y mezcla aditiva, más partículas que viajan por ellos (sentido = origen → destino);
++//   · los agentes son UN Points con shader propio: disco por país y anillo que late cuando hay evento;
++//   · la selección es un raycast a la esfera → uv → lon/lat → punto en polígono.
++//
++// Convención (la de SphereGeometry): u = (lon + 180) / 360, v = (90 - lat) / 180, con el canvas arriba = norte.
++
++import { useEffect, useRef } from "react";
++import * as THREE from "three";
++import { OrbitControls } from "three/addons/controls/OrbitControls.js";
++
++import type { GeoFeature } from "@/lib/world4";
++
++export interface GlobeArc {
++  a: [number, number];
++  b: [number, number];
++  /** Peso 0-1 (valor relativo al mayor del año). */
++  w: number;
++  color: string;
++}
++
++export interface GlobeAgent {
++  lon: number;
++  lat: number;
++  /** Tamaño relativo 0-1. */
++  size: number;
++  color: string;
++  /** 0 = sin evento; > 0 = anillo que late. */
++  pulse: number;
++  feature: number;
++}
++
++export interface Globe3DProps {
++  features: GeoFeature[];
++  fills: (string | null)[];
++  selected: number | null;
++  arcs: GlobeArc[];
++  agents: GlobeAgent[];
++  autoRotate: boolean;
++  onPick: (feature: number | null) => void;
++  onHover: (feature: number | null, x: number, y: number) => void;
++  onError?: (message: string) => void;
++  height?: number;
++}
++
++const TEX_W = 4096;
++const TEX_H = 2048;
++const OCEAN = "#0a1622";
++const NO_DATA = "rgba(120,135,150,0.35)";
++const ARC_SEGMENTS = 48;
++const PARTICLES_PER_ARC = 2;
++
++export function lonLatToVec3(lon: number, lat: number, r = 1): THREE.Vector3 {
++  const phi = ((lon + 180) / 360) * Math.PI * 2;
++  const theta = ((90 - lat) / 180) * Math.PI;
++  return new THREE.Vector3(-Math.cos(phi) * Math.sin(theta) * r, Math.cos(theta) * r, Math.sin(phi) * Math.sin(theta) * r);
++}
++
++// ── geometría de los países ──────────────────────────────────────────────────
++
++type Ring = [number, number][];
++interface Prepared {
++  polys: Ring[][]; // polígono → anillos (el 0 es el exterior) con longitudes desenrolladas
++  bbox: [number, number, number, number];
++}
++
++function unwrap(ring: number[][]): Ring {
++  const out: Ring = [];
++  let prev = ring[0]?.[0] ?? 0;
++  for (const [lon0, lat] of ring) {
++    let lon = lon0;
++    while (lon - prev > 180) lon -= 360;
++    while (lon - prev < -180) lon += 360;
++    out.push([lon, lat]);
++    prev = lon;
++  }
++  return out;
++}
++
++function prepare(f: GeoFeature): Prepared {
++  const polys = (f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates).map((p) =>
++    p.map((r) => unwrap(r)),
++  );
++  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
++  for (const p of polys) for (const [x, y] of p[0] ?? []) {
++    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
++  }
++  return { polys, bbox: [x0, y0, x1, y1] };
++}
++
++function inRing(x: number, y: number, ring: Ring): boolean {
++  let inside = false;
++  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
++    const [xi, yi] = ring[i];
++    const [xj, yj] = ring[j];
++    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi + 1e-12) + xi) inside = !inside;
++  }
++  return inside;
++}
++
++function pick(prep: Prepared[], lon: number, lat: number): number | null {
++  for (let k = 0; k < prep.length; k++) {
++    const { polys, bbox } = prep[k];
++    for (const x of [lon, lon - 360, lon + 360]) {
++      if (x < bbox[0] || x > bbox[2] || lat < bbox[1] || lat > bbox[3]) continue;
++      for (const p of polys) {
++        if (!p[0] || !inRing(x, lat, p[0])) continue;
++        if (p.slice(1).some((hole) => inRing(x, lat, hole))) continue;
++        return k;
++      }
++    }
++  }
++  return null;
++}
++
++function drawTexture(ctx: CanvasRenderingContext2D, prep: Prepared[], fills: (string | null)[], selected: number | null) {
++  ctx.fillStyle = OCEAN;
++  ctx.fillRect(0, 0, TEX_W, TEX_H);
++  // retícula cada 30°
++  ctx.strokeStyle = "rgba(92,200,232,0.07)";
++  ctx.lineWidth = 2;
++  for (let lon = -180; lon <= 180; lon += 30) {
++    const x = ((lon + 180) / 360) * TEX_W;
++    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, TEX_H); ctx.stroke();
++  }
++  for (let lat = -60; lat <= 60; lat += 30) {
++    const y = ((90 - lat) / 180) * TEX_H;
++    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(TEX_W, y); ctx.stroke();
++  }
++  const trace = (k: number) => {
++    const { polys, bbox } = prep[k];
++    ctx.beginPath();
++    for (const off of [-360, 0, 360]) {
++      if (bbox[2] + off < -180 || bbox[0] + off > 180) continue;
++      for (const p of polys) for (const ring of p) {
++        ring.forEach(([lon, lat], i) => {
++          const x = ((lon + off + 180) / 360) * TEX_W;
++          const y = ((90 - lat) / 180) * TEX_H;
++          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
++        });
++        ctx.closePath();
++      }
++    }
++  };
++  for (let k = 0; k < prep.length; k++) {
++    trace(k);
++    ctx.fillStyle = fills[k] ?? NO_DATA;
++    ctx.fill("evenodd");
++    ctx.strokeStyle = "rgba(10,22,34,0.85)";
++    ctx.lineWidth = 2.2;
++    ctx.stroke();
++  }
++  if (selected !== null && prep[selected]) {
++    trace(selected);
++    ctx.strokeStyle = "#F5F7FA";
++    ctx.lineWidth = 7;
++    ctx.stroke();
++  }
++}
++
++// ── arcos ────────────────────────────────────────────────────────────────────
++
++function arcPoints(a: [number, number], b: [number, number]): THREE.Vector3[] {
++  const va = lonLatToVec3(a[0], a[1]);
++  const vb = lonLatToVec3(b[0], b[1]);
++  const ang = va.angleTo(vb);
++  const lift = 0.04 + 0.32 * (ang / Math.PI);
++  const pts: THREE.Vector3[] = [];
++  const q = new THREE.Quaternion();
++  const axis = new THREE.Vector3().crossVectors(va, vb).normalize();
++  for (let i = 0; i <= ARC_SEGMENTS; i++) {
++    const t = i / ARC_SEGMENTS;
++    q.setFromAxisAngle(axis.lengthSq() > 0 ? axis : new THREE.Vector3(0, 1, 0), ang * t);
++    const p = va.clone().applyQuaternion(q);
++    pts.push(p.multiplyScalar(1.004 + lift * Math.sin(Math.PI * t)));
++  }
++  return pts;
++}
++
++const AGENT_VERT = `
++attribute float aSize; attribute vec3 aColor; attribute float aPulse;
++uniform float uScale;
++varying vec3 vColor; varying float vPulse;
++void main() {
++  vColor = aColor; vPulse = aPulse;
++  vec4 mv = modelViewMatrix * vec4(position, 1.0);
++  float s = aSize * (aPulse > 0.0 ? 3.0 : 1.0);
++  gl_PointSize = s * uScale / -mv.z;
++  gl_Position = projectionMatrix * mv;
++}`;
++
++const AGENT_FRAG = `
++uniform float uTime;
++varying vec3 vColor; varying float vPulse;
++void main() {
++  vec2 c = gl_PointCoord - 0.5;
++  float d = length(c);
++  float coreR = vPulse > 0.0 ? 0.5 / 3.0 : 0.5;
++  float core = 1.0 - smoothstep(coreR * 0.55, coreR, d);
++  float alpha = core * 0.95;
++  vec3 col = vColor;
++  if (vPulse > 0.0) {
++    float ph = fract(uTime * 0.7 + vPulse * 0.37);
++    float r = coreR + ph * (0.5 - coreR);
++    float ring = (1.0 - smoothstep(0.0, 0.035, abs(d - r))) * (1.0 - ph);
++    col = mix(col, vec3(0.97, 0.36, 0.30), ring);
++    alpha = max(alpha, ring * 0.9);
++  }
++  if (alpha < 0.02) discard;
++  gl_FragColor = vec4(col, alpha);
++}`;
++
++const GLOW_VERT = `
++varying vec3 vNormal;
++void main() { vNormal = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
++const GLOW_FRAG = `
++varying vec3 vNormal;
++void main() { float i = pow(0.72 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.2); gl_FragColor = vec4(0.23, 0.63, 1.0, 1.0) * i; }`;
++
++interface SceneState {
++  renderer: THREE.WebGLRenderer;
++  scene: THREE.Scene;
++  camera: THREE.PerspectiveCamera;
++  controls: OrbitControls;
++  globe: THREE.Mesh;
++  canvas: HTMLCanvasElement;
++  ctx: CanvasRenderingContext2D;
++  texture: THREE.CanvasTexture;
++  arcs: THREE.LineSegments | null;
++  particles: THREE.Points | null;
++  particlePaths: { pts: THREE.Vector3[]; offset: number; speed: number }[];
++  agents: THREE.Points | null;
++  agentMat: THREE.ShaderMaterial;
++  frame: number;
++  visible: boolean;
++}
++
++export function Globe3D({ features, fills, selected, arcs, agents, autoRotate, onPick, onHover, onError, height = 560 }: Globe3DProps) {
++  const hostRef = useRef<HTMLDivElement | null>(null);
++  const stateRef = useRef<SceneState | null>(null);
++  const prepRef = useRef<Prepared[]>([]);
++  const cbRef = useRef({ onPick, onHover, onError });
++  useEffect(() => {
++    cbRef.current = { onPick, onHover, onError };
++  }, [onPick, onHover, onError]);
++
++  // Escena: una vez por montaje.
++  useEffect(() => {
++    const host = hostRef.current;
++    if (!host) return;
++    let renderer: THREE.WebGLRenderer;
++    try {
++      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
++    } catch (e) {
++      cbRef.current.onError?.(String(e));
++      return;
++    }
++    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
++    renderer.setSize(host.clientWidth, height);
++    renderer.outputColorSpace = THREE.SRGBColorSpace;
++    host.appendChild(renderer.domElement);
++    renderer.domElement.style.display = "block";
++    renderer.domElement.style.cursor = "grab";
++
++    const scene = new THREE.Scene();
++    const camera = new THREE.PerspectiveCamera(38, host.clientWidth / height, 0.05, 100);
++    camera.position.copy(lonLatToVec3(15, 22, 3.3));
++    const controls = new OrbitControls(camera, renderer.domElement);
++    controls.enableDamping = true;
++    controls.dampingFactor = 0.08;
++    controls.minDistance = 1.35;
++    controls.maxDistance = 5;
++    controls.enablePan = false;
++    controls.rotateSpeed = 0.55;
++    controls.autoRotateSpeed = 0.35;
++
++    scene.add(new THREE.AmbientLight(0xffffff, 1.6));
++    const sun = new THREE.DirectionalLight(0xffffff, 1.1);
++    camera.add(sun);
++    sun.position.set(-1.5, 1.2, 1);
++    scene.add(camera);
++
++    const canvas = document.createElement("canvas");
++    canvas.width = TEX_W;
++    canvas.height = TEX_H;
++    const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
++    const texture = new THREE.CanvasTexture(canvas);
++    texture.colorSpace = THREE.SRGBColorSpace;
++    texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
++    const globe = new THREE.Mesh(
++      new THREE.SphereGeometry(1, 128, 96),
++      new THREE.MeshStandardMaterial({ map: texture, roughness: 0.95, metalness: 0.0 }),
++    );
++    scene.add(globe);
++    const glow = new THREE.Mesh(
++      new THREE.SphereGeometry(1.09, 64, 48),
++      new THREE.ShaderMaterial({ vertexShader: GLOW_VERT, fragmentShader: GLOW_FRAG, side: THREE.BackSide,
++        blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }),
++    );
++    scene.add(glow);
++    // cielo de estrellas
++    const starPos = new Float32Array(1800 * 3);
++    for (let i = 0; i < 1800; i++) {
++      const v = new THREE.Vector3().randomDirection().multiplyScalar(30 + Math.random() * 20);
++      starPos.set([v.x, v.y, v.z], i * 3);
++    }
++    const starGeo = new THREE.BufferGeometry();
++    starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
++    scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x8fb4d8, size: 0.08, transparent: true, opacity: 0.55 })));
++
++    const agentMat = new THREE.ShaderMaterial({
++      vertexShader: AGENT_VERT, fragmentShader: AGENT_FRAG, transparent: true, depthWrite: false,
++      uniforms: { uTime: { value: 0 }, uScale: { value: 3.2 * renderer.getPixelRatio() } },
++    });
++
++    const st: SceneState = { renderer, scene, camera, controls, globe, canvas, ctx, texture, arcs: null, particles: null,
++      particlePaths: [], agents: null, agentMat, frame: 0, visible: true };
++    stateRef.current = st;
++
++    // ── interacción ────────────────────────────────────────────────────────
++    const ray = new THREE.Raycaster();
++    const ndc = new THREE.Vector2();
++    const featureAt = (ev: PointerEvent): number | null => {
++      const r = renderer.domElement.getBoundingClientRect();
++      ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
++      ray.setFromCamera(ndc, camera);
++      const hit = ray.intersectObject(globe, false)[0];
++      if (!hit?.uv) return null;
++      return pick(prepRef.current, hit.uv.x * 360 - 180, hit.uv.y * 180 - 90);
++    };
++    let down: { x: number; y: number } | null = null;
++    let hoverQueued = false;
++    const onDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY }; renderer.domElement.style.cursor = "grabbing"; };
++    const onUp = (e: PointerEvent) => {
++      renderer.domElement.style.cursor = "grab";
++      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 5) cbRef.current.onPick(featureAt(e));
++      down = null;
++    };
++    const onMove = (e: PointerEvent) => {
++      if (hoverQueued || down) return;
++      hoverQueued = true;
++      requestAnimationFrame(() => {
++        hoverQueued = false;
++        const r = renderer.domElement.getBoundingClientRect();
++        cbRef.current.onHover(featureAt(e), e.clientX - r.left, e.clientY - r.top);
++      });
++    };
++    const onLeave = () => cbRef.current.onHover(null, 0, 0);
++    renderer.domElement.addEventListener("pointerdown", onDown);
++    renderer.domElement.addEventListener("pointerup", onUp);
++    renderer.domElement.addEventListener("pointermove", onMove);
++    renderer.domElement.addEventListener("pointerleave", onLeave);
++
++    const resize = () => {
++      const w = host.clientWidth;
++      renderer.setSize(w, height);
++      camera.aspect = w / height;
++      camera.updateProjectionMatrix();
++    };
++    const ro = new ResizeObserver(resize);
++    ro.observe(host);
++    const io = new IntersectionObserver(([entry]) => { st.visible = entry.isIntersecting; });
++    io.observe(host);
++
++    const clock = new THREE.Clock();
++    const tick = () => {
++      st.frame = requestAnimationFrame(tick);
++      if (!st.visible || document.hidden) return;
++      const t = clock.getElapsedTime();
++      controls.update();
++      agentMat.uniforms.uTime.value = t;
++      const P = st.particles;
++      if (P) {
++        const pos = P.geometry.getAttribute("position") as THREE.BufferAttribute;
++        st.particlePaths.forEach((path, i) => {
++          const u = (t * path.speed + path.offset) % 1;
++          const x = u * ARC_SEGMENTS;
++          const k = Math.min(Math.floor(x), ARC_SEGMENTS - 1);
++          const a = path.pts[k], b = path.pts[k + 1];
++          const f = x - k;
++          pos.setXYZ(i, a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.z + (b.z - a.z) * f);
++        });
++        pos.needsUpdate = true;
++      }
++      renderer.render(scene, camera);
++    };
++    tick();
++
++    return () => {
++      cancelAnimationFrame(st.frame);
++      ro.disconnect();
++      io.disconnect();
++      renderer.domElement.removeEventListener("pointerdown", onDown);
++      renderer.domElement.removeEventListener("pointerup", onUp);
++      renderer.domElement.removeEventListener("pointermove", onMove);
++      renderer.domElement.removeEventListener("pointerleave", onLeave);
++      controls.dispose();
++      scene.traverse((o) => {
++        const m = o as THREE.Mesh;
++        m.geometry?.dispose?.();
++        const mat = m.material as THREE.Material | THREE.Material[] | undefined;
++        if (Array.isArray(mat)) mat.forEach((x) => x.dispose()); else mat?.dispose?.();
++      });
++      texture.dispose();
++      renderer.dispose();
++      renderer.domElement.remove();
++      stateRef.current = null;
++    };
++  }, [height]);
++
++  // Geometría preparada (una vez por conjunto de países).
++  useEffect(() => {
++    prepRef.current = features.map(prepare);
++  }, [features]);
++
++  // Textura: capa, año o selección.
++  useEffect(() => {
++    const st = stateRef.current;
++    if (!st || prepRef.current.length !== features.length) {
++      prepRef.current = features.map(prepare);
++    }
++    if (!st) return;
++    drawTexture(st.ctx, prepRef.current, fills, selected);
++    st.texture.needsUpdate = true;
++  }, [features, fills, selected]);
++
++  // Arcos y partículas.
++  useEffect(() => {
++    const st = stateRef.current;
++    if (!st) return;
++    for (const o of [st.arcs, st.particles]) {
++      if (!o) continue;
++      st.scene.remove(o);
++      o.geometry.dispose();
++      (o.material as THREE.Material).dispose();
++    }
++    st.arcs = null;
++    st.particles = null;
++    st.particlePaths = [];
++    if (!arcs.length) return;
++    const pos: number[] = [];
++    const col: number[] = [];
++    const ppos: number[] = [];
++    const pcol: number[] = [];
++    const c = new THREE.Color();
++    arcs.forEach((arc, n) => {
++      const pts = arcPoints(arc.a, arc.b);
++      c.set(arc.color);
++      const k = 0.18 + 0.82 * arc.w;
++      for (let i = 0; i < ARC_SEGMENTS; i++) {
++        const [p, q] = [pts[i], pts[i + 1]];
++        // degradado a lo largo del arco: más brillante hacia el destino
++        const f0 = k * (0.35 + 0.65 * (i / ARC_SEGMENTS));
++        const f1 = k * (0.35 + 0.65 * ((i + 1) / ARC_SEGMENTS));
++        pos.push(p.x, p.y, p.z, q.x, q.y, q.z);
++        col.push(c.r * f0, c.g * f0, c.b * f0, c.r * f1, c.g * f1, c.b * f1);
++      }
++      for (let j = 0; j < PARTICLES_PER_ARC; j++) {
++        st.particlePaths.push({ pts, offset: (j / PARTICLES_PER_ARC + n * 0.137) % 1, speed: 0.12 + 0.1 * arc.w });
++        ppos.push(0, 0, 0);
++        pcol.push(c.r, c.g, c.b);
++      }
++    });
++    const g = new THREE.BufferGeometry();
++    g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
++    g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
++    st.arcs = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true,
++      blending: THREE.AdditiveBlending, depthWrite: false }));
++    st.scene.add(st.arcs);
++    const pg = new THREE.BufferGeometry();
++    pg.setAttribute("position", new THREE.Float32BufferAttribute(ppos, 3));
++    pg.setAttribute("color", new THREE.Float32BufferAttribute(pcol, 3));
++    st.particles = new THREE.Points(pg, new THREE.PointsMaterial({ size: 0.022, vertexColors: true, transparent: true,
++      blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true }));
++    st.scene.add(st.particles);
++  }, [arcs]);
++
++  // Agentes.
++  useEffect(() => {
++    const st = stateRef.current;
++    if (!st) return;
++    if (st.agents) {
++      st.scene.remove(st.agents);
++      st.agents.geometry.dispose();
++      st.agents = null;
++    }
++    if (!agents.length) return;
++    const pos = new Float32Array(agents.length * 3);
++    const col = new Float32Array(agents.length * 3);
++    const size = new Float32Array(agents.length);
++    const pulse = new Float32Array(agents.length);
++    const c = new THREE.Color();
++    agents.forEach((a, i) => {
++      const v = lonLatToVec3(a.lon, a.lat, 1.006);
++      pos.set([v.x, v.y, v.z], i * 3);
++      c.set(a.feature === selected ? "#F5F7FA" : a.color);
++      col.set([c.r, c.g, c.b], i * 3);
++      size[i] = (a.feature === selected ? 1.5 : 1) * (3 + 10 * Math.sqrt(Math.max(a.size, 0)));
++      pulse[i] = a.pulse;
++    });
++    const g = new THREE.BufferGeometry();
++    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
++    g.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
++    g.setAttribute("aSize", new THREE.BufferAttribute(size, 1));
++    g.setAttribute("aPulse", new THREE.BufferAttribute(pulse, 1));
++    st.agents = new THREE.Points(g, st.agentMat);
++    st.scene.add(st.agents);
++  }, [agents, selected]);
++
++  useEffect(() => {
++    const st = stateRef.current;
++    if (st) st.controls.autoRotate = autoRotate;
++  }, [autoRotate]);
++
++  // Girar hacia el país elegido.
++  useEffect(() => {
++    const st = stateRef.current;
++    const f = selected !== null ? features[selected] : null;
++    if (!st || !f) return;
++    const [lon, lat] = f.properties.centroid;
++    const from = st.camera.position.clone();
++    const to = lonLatToVec3(lon, lat, from.length());
++    let k = 0;
++    let raf = 0;
++    const step = () => {
++      k = Math.min(k + 0.06, 1);
++      const e = 1 - (1 - k) ** 3;
++      st.camera.position.copy(from.clone().lerp(to, e).setLength(from.length()));
++      st.camera.lookAt(0, 0, 0);
++      if (k < 1) raf = requestAnimationFrame(step);
++    };
++    step();
++    return () => cancelAnimationFrame(raf);
++  }, [selected, features]);
++
++  return <div ref={hostRef} style={{ width: "100%", height, position: "relative" }} />;
++}
++
++export default Globe3D;
+diff --git a/frontend/src/components/world4/GlobeView.tsx b/frontend/src/components/world4/GlobeView.tsx
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/components/world4/GlobeView.tsx
+@@ -0,0 +1,560 @@
++"use client";
++
++// Pestaña "Globe" del explorador de World4: el globo 3D con la capa elegida, los flujos y los agentes, una
++// línea de tiempo con reproducción, y a la derecha el pulso del mundo o la ficha del país-agente elegido.
++
++import { useCallback, useEffect, useMemo, useState } from "react";
++import { Pause, Play, X } from "lucide-react";
++
++import { useT } from "@/lib/i18n";
++import {
++  centralValue,
++  isFrequency,
++  type CountrySeries,
++  type GeoFeature,
++  type QuantileSeries,
++  type World4RunData,
++} from "@/lib/world4";
++import { Badge, labelStyle, monoStyle, Notice } from "@/components/phy/ui";
++
++import { BandSparkline, DecisionColumns } from "./charts";
++import { Globe3D, type GlobeAgent, type GlobeArc } from "./Globe3D";
++import {
++  CHANNEL_COLORS,
++  DIVERGING_LAYERS,
++  FLOW_COLORS,
++  LOG_LAYERS,
++  fmt,
++  growthGrid,
++  legendStops,
++  makeScale,
++  pct,
++} from "./scales";
++
++/** "+1,2 pp hacia X" / "−1,2 pp desde X": el sentido del cambio de reparto del agente. */
++function shiftText(t: ReturnType<typeof useT>, mv: { ch: string; d: number }): string {
++  return t(mv.d > 0 ? "world4.pulse.shiftIn" : "world4.pulse.shiftOut", {
++    pp: fmt(Math.abs(mv.d) * 100, 2), channel: t(`world4.channels.${mv.ch}`),
++  });
++}
++
++export interface AskTarget {
++  target: "quo" | "pr";
++  iso3?: string;
++  name?: string;
++}
++
++type FlowMode = "trade" | "drain" | "none";
++
++const L1_LAYER_ORDER = [
++  "gdp_pc", "growth", "population", "coreness", "asabiya", "debt_gdp", "democracy", "conflict_hazard", "conflict",
++  "crisis", "coup", "drain", "net_rents", "resource_rents", "co2", "primary_energy", "food_supply",
++];
++const L0_LAYERS = ["gdp_pc", "population", "debt_gdp", "cereal_pc", "nonfossil_share"] as const;
++const EVENT_THRESHOLDS = { conflict: 0.5, crisis: 0.25, coup: 0.1 } as const;
++const MOVE_MIN = 0.002; // 0,2 puntos de la renta: por debajo no se cuenta como decisión
++
++const selectStyle: React.CSSProperties = {
++  fontFamily: "var(--quasar-font-mono)", fontSize: "12px", color: "var(--ink-primary)",
++  background: "rgba(10,14,20,0.82)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: "6px", padding: "4px 8px",
++};
++const chipStyle = (on: boolean): React.CSSProperties => ({
++  fontFamily: "var(--quasar-font-mono)", fontSize: "11px", padding: "3px 9px", borderRadius: "999px", cursor: "pointer",
++  color: on ? "var(--ink-primary)" : "var(--ink-dim)", background: on ? "rgba(58,160,255,0.18)" : "rgba(10,14,20,0.7)",
++  border: `1px solid ${on ? "rgba(58,160,255,0.55)" : "rgba(255,255,255,0.12)"}`,
++});
++
++export function GlobeView({ data, onAsk }: { data: World4RunData; onAsk: (t: AskTarget) => void }) {
++  const t = useT();
++  const { world, geo } = data;
++  const l1 = world.l1;
++  const features: GeoFeature[] = geo.features;
++  const years = l1 ? l1.years : world.l0.years;
++
++  const [layer, setLayer] = useState<string>("gdp_pc");
++  const [yearIdx, setYearIdx] = useState(0);
++  const [playing, setPlaying] = useState(false);
++  const [flowMode, setFlowMode] = useState<FlowMode>(l1 ? "drain" : "none");
++  const [flowTop, setFlowTop] = useState(80);
++  const [showAgents, setShowAgents] = useState(true);
++  const [autoRotate, setAutoRotate] = useState(true);
++  const [selected, setSelected] = useState<number | null>(null);
++  const [hover, setHover] = useState<{ f: number | null; x: number; y: number }>({ f: null, x: 0, y: 0 });
++  const [glError, setGlError] = useState<string | null>(null);
++
++  // reproducción
++  useEffect(() => {
++    if (!playing) return;
++    const id = window.setInterval(() => {
++      setYearIdx((k) => {
++        if (k + 1 >= years.length) {
++          setPlaying(false);
++          return k;
++        }
++        return k + 1;
++      });
++    }, l1 ? 900 : 140);
++    return () => window.clearInterval(id);
++  }, [playing, years.length, l1]);
++
++  // país del L1 (o región del L0) de cada feature, por isonum
++  const featureCountry = useMemo(() => {
++    const idx = new Map<number, number>();
++    (l1?.countries ?? []).forEach((c, i) => idx.set(c.isonum, i));
++    return features.map((f) => (idx.has(f.id) ? (idx.get(f.id) as number) : null));
++  }, [features, l1]);
++  const featureRegion = useMemo(() => {
++    const reg = new Map<number, string>();
++    for (const c of world.l0.countries ?? []) if (c.region) reg.set(c.isonum, c.region);
++    return features.map((f) => reg.get(f.id) ?? null);
++  }, [features, world.l0.countries]);
++  const nameOf = useCallback(
++    (iso3: string) => {
++      const c = l1?.countries.find((x) => x.iso3 === iso3) ?? world.l0.countries?.find((x) => x.iso3 === iso3);
++      const f = c ? features.find((g) => g.id === c.isonum) : undefined;
++      return f?.properties.name ?? iso3;
++    },
++    [features, l1, world.l0.countries],
++  );
++
++  const growth = useMemo(() => (l1 ? growthGrid(l1) : []), [l1]);
++
++  // capas disponibles
++  const layers = useMemo(() => {
++    if (l1) return L1_LAYER_ORDER.filter((k) => k === "growth" || l1.series[k]);
++    return [...L0_LAYERS];
++  }, [l1]);
++  const activeLayer = layers.includes(layer) ? layer : layers[0];
++  const layerName = (k: string) => t(l1 ? `world4.layers.${k}` : `world4.layers.l0_${k}`);
++  const layerUnit = (k: string): string => {
++    if (!l1) return (world.l0.regions[Object.keys(world.l0.regions)[0]]?.[k as (typeof L0_LAYERS)[number]]?.unit) ?? "";
++    if (k === "growth") return t("world4.globe.growthUnit");
++    return l1.series[k]?.unit ?? "";
++  };
++
++  // valor por país (índice L1) o región, año k
++  const valueAt = useCallback(
++    (f: number, k: number): number | null => {
++      if (l1) {
++        const i = featureCountry[f];
++        if (i === null) return null;
++        if (activeLayer === "growth") return growth[i]?.[k] ?? null;
++        const s = l1.series[activeLayer];
++        return s ? centralValue(s, i, k) : null;
++      }
++      const r = featureRegion[f];
++      const band = r ? world.l0.regions[r]?.[activeLayer as (typeof L0_LAYERS)[number]] : null;
++      const v = band?.p50?.[k];
++      return typeof v === "number" ? v : null;
++    },
++    [l1, featureCountry, featureRegion, activeLayer, growth, world.l0.regions],
++  );
++
++  const scale = useMemo(() => {
++    const vals: number[] = [];
++    for (let f = 0; f < features.length; f++)
++      for (let k = 0; k < years.length; k++) {
++        const v = valueAt(f, k);
++        if (v !== null) vals.push(v);
++      }
++    return makeScale(vals, { log: LOG_LAYERS.has(activeLayer), diverging: DIVERGING_LAYERS.has(activeLayer) });
++  }, [features.length, years.length, valueAt, activeLayer]);
++
++  const fills = useMemo(() => features.map((_, f) => scale.color(valueAt(f, yearIdx))), [features, scale, valueAt, yearIdx]);
++
++  // agentes
++  const channelNames = useMemo(() => l1?.channels.names ?? [], [l1]);
++  const moveOf = useCallback(
++    (i: number, k: number): { ch: string; d: number } | null => {
++      if (!l1 || k === 0) return null;
++      const now = l1.channels.share[i]?.[k];
++      const before = l1.channels.share[i]?.[k - 1];
++      if (!now || !before) return null;
++      let best: { ch: string; d: number } | null = null;
++      channelNames.forEach((c, j) => {
++        const a = before[j], b = now[j];
++        if (typeof a !== "number" || typeof b !== "number") return;
++        const d = b - a;
++        if (Math.abs(d) >= MOVE_MIN && (!best || Math.abs(d) > Math.abs(best.d))) best = { ch: c, d };
++      });
++      return best;
++    },
++    [l1, channelNames],
++  );
++  const eventsOf = useCallback(
++    (i: number, k: number) => {
++      if (!l1) return [] as { kind: keyof typeof EVENT_THRESHOLDS; p: number }[];
++      const out: { kind: keyof typeof EVENT_THRESHOLDS; p: number }[] = [];
++      for (const kind of Object.keys(EVENT_THRESHOLDS) as (keyof typeof EVENT_THRESHOLDS)[]) {
++        const s = l1.series[kind];
++        const v = s ? centralValue(s, i, k) : null;
++        if (v !== null && v >= EVENT_THRESHOLDS[kind]) out.push({ kind, p: v });
++      }
++      return out;
++    },
++    [l1],
++  );
++
++  const agents = useMemo<GlobeAgent[]>(() => {
++    if (!l1 || !showAgents) return [];
++    const gdp = l1.countries.map((_, i) => {
++      const y = centralValue(l1.series.gdp_pc, i, yearIdx);
++      const p = centralValue(l1.series.population, i, yearIdx);
++      return y && p ? y * p : 0;
++    });
++    const top = Math.max(...gdp, 1);
++    const out: GlobeAgent[] = [];
++    features.forEach((f, fi) => {
++      const i = featureCountry[fi];
++      if (i === null) return;
++      const mv = moveOf(i, yearIdx);
++      const ev = eventsOf(i, yearIdx);
++      out.push({
++        lon: f.properties.centroid[0], lat: f.properties.centroid[1], size: gdp[i] / top,
++        color: mv ? CHANNEL_COLORS[mv.ch] ?? "#94a3b8" : "#94a3b8", pulse: ev.length ? 1 + fi * 0.01 : 0, feature: fi,
++      });
++    });
++    return out;
++  }, [l1, showAgents, features, featureCountry, yearIdx, moveOf, eventsOf]);
++
++  // flujos
++  const centroidOfCountry = useMemo(() => {
++    const m = new Map<number, [number, number]>();
++    features.forEach((f, fi) => {
++      const i = featureCountry[fi];
++      if (i !== null) m.set(i, f.properties.centroid);
++    });
++    return m;
++  }, [features, featureCountry]);
++  const arcs = useMemo<GlobeArc[]>(() => {
++    if (!l1 || flowMode === "none") return [];
++    const rows = (l1.flows[flowMode]?.[yearIdx] ?? []).slice(0, flowTop);
++    const top = Math.max(...rows.map((r) => r[2]), 1e-9);
++    const out: GlobeArc[] = [];
++    for (const [a, b, v] of rows) {
++      const ca = centroidOfCountry.get(a), cb = centroidOfCountry.get(b);
++      if (!ca || !cb) continue;
++      out.push({ a: ca, b: cb, w: Math.sqrt(v / top), color: FLOW_COLORS[flowMode] });
++    }
++    return out;
++  }, [l1, flowMode, flowTop, yearIdx, centroidOfCountry]);
++
++  const onPick = useCallback((f: number | null) => {
++    setSelected(f);
++    if (f !== null) setAutoRotate(false);
++  }, []);
++  const onHover = useCallback((f: number | null, x: number, y: number) => setHover({ f, x, y }), []);
++  const onGlError = useCallback((m: string) => setGlError(m), []);
++
++  const year = years[yearIdx];
++  const hoverName = hover.f !== null ? features[hover.f]?.properties.name : null;
++  const hoverVal = hover.f !== null ? valueAt(hover.f, yearIdx) : null;
++  const selCountry = selected !== null ? featureCountry[selected] : null;
++
++  return (
++    <div className="grid gap-4" style={{ gridTemplateColumns: "minmax(0,1fr) 340px" }}>
++      <div className="flex min-w-0 flex-col gap-3">
++        <div className="relative overflow-hidden rounded-lg" style={{ background: "radial-gradient(ellipse at center, #0f1d2e 0%, #070b11 72%)", border: "1px solid rgba(255,255,255,0.06)" }}>
++          {glError ? (
++            <div className="p-6"><Notice tone="warn">{t("world4.globe.webglMissing")}</Notice></div>
++          ) : (
++            <Globe3D features={features} fills={fills} selected={selected} arcs={arcs} agents={agents}
++              autoRotate={autoRotate} onPick={onPick} onHover={onHover} onError={onGlError} />
++          )}
++          {/* controles superpuestos */}
++          <div className="absolute left-3 top-3 flex flex-col gap-2" style={{ maxWidth: 300 }}>
++            <label className="flex items-center gap-2">
++              <span style={{ ...labelStyle, fontSize: "10px" }}>{t("world4.globe.layer")}</span>
++              <select value={activeLayer} onChange={(e) => setLayer(e.target.value)} style={selectStyle} aria-label={t("world4.globe.layer")}>
++                {layers.map((k) => <option key={k} value={k}>{layerName(k)}</option>)}
++              </select>
++            </label>
++            {l1 ? (
++              <div className="flex flex-wrap items-center gap-1.5">
++                <span style={{ ...labelStyle, fontSize: "10px" }}>{t("world4.globe.flows")}</span>
++                {(["drain", "trade", "none"] as FlowMode[]).map((m) => (
++                  <button key={m} type="button" style={chipStyle(flowMode === m)} onClick={() => setFlowMode(m)}
++                    aria-pressed={flowMode === m}>
++                    {m === "trade" ? t("world4.globe.flowsTrade") : m === "drain" ? t("world4.globe.flowsDrain") : t("world4.globe.flowsNone")}
++                  </button>
++                ))}
++                {flowMode !== "none" ? (
++                  <select value={flowTop} onChange={(e) => setFlowTop(Number(e.target.value))} style={{ ...selectStyle, padding: "2px 6px" }} aria-label="top">
++                    {[40, 80, 160].map((n) => <option key={n} value={n}>top {n}</option>)}
++                  </select>
++                ) : null}
++              </div>
++            ) : null}
++            <div className="flex flex-wrap gap-1.5">
++              {l1 ? <button type="button" style={chipStyle(showAgents)} onClick={() => setShowAgents((v) => !v)} aria-pressed={showAgents}>{t("world4.globe.agents")}</button> : null}
++              <button type="button" style={chipStyle(autoRotate)} onClick={() => setAutoRotate((v) => !v)} aria-pressed={autoRotate}>{t("world4.globe.rotate")}</button>
++            </div>
++          </div>
++          {/* leyenda */}
++          <div className="absolute bottom-3 left-3 flex flex-col gap-1 rounded-md px-3 py-2" style={{ background: "rgba(10,14,20,0.78)", maxWidth: 320 }}>
++            <span style={{ ...monoStyle, fontSize: "11px", color: "var(--ink-primary)" }}>{layerName(activeLayer)}</span>
++            <div className="flex h-2 overflow-hidden rounded-sm">
++              {legendStops(scale.diverging).map((c) => <span key={c} style={{ flex: 1, background: c }} />)}
++            </div>
++            <span style={{ ...monoStyle, fontSize: "10px" }}>{t("world4.globe.legendRange", { lo: fmt(scale.lo), hi: fmt(scale.hi), unit: layerUnit(activeLayer) })}</span>
++            <span style={{ ...monoStyle, fontSize: "10px", color: "var(--ink-dim)" }}>{l1 ? t("world4.globe.legendNote") : t("world4.globe.regionNote")}</span>
++          </div>
++          {/* tooltip */}
++          {hover.f !== null && hoverName ? (
++            <div className="pointer-events-none absolute rounded-md px-2.5 py-1.5" style={{ left: hover.x + 14, top: hover.y + 10, background: "rgba(10,14,20,0.92)", border: "1px solid rgba(255,255,255,0.12)" }}>
++              <div style={{ ...monoStyle, fontSize: "12px", color: "var(--ink-primary)" }}>{hoverName}</div>
++              <div style={{ ...monoStyle, fontSize: "11px" }}>{hoverVal === null ? t("world4.globe.hoverNoData") : `${fmt(hoverVal)} · ${year}`}</div>
++            </div>
++          ) : null}
++        </div>
++        {/* línea de tiempo */}
++        <div className="flex items-center gap-3">
++          <button type="button" onClick={() => { if (yearIdx >= years.length - 1) setYearIdx(0); setPlaying((p) => !p); }}
++            aria-label={playing ? t("world4.globe.pause") : t("world4.globe.play")}
++            className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: "var(--electric)", color: "#0A0E14" }}>
++            {playing ? <Pause size={14} /> : <Play size={14} />}
++          </button>
++          <input type="range" min={0} max={years.length - 1} value={yearIdx} onChange={(e) => { setPlaying(false); setYearIdx(Number(e.target.value)); }}
++            aria-label={t("world4.globe.year")} style={{ flex: 1, accentColor: "var(--electric)" }} />
++          <span style={{ fontFamily: "var(--quasar-font-display)", fontSize: "22px", color: "var(--ink-primary)", minWidth: 56, textAlign: "right" }}>{year}</span>
++        </div>
++        {l1 ? (
++          <span style={{ ...monoStyle, fontSize: "11px", color: "var(--ink-dim)" }}>
++            {flowMode !== "none" ? t("world4.globe.flowsNote", { n: Math.min(flowTop, (l1.flows[flowMode]?.[yearIdx] ?? []).length), kind: (flowMode === "trade" ? t("world4.globe.flowsTrade") : t("world4.globe.flowsDrain")).toLowerCase() }) + " " : ""}
++            {showAgents ? t("world4.globe.agentsNote") : ""}
++          </span>
++        ) : null}
++      </div>
++
++      <div className="flex min-w-0 flex-col gap-3">
++        {selected !== null ? (
++          selCountry !== null && l1 ? (
++            <AgentCard data={data} country={selCountry} name={features[selected].properties.name} yearIdx={yearIdx}
++              layer={activeLayer} layerName={layerName(activeLayer)} growth={growth} onClose={() => setSelected(null)}
++              onAsk={onAsk} moveOf={moveOf} nameOf={nameOf} />
++          ) : (
++            <div className="flex flex-col gap-2 rounded-lg p-4" style={{ background: "var(--surface-0)", border: "1px solid rgba(255,255,255,0.06)" }}>
++              <div className="flex items-center justify-between">
++                <span style={{ fontFamily: "var(--quasar-font-display)", fontSize: "16px", color: "var(--ink-primary)" }}>{features[selected].properties.name}</span>
++                <button type="button" onClick={() => setSelected(null)} aria-label={t("world4.agent.close")} style={{ color: "var(--ink-dim)" }}><X size={14} /></button>
++              </div>
++              <span style={{ ...monoStyle, fontSize: "12px" }}>
++                {l1 ? t("world4.agent.notSimulated", { name: features[selected].properties.name }) : t("world4.globe.regionNote")}
++                {featureRegion[selected] ? ` · ${t("world4.agent.region", { region: featureRegion[selected] as string })}` : ""}
++              </span>
++            </div>
++          )
++        ) : (
++          <WorldPulse data={data} yearIdx={yearIdx} moveOf={moveOf} eventsOf={eventsOf} nameOf={nameOf}
++            onPickIso={(iso3) => {
++              const c = l1?.countries.find((x) => x.iso3 === iso3);
++              const fi = c ? features.findIndex((f) => f.id === c.isonum) : -1;
++              if (fi >= 0) onPick(fi);
++            }} />
++        )}
++      </div>
++    </div>
++  );
++}
++
++// ── el pulso del mundo (sin país elegido) ─────────────────────────────────────
++
++function WorldPulse({ data, yearIdx, moveOf, eventsOf, nameOf, onPickIso }: {
++  data: World4RunData;
++  yearIdx: number;
++  moveOf: (i: number, k: number) => { ch: string; d: number } | null;
++  eventsOf: (i: number, k: number) => { kind: "conflict" | "crisis" | "coup"; p: number }[];
++  nameOf: (iso3: string) => string;
++  onPickIso: (iso3: string) => void;
++}) {
++  const t = useT();
++  const { world } = data;
++  const l1 = world.l1;
++  const year = (l1 ? l1.years : world.l0.years)[yearIdx];
++  const movers = useMemo(() => {
++    if (!l1) return [];
++    return l1.countries
++      .map((c, i) => ({ c, mv: moveOf(i, yearIdx) }))
++      .filter((x) => x.mv)
++      .sort((a, b) => Math.abs((b.mv as { d: number }).d) - Math.abs((a.mv as { d: number }).d))
++      .slice(0, 8);
++  }, [l1, moveOf, yearIdx]);
++  const events = useMemo(() => {
++    if (!l1) return [];
++    return l1.countries.flatMap((c, i) => eventsOf(i, yearIdx).map((e) => ({ c, ...e })))
++      .sort((a, b) => b.p - a.p).slice(0, 10);
++  }, [l1, eventsOf, yearIdx]);
++  const card = { background: "var(--surface-0)", border: "1px solid rgba(255,255,255,0.06)" };
++  const w0 = world.l0.world;
++  const last = world.l0.years.length - 1;
++  return (
++    <>
++      <div className="flex flex-col gap-2 rounded-lg p-4" style={card}>
++        <span style={{ fontFamily: "var(--quasar-font-display)", fontSize: "16px", color: "var(--ink-primary)" }}>{t("world4.pulse.title", { year })}</span>
++        {l1 ? (
++          <div className="grid grid-cols-1 gap-1">
++            {Object.entries(l1.world).map(([k, b]) => (
++              <div key={k} className="flex items-baseline justify-between gap-2">
++                <span style={{ ...monoStyle, fontSize: "11px" }}>{t(`world4.layers.world_${k}`)}</span>
++                <span style={{ ...monoStyle, fontSize: "12px", color: "var(--ink-primary)" }}>
++                  {fmt(b.p50[yearIdx])} <span style={{ color: "var(--ink-dim)" }}>[{fmt(b.p10[yearIdx])}–{fmt(b.p90[yearIdx])}]</span>
++                </span>
++              </div>
++            ))}
++          </div>
++        ) : null}
++        <span style={{ ...monoStyle, fontSize: "11px", color: "var(--ink-dim)" }}>{t("world4.pulse.pickHint")}</span>
++      </div>
++      {l1 ? (
++        <div className="flex flex-col gap-2 rounded-lg p-4" style={card}>
++          <span style={labelStyle}>{t("world4.pulse.movers")}</span>
++          <span style={{ ...monoStyle, fontSize: "10px", color: "var(--ink-dim)" }}>{t("world4.pulse.moversNote")}</span>
++          {movers.map(({ c, mv }) => (
++            <button key={c.iso3} type="button" onClick={() => onPickIso(c.iso3)} className="flex items-center justify-between gap-2 text-left">
++              <span style={{ ...monoStyle, fontSize: "12px", color: "var(--ink-primary)" }}>{nameOf(c.iso3)}</span>
++              <span className="flex items-center gap-1.5" style={{ ...monoStyle, fontSize: "11px" }}>
++                <span style={{ width: 8, height: 8, borderRadius: 999, background: CHANNEL_COLORS[(mv as { ch: string }).ch] }} />
++                {shiftText(t, mv as { ch: string; d: number })}
++              </span>
++            </button>
++          ))}
++          <span style={{ ...labelStyle, marginTop: 6 }}>{t("world4.pulse.events")}</span>
++          {events.length ? events.map((e) => (
++            <button key={`${e.c.iso3}-${e.kind}`} type="button" onClick={() => onPickIso(e.c.iso3)} className="flex items-center justify-between gap-2 text-left">
++              <span style={{ ...monoStyle, fontSize: "12px", color: "var(--ink-primary)" }}>{nameOf(e.c.iso3)}</span>
++              <span style={{ ...monoStyle, fontSize: "11px", color: e.kind === "conflict" ? "var(--error)" : "var(--warning)" }}>
++                {t(`world4.pulse.event${e.kind[0].toUpperCase()}${e.kind.slice(1)}`, { p: pct(e.p) })}
++              </span>
++            </button>
++          )) : <span style={{ ...monoStyle, fontSize: "11px" }}>{t("world4.pulse.eventsNone")}</span>}
++        </div>
++      ) : null}
++      <div className="flex flex-col gap-2 rounded-lg p-4" style={card}>
++        <span style={labelStyle}>{t("world4.pulse.l0Title")}</span>
++        <BandSparkline years={world.l0.years} p50={w0.gmst.p50} p10={w0.gmst.p10} p90={w0.gmst.p90} baseline={w0.gmst.baseline_p50}
++          mark={year} color="var(--warning)" />
++        <span style={{ ...monoStyle, fontSize: "11px" }}>
++          {t("world4.pulse.gmst2100")}: {t("world4.pulse.withPolicy")} {fmt(w0.gmst.p50[last])} [{fmt(w0.gmst.p10[last])}–{fmt(w0.gmst.p90[last])}] · {t("world4.pulse.noPolicy")} {fmt(w0.gmst.baseline_p50?.[last])} {w0.gmst.unit}
++        </span>
++      </div>
++    </>
++  );
++}
++
++// ── la ficha del país-agente ─────────────────────────────────────────────────
++
++const STATE_KEYS = ["gdp_pc", "population", "coreness", "asabiya", "debt_gdp", "democracy", "conflict_hazard",
++  "conflict", "crisis", "coup", "drain", "net_rents"];
++
++function AgentCard({ data, country, name, yearIdx, layer, layerName, growth, onClose, onAsk, moveOf, nameOf }: {
++  data: World4RunData;
++  country: number;
++  name: string;
++  yearIdx: number;
++  layer: string;
++  layerName: string;
++  growth: (number | null)[][];
++  onClose: () => void;
++  onAsk: (t: AskTarget) => void;
++  moveOf: (i: number, k: number) => { ch: string; d: number } | null;
++  nameOf: (iso3: string) => string;
++}) {
++  const t = useT();
++  const l1 = data.world.l1!;
++  const c = l1.countries[country];
++  const year = l1.years[yearIdx];
++  const mv = moveOf(country, yearIdx);
++  const card = { background: "var(--surface-0)", border: "1px solid rgba(255,255,255,0.06)" };
++  const s: CountrySeries | undefined = layer === "growth" ? undefined : l1.series[layer];
++  const partners = (kind: "trade" | "drain", dir: "out" | "in") => {
++    const own = l1.flows.partners?.[`${kind}_${dir}`]?.[country]?.[yearIdx];
++    if (own) return own.map(([j, v]) => ({ iso3: l1.countries[j].iso3, v }));
++    return (l1.flows[kind]?.[yearIdx] ?? [])
++      .filter(([a, b]) => (dir === "out" ? a === country : b === country))
++      .slice(0, 3)
++      .map(([a, b, v]) => ({ iso3: l1.countries[dir === "out" ? b : a].iso3, v }));
++  };
++  return (
++    <div className="flex flex-col gap-3 rounded-lg p-4" style={card}>
++      <div className="flex items-start justify-between gap-2">
++        <div className="flex flex-col">
++          <span style={{ fontFamily: "var(--quasar-font-display)", fontSize: "18px", color: "var(--ink-primary)" }}>{name}</span>
++          <span className="flex items-center gap-2" style={{ ...monoStyle, fontSize: "11px" }}>
++            {c.iso3}{c.region ? <Badge tone="dim">{t("world4.agent.region", { region: c.region })}</Badge> : null}
++          </span>
++        </div>
++        <button type="button" onClick={onClose} aria-label={t("world4.agent.close")} style={{ color: "var(--ink-dim)" }}><X size={16} /></button>
++      </div>
++
++      <span style={labelStyle}>{t("world4.agent.state", { year })}</span>
++      <div className="grid gap-x-3 gap-y-1" style={{ gridTemplateColumns: "1fr auto" }}>
++        {STATE_KEYS.filter((k) => l1.series[k]).map((k) => {
++          const sr = l1.series[k];
++          const v = centralValue(sr, country, yearIdx);
++          const q = isFrequency(sr) ? null : (sr as QuantileSeries);
++          return (
++            <div key={k} className="contents">
++              <span style={{ ...monoStyle, fontSize: "11px" }} title={sr.unit}>{t(`world4.layers.${k}`)}</span>
++              <span style={{ ...monoStyle, fontSize: "11px", color: "var(--ink-primary)", textAlign: "right" }}>
++                {isFrequency(sr) ? pct(v) : fmt(v)}
++                {q ? <span style={{ color: "var(--ink-dim)" }}> [{fmt(q.p10[country]?.[yearIdx])}–{fmt(q.p90[country]?.[yearIdx])}]</span> : null}
++              </span>
++            </div>
++          );
++        })}
++      </div>
++
++      <span style={labelStyle}>{t("world4.agent.trajectory", { layer: layerName })}</span>
++      {s ? (
++        <BandSparkline years={l1.years} p50={isFrequency(s) ? s.mean[country] : s.p50[country]}
++          p10={isFrequency(s) ? undefined : s.p10[country]} p90={isFrequency(s) ? undefined : s.p90[country]} mark={year} />
++      ) : (
++        <BandSparkline years={l1.years} p50={growth[country] ?? []} mark={year} />
++      )}
++
++      <span style={labelStyle}>{t("world4.agent.decisions")}</span>
++      <DecisionColumns years={l1.years} shares={l1.channels.share[country] ?? []} names={l1.channels.names} mark={year} />
++      <div className="flex flex-wrap gap-x-3 gap-y-1">
++        {l1.channels.names.map((ch) => (
++          <span key={ch} className="flex items-center gap-1" style={{ ...monoStyle, fontSize: "10px" }}>
++            <span style={{ width: 8, height: 8, borderRadius: 2, background: CHANNEL_COLORS[ch] }} />
++            {t(`world4.channels.${ch}`)} {pct(l1.channels.share[country]?.[yearIdx]?.[l1.channels.names.indexOf(ch)] ?? null)}
++          </span>
++        ))}
++      </div>
++      <span style={{ ...monoStyle, fontSize: "11px", color: mv ? "var(--ink-primary)" : "var(--ink-dim)" }}>
++        {mv
++          ? t("world4.agent.biggest", { year, shift: shiftText(t, mv) })
++          : t("world4.agent.noMove", { year })}
++      </span>
++      <span style={{ ...monoStyle, fontSize: "10px", color: "var(--ink-dim)" }}>{t("world4.agent.decisionsNote")}</span>
++
++      <span style={labelStyle}>{t("world4.agent.partners", { year })}</span>
++      <div className="grid grid-cols-2 gap-2">
++        {([["trade", "out", "exportsTo"], ["trade", "in", "importsFrom"], ["drain", "out", "drainsTo"], ["drain", "in", "drainsFrom"]] as const).map(([kind, dir, key]) => {
++          const rows = partners(kind, dir);
++          return (
++            <div key={key} className="flex flex-col">
++              <span style={{ ...monoStyle, fontSize: "10px", color: FLOW_COLORS[kind] }}>{t(`world4.agent.${key}`)}</span>
++              {rows.length ? rows.map((r) => (
++                <span key={r.iso3} style={{ ...monoStyle, fontSize: "11px" }}>{nameOf(r.iso3)} · {fmt(r.v)}</span>
++              )) : <span style={{ ...monoStyle, fontSize: "11px", color: "var(--ink-dim)" }}>{t("world4.agent.none")}</span>}
++            </div>
++          );
++        })}
++      </div>
++      <span style={{ ...monoStyle, fontSize: "10px", color: "var(--ink-dim)" }}>{l1.flows.unit}</span>
++
++      <div className="flex flex-wrap gap-2">
++        <button type="button" onClick={() => onAsk({ target: "quo", iso3: c.iso3, name })}
++          className="rounded-md px-3 py-1.5" style={{ background: "var(--electric)", color: "#0A0E14", fontFamily: "var(--quasar-font-mono)", fontSize: "12px" }}>
++          {t("world4.agent.askQuo", { name })}
++        </button>
++        <button type="button" onClick={() => onAsk({ target: "pr", iso3: c.iso3, name })}
++          className="rounded-md px-3 py-1.5" style={{ background: "transparent", color: "var(--ink-primary)", border: "1px solid rgba(255,255,255,0.18)", fontFamily: "var(--quasar-font-mono)", fontSize: "12px" }}>
++          {t("world4.agent.askPr")}
++        </button>
++      </div>
++    </div>
++  );
++}
+diff --git a/frontend/src/components/world4/RunGraph.tsx b/frontend/src/components/world4/RunGraph.tsx
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/components/world4/RunGraph.tsx
+@@ -0,0 +1,373 @@
++"use client";
++
++// Pestaña "Run graph" del explorador de World4: dos grafos de @xyflow sobre `graph.json` de la corrida.
++//
++//   · Flujo de información: datos → sectores → agentes y flujos → L0 → palancas ⇄ búsqueda → objetivos y
++//     límites → Prime Radiant y QUO. Columnas por tipo de nodo; cada nodo con el número principal de ESTA
++//     corrida y su estado (ok / falta / no corrido / violado). Clic → ficha con métricas, trayectoria,
++//     salvedades y procedencia.
++//   · Lazos de realimentación: los stocks del L0 (vista mundial) en círculo, unidos por sus flujos; la década
++//     elige los lazos dominantes (Loops that Matter) y uno elegido se resalta sobre el grafo.
++
++import { useCallback, useMemo, useState } from "react";
++import {
++  Background,
++  Controls,
++  Handle,
++  MarkerType,
++  Position,
++  ReactFlow,
++  type Edge,
++  type Node,
++  type NodeProps,
++  type NodeTypes,
++} from "@xyflow/react";
++import "@xyflow/react/dist/style.css";
++
++import { useT } from "@/lib/i18n";
++import type { GraphNode, World4RunData } from "@/lib/world4";
++import { Badge, labelStyle, monoStyle, Notice } from "@/components/phy/ui";
++
++import { BandSparkline } from "./charts";
++import { fmt, pct } from "./scales";
++
++const KIND_COLUMN: Record<string, number> = {
++  data: 0, sector: 1, agents: 2, flows: 2, model: 3, policy: 3, search: 4, objectives: 4, constraints: 4, consumer: 5,
++};
++const KIND_COLOR: Record<string, string> = {
++  data: "#78909C", sector: "#5CC8E8", agents: "#3AA0FF", flows: "#f97316", model: "#a78bfa", policy: "#22C55E",
++  search: "#E23EC0", objectives: "#e5d36a", constraints: "#f59e0b", consumer: "#F5F7FA",
++};
++const STATUS_COLOR: Record<string, string> = {
++  ok: "var(--success)", missing: "var(--error)", skipped: "var(--ink-dim)", violated: "var(--warning)",
++};
++const COL_W = 250;
++const ROW_H = 118;
++const hidden = { opacity: 0, width: 1, height: 1, minWidth: 0, minHeight: 0, border: 0 };
++
++interface FlowNodeData extends Record<string, unknown> {
++  node: GraphNode;
++  label: string;
++  selected: boolean;
++  kindLabel: string;
++  statusLabel: string;
++}
++
++function FlowNode({ data }: NodeProps<Node<FlowNodeData>>) {
++  const n = data.node;
++  const color = KIND_COLOR[n.kind] ?? "#78909C";
++  const m = n.metrics.find((x) => x.value !== null);
++  return (
++    <div className="flex flex-col gap-1 rounded-lg px-3 py-2"
++      style={{ width: 210, background: "var(--surface-0)", border: `1px solid ${data.selected ? color : "rgba(255,255,255,0.10)"}`,
++        boxShadow: data.selected ? `0 0 0 2px ${color}55, 0 0 18px ${color}33` : "none", cursor: "pointer" }}>
++      <Handle type="target" position={Position.Left} style={hidden} />
++      <Handle type="source" position={Position.Right} style={hidden} />
++      <div className="flex items-center justify-between gap-2">
++        <span style={{ fontFamily: "var(--quasar-font-mono)", fontSize: "9px", letterSpacing: "0.1em", textTransform: "uppercase", color }}>{data.kindLabel}</span>
++        <span className="flex items-center gap-1" style={{ fontFamily: "var(--quasar-font-mono)", fontSize: "9px", color: "var(--ink-dim)" }}>
++          <span style={{ width: 7, height: 7, borderRadius: 999, background: STATUS_COLOR[n.status] ?? "var(--ink-dim)" }} />
++          {data.statusLabel}
++        </span>
++      </div>
++      <span style={{ fontFamily: "var(--quasar-font-display)", fontSize: "13px", color: "var(--ink-primary)", lineHeight: 1.25 }}>{data.label}</span>
++      {m ? (
++        <span style={{ fontFamily: "var(--quasar-font-mono)", fontSize: "10px", color: "var(--ink-muted)" }} title={m.unit}>
++          {m.label}: <b style={{ color: "var(--ink-primary)" }}>{fmt(m.value)}</b>
++        </span>
++      ) : null}
++    </div>
++  );
++}
++
++interface StockNodeData extends Record<string, unknown> {
++  label: string;
++  active: boolean;
++  /** Flujo de un lazo de un solo stock activo (s → s): se pinta como anillo, no como arista. */
++  selfLoop: string | null;
++}
++
++function StockNode({ data }: NodeProps<Node<StockNodeData>>) {
++  return (
++    <div className="relative flex items-center justify-center rounded-full"
++      style={{ width: 64, height: 64, background: data.active ? "rgba(58,160,255,0.22)" : "var(--surface-0)",
++        border: `1px solid ${data.active ? "var(--electric)" : "rgba(255,255,255,0.16)"}`,
++        fontFamily: "var(--quasar-font-mono)", fontSize: "12px", color: "var(--ink-primary)" }}>
++      <Handle type="target" position={Position.Top} style={{ ...hidden, left: "50%", top: "50%" }} />
++      <Handle type="source" position={Position.Bottom} style={{ ...hidden, left: "50%", top: "50%" }} />
++      {data.label}
++      {data.selfLoop ? (
++        <>
++          <span aria-hidden="true" style={{ position: "absolute", inset: -7, borderRadius: 999, border: "2px dashed var(--electric)" }} />
++          <span style={{ position: "absolute", top: 70, whiteSpace: "nowrap", fontSize: "10px", color: "var(--electric)",
++            background: "#0A0E14", padding: "1px 4px", borderRadius: 4 }}>↻ {data.selfLoop}</span>
++        </>
++      ) : null}
++    </div>
++  );
++}
++
++const nodeTypes: NodeTypes = { flow: FlowNode, stock: StockNode };
++
++/** Etiqueta y descripción traducidas por id de nodo; si el diccionario no lo tiene, el texto del backend. */
++function useNodeText() {
++  const t = useT();
++  return useCallback((n: GraphNode) => {
++    const pick = (key: "label" | "description", fallback: string) => {
++      const path = `world4.nodes.${n.id}.${key}`;
++      const v = t(path);
++      return v === path ? fallback : v;
++    };
++    return { label: pick("label", n.label), description: pick("description", n.description) };
++  }, [t]);
++}
++
++export function RunGraph({ data }: { data: World4RunData }) {
++  const t = useT();
++  const [mode, setMode] = useState<"flow" | "loops">("flow");
++  const [sel, setSel] = useState<string | null>(null);
++  const graph = data.graph;
++
++  if (!graph) return <Notice tone="info">{t("world4.missing")}</Notice>;
++  return (
++    <div className="flex flex-col gap-3">
++      <div className="flex flex-wrap items-center gap-2">
++        {(["flow", "loops"] as const).map((m) => (
++          <button key={m} type="button" onClick={() => setMode(m)} aria-pressed={mode === m}
++            className="rounded-md px-3 py-1.5"
++            style={{ fontFamily: "var(--quasar-font-mono)", fontSize: "12px",
++              background: mode === m ? "rgba(58,160,255,0.18)" : "transparent",
++              color: mode === m ? "var(--ink-primary)" : "var(--ink-dim)",
++              border: `1px solid ${mode === m ? "rgba(58,160,255,0.55)" : "rgba(255,255,255,0.12)"}` }}>
++            {m === "flow" ? t("world4.graph.modeFlow") : t("world4.graph.modeLoops")}
++          </button>
++        ))}
++        <span style={{ ...monoStyle, fontSize: "11px", color: "var(--ink-dim)", flex: 1, minWidth: 240 }}>
++          {mode === "flow" ? t("world4.graph.flowHelp") : t("world4.graph.loopsHelp")}
++        </span>
++      </div>
++      {mode === "flow" ? <FlowGraph data={data} sel={sel} onSel={setSel} /> : <LoopsGraph data={data} />}
++      <PolicyStrip data={data} />
++    </div>
++  );
++}
++
++function FlowGraph({ data, sel, onSel }: { data: World4RunData; sel: string | null; onSel: (id: string | null) => void }) {
++  const t = useT();
++  const text = useNodeText();
++  const g = data.graph!;
++  const { nodes, edges } = useMemo(() => {
++    const rows: Record<number, number> = {};
++    const ns: Node<FlowNodeData>[] = g.nodes.map((n) => {
++      const col = KIND_COLUMN[n.kind] ?? 5;
++      const row = rows[col] ?? 0;
++      rows[col] = row + 1;
++      return {
++        id: n.id, type: "flow", position: { x: col * COL_W, y: row * ROW_H },
++        data: { node: n, label: text(n).label, selected: n.id === sel, kindLabel: t(`world4.graph.kinds.${n.kind}`),
++          statusLabel: t(`world4.graph.status.${n.status}`) },
++      };
++    });
++    // centrar verticalmente cada columna
++    const tallest = Math.max(...Object.values(rows));
++    for (const node of ns) {
++      const col = KIND_COLUMN[node.data.node.kind] ?? 5;
++      node.position.y += ((tallest - (rows[col] ?? 0)) * ROW_H) / 2;
++    }
++    const es: Edge[] = g.edges.map((e) => {
++      const hot = sel !== null && (e.source === sel || e.target === sel);
++      const color = KIND_COLOR[g.nodes.find((n) => n.id === e.source)?.kind ?? "data"] ?? "#78909C";
++      return {
++        id: e.id, source: e.source, target: e.target, label: hot ? e.label : undefined,
++        animated: e.kind === "coupling" || e.kind === "policy" || hot,
++        style: { stroke: color, strokeWidth: hot ? 2.2 : 1.2, opacity: sel === null || hot ? 0.85 : 0.18 },
++        labelStyle: { fill: "var(--ink-primary)", fontSize: 10, fontFamily: "var(--quasar-font-mono)" },
++        labelBgStyle: { fill: "#0A0E14", fillOpacity: 0.9 },
++        markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
++      };
++    });
++    return { nodes: ns, edges: es };
++  }, [g, sel, t, text]);
++  const node = g.nodes.find((n) => n.id === sel) ?? null;
++  return (
++    <div className="grid gap-4" style={{ gridTemplateColumns: "minmax(0,1fr) 320px" }}>
++      <div className="overflow-hidden rounded-lg" style={{ height: 620, background: "#070b11", border: "1px solid rgba(255,255,255,0.06)" }}>
++        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.12 }}
++          minZoom={0.3} maxZoom={1.8} nodesDraggable nodesConnectable={false} proOptions={{ hideAttribution: true }}
++          onNodeClick={(_, n) => onSel(n.id === sel ? null : n.id)} onPaneClick={() => onSel(null)} colorMode="dark">
++          <Background color="rgba(255,255,255,0.06)" gap={24} />
++          <Controls showInteractive={false} />
++        </ReactFlow>
++      </div>
++      <NodeDetail node={node} />
++    </div>
++  );
++}
++
++function NodeDetail({ node }: { node: GraphNode | null }) {
++  const t = useT();
++  const text = useNodeText();
++  const card = { background: "var(--surface-0)", border: "1px solid rgba(255,255,255,0.06)" };
++  if (!node) {
++    return <div className="rounded-lg p-4" style={card}><span style={{ ...monoStyle, fontSize: "12px" }}>{t("world4.graph.pick")}</span></div>;
++  }
++  return (
++    <div className="flex flex-col gap-3 overflow-auto rounded-lg p-4" style={{ ...card, maxHeight: 620 }}>
++      <div className="flex flex-col gap-1">
++        <span style={{ ...labelStyle, color: KIND_COLOR[node.kind] }}>{t(`world4.graph.kinds.${node.kind}`)}</span>
++        <span style={{ fontFamily: "var(--quasar-font-display)", fontSize: "16px", color: "var(--ink-primary)" }}>{text(node).label}</span>
++        <span style={{ ...monoStyle, fontSize: "12px" }}>{text(node).description}</span>
++        <span><Badge tone={node.status === "ok" ? "ok" : node.status === "skipped" ? "dim" : "warn"}>{t(`world4.graph.status.${node.status}`)}</Badge></span>
++      </div>
++      {node.metrics.length ? (
++        <div className="flex flex-col gap-1">
++          <span style={labelStyle}>{t("world4.graph.metrics")}</span>
++          {node.metrics.map((m) => (
++            <div key={m.label} className="flex items-baseline justify-between gap-2">
++              <span style={{ ...monoStyle, fontSize: "11px" }}>{m.label}</span>
++              <span style={{ ...monoStyle, fontSize: "12px", color: "var(--ink-primary)", textAlign: "right" }}>
++                {fmt(m.value)} <span style={{ color: "var(--ink-dim)", fontSize: "10px" }}>{m.unit}</span>
++              </span>
++            </div>
++          ))}
++        </div>
++      ) : null}
++      {node.series ? (
++        <div className="flex flex-col gap-1">
++          <span style={labelStyle}>{t("world4.graph.series")} · {node.series.label}</span>
++          <BandSparkline years={node.series.years} p50={node.series.values} />
++          <span style={{ ...monoStyle, fontSize: "10px", color: "var(--ink-dim)" }}>{node.series.unit} · {node.series.band}</span>
++        </div>
++      ) : null}
++      {node.caveats?.length ? (
++        <div className="flex flex-col gap-1">
++          <span style={labelStyle}>{t("world4.graph.caveats")}</span>
++          {node.caveats.map((c) => <span key={c} style={{ ...monoStyle, fontSize: "11px", color: "var(--warning)" }}>· {c}</span>)}
++        </div>
++      ) : null}
++      {node.provenance && Object.keys(node.provenance).length ? (
++        <div className="flex flex-col gap-1">
++          <span style={labelStyle}>{t("world4.graph.provenance")}</span>
++          {Object.entries(node.provenance).map(([k, v]) => (
++            <span key={k} style={{ ...monoStyle, fontSize: "11px" }}>{k}: {Array.isArray(v) ? v.join(", ") : String(v)}</span>
++          ))}
++        </div>
++      ) : null}
++    </div>
++  );
++}
++
++function LoopsGraph({ data }: { data: World4RunData }) {
++  const t = useT();
++  const loops = data.graph?.loops;
++  const [decade, setDecade] = useState(0);
++  const [loopSel, setLoopSel] = useState<string | null>(null);
++  const table = loops?.dominant_by_decade ?? [];
++  const row = table[Math.min(decade, Math.max(table.length - 1, 0))];
++  const active = useMemo(() => {
++    const name = loopSel ?? row?.loops[0]?.loop ?? null;
++    const set = new Set<string>();
++    const stocks = new Set<string>();
++    if (name) {
++      const seq = name.split("->").map((p) => p.trim()).filter((p) => p.includes("-["))
++        .map((p) => { const [s, f] = p.split("-["); return { s: s.trim(), f: f.replace("]", "").trim() }; });
++      seq.forEach((x, i) => {
++        const next = seq[(i + 1) % seq.length].s;
++        set.add(`${x.s}|${next}|${x.f}`);
++        stocks.add(x.s);
++      });
++    }
++    return { name, set, stocks };
++  }, [loopSel, row]);
++  const score = row?.loops.find((l) => l.loop === active.name)?.score ?? null;
++
++  const { nodes, edges } = useMemo(() => {
++    if (!loops) return { nodes: [], edges: [] };
++    const R = 250;
++    const ns: Node<StockNodeData>[] = loops.stocks.map((s, i) => {
++      const a = (i / loops.stocks.length) * Math.PI * 2 - Math.PI / 2;
++      const self = loops.links.find((l) => l.source === s && l.target === s && active.set.has(`${s}|${s}|${l.flow}`));
++      return { id: s, type: "stock", position: { x: R * Math.cos(a), y: R * Math.sin(a) },
++        data: { label: s, active: active.stocks.has(s), selfLoop: self ? self.flow : null } };
++    });
++    const es: Edge[] = loops.links.filter((l) => l.source !== l.target).map((l, k) => {
++      const on = active.set.has(`${l.source}|${l.target}|${l.flow}`);
++      const pos = (score ?? 1) >= 0;
++      const color = on ? (pos ? "#3AA0FF" : "#f59e0b") : "rgba(176,190,197,0.35)";
++      return {
++        id: `${l.source}-${l.target}-${l.flow}-${k}`, source: l.source, target: l.target, label: on ? l.flow : undefined,
++        animated: on,
++        style: { stroke: color, strokeWidth: on ? 2.4 : 1, opacity: on ? 1 : 0.5 },
++        labelStyle: { fill: "var(--ink-primary)", fontSize: 10, fontFamily: "var(--quasar-font-mono)" },
++        labelBgStyle: { fill: "#0A0E14", fillOpacity: 0.9 },
++        markerEnd: { type: MarkerType.ArrowClosed, color, width: 12, height: 12 },
++      };
++    });
++    return { nodes: ns, edges: es };
++  }, [loops, active, score]);
++
++  if (!loops) return <Notice tone="info">{t("world4.graph.noLoops")}</Notice>;
++  return (
++    <div className="grid gap-4" style={{ gridTemplateColumns: "minmax(0,1fr) 320px" }}>
++      <div className="overflow-hidden rounded-lg" style={{ height: 620, background: "#070b11", border: "1px solid rgba(255,255,255,0.06)" }}>
++        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.15 }}
++          nodesConnectable={false} proOptions={{ hideAttribution: true }} colorMode="dark">
++          <Background color="rgba(255,255,255,0.06)" gap={24} />
++          <Controls showInteractive={false} />
++        </ReactFlow>
++      </div>
++      <div className="flex flex-col gap-3 rounded-lg p-4" style={{ background: "var(--surface-0)", border: "1px solid rgba(255,255,255,0.06)" }}>
++        <span style={labelStyle}>{t("world4.graph.decade", { year: row?.year ?? "—" })}</span>
++        <input type="range" min={0} max={Math.max(table.length - 1, 0)} value={decade}
++          onChange={(e) => { setDecade(Number(e.target.value)); setLoopSel(null); }} style={{ accentColor: "var(--electric)" }}
++          aria-label={t("world4.graph.decade", { year: row?.year ?? "—" })} />
++        <span style={labelStyle}>{t("world4.graph.topLoops")}</span>
++        {(row?.loops ?? []).map((l) => {
++          const on = l.loop === active.name;
++          return (
++            <button key={l.loop} type="button" onClick={() => setLoopSel(l.loop)} className="flex flex-col gap-1 rounded-md p-2 text-left"
++              style={{ background: on ? "rgba(58,160,255,0.12)" : "transparent", border: `1px solid ${on ? "rgba(58,160,255,0.5)" : "rgba(255,255,255,0.08)"}` }}>
++              <span style={{ ...monoStyle, fontSize: "11px", color: "var(--ink-primary)" }}>{l.loop}</span>
++              <div className="flex items-center gap-2">
++                <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: "var(--surface-3)" }}>
++                  <div className="h-full" style={{ width: `${Math.min(Math.abs(l.score) * 100, 100)}%`, background: l.score >= 0 ? "#3AA0FF" : "#f59e0b" }} />
++                </div>
++                <span style={{ ...monoStyle, fontSize: "10px" }}>{t("world4.graph.score", { s: fmt(l.score, 2) })}</span>
++              </div>
++            </button>
++          );
++        })}
++        <span style={{ ...monoStyle, fontSize: "10px", color: "var(--ink-dim)" }}>{loops.unit} · {loops.band}</span>
++      </div>
++    </div>
++  );
++}
++
++function PolicyStrip({ data }: { data: World4RunData }) {
++  const t = useT();
++  const p = data.policy;
++  if (!p) return null;
++  const rows = [...Object.entries(p.objectives).map(([k, v]) => ({ k, v, b: p.baseline_objectives[k] })),
++    ...Object.entries(p.constraints).map(([k, v]) => ({ k, v, b: p.baseline_constraints[k] }))];
++  return (
++    <div className="flex flex-col gap-2 rounded-lg p-4" style={{ background: "var(--surface-0)", border: "1px solid rgba(255,255,255,0.06)" }}>
++      <div className="flex flex-wrap items-center gap-2">
++        <span style={labelStyle}>{t("world4.graph.objectivesTitle")}</span>
++        <Badge tone={p.feasible ? "ok" : "warn"}>{p.feasible ? t("world4.graph.feasible") : t("world4.graph.infeasible")}</Badge>
++        <span style={{ ...monoStyle, fontSize: "11px" }}>
++          {t("world4.graph.better", { w: pct(p.better_than_baseline_share.welfare), g: pct(p.better_than_baseline_share.peak_gmst) })}
++        </span>
++      </div>
++      <div className="grid gap-x-6 gap-y-1" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
++        {rows.map(({ k, v, b }) => (
++          <div key={k} className="flex items-baseline justify-between gap-2" title={p.units[k]}>
++            <span style={{ ...monoStyle, fontSize: "11px" }}>{k}</span>
++            <span style={{ ...monoStyle, fontSize: "12px", color: k in p.constraints && v > 0 ? "var(--warning)" : "var(--ink-primary)" }}>
++              {fmt(v)} <span style={{ color: "var(--ink-dim)", fontSize: "10px" }}>vs {fmt(b)}</span>
++            </span>
++          </div>
++        ))}
++      </div>
++    </div>
++  );
++}
+diff --git a/frontend/src/components/world4/WorldExplorer.tsx b/frontend/src/components/world4/WorldExplorer.tsx
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/components/world4/WorldExplorer.tsx
+@@ -0,0 +1,140 @@
++"use client";
++
++// Explorador de World4 (F10): el slot `world_explorer` que el manifest de World4 declara con stage
++// "explorer". Tres pestañas sobre los datos de una corrida terminada (world.json, geo.json, graph.json,
++// policy.json): el globo 3D con los países como agentes, el grafo de la corrida y las preguntas a QUO y a
++// Prime Radiant. La corrida abierta en la vista manda; el selector permite volver a cualquier otra.
++
++import { useCallback, useEffect, useState } from "react";
++import { Globe2, MessageSquareText, RefreshCw, Workflow } from "lucide-react";
++
++import { useT } from "@/lib/i18n";
++import type { PhyRunSnapshot, PhySlot } from "@/lib/phyModels";
++import { listWorld4Runs, loadWorld4Run, type World4RunData } from "@/lib/world4";
++import { Badge, labelStyle, monoStyle, Notice, Panel } from "@/components/phy/ui";
++
++import { AskPanel } from "./AskPanel";
++import { GlobeView, type AskTarget } from "./GlobeView";
++import { RunGraph } from "./RunGraph";
++
++type Tab = "globe" | "graph" | "ask";
++
++export function WorldExplorer({ modelId, run }: { slot?: PhySlot; modelId: string; run: PhyRunSnapshot | null }) {
++  const t = useT();
++  const [runs, setRuns] = useState<PhyRunSnapshot[]>([]);
++  const [runId, setRunId] = useState<string | null>(null);
++  const [data, setData] = useState<World4RunData | null>(null);
++  const [state, setState] = useState<"idle" | "loading" | "missing">("idle");
++  const [tab, setTab] = useState<Tab>("globe");
++  const [focus, setFocus] = useState<AskTarget | null>(null);
++  const [tick, setTick] = useState(0);
++
++  // la lista de corridas terminadas (y la de la vista cuando termina)
++  useEffect(() => {
++    let alive = true;
++    void listWorld4Runs(modelId).then((rs) => {
++      if (!alive) return;
++      setRuns(rs);
++      setRunId((cur) => cur ?? rs[0]?.run_id ?? null);
++    });
++    return () => { alive = false; };
++  }, [modelId, tick, run?.status]);
++  useEffect(() => {
++    if (run?.status === "done") void Promise.resolve().then(() => setRunId(run.run_id));
++  }, [run?.run_id, run?.status]);
++
++  useEffect(() => {
++    if (!runId) return;
++    let alive = true;
++    void Promise.resolve().then(() => alive && setState("loading"));
++    void loadWorld4Run(modelId, runId).then((d) => {
++      if (!alive) return;
++      setData(d);
++      setState(d ? "idle" : "missing");
++    });
++    return () => { alive = false; };
++  }, [modelId, runId]);
++
++  const snap = runs.find((r) => r.run_id === runId) ?? (run?.run_id === runId ? run : null);
++  const family = String(snap?.family ?? snap?.config?.family ?? "scenario");
++  const fidelity = String(snap?.fidelity ?? "L0");
++  const onAsk = useCallback((target: AskTarget) => {
++    setFocus(target);
++    setTab("ask");
++  }, []);
++
++  const runLabel = (r: PhyRunSnapshot) =>
++    t("world4.runLabel", {
++      family: String(r.family ?? r.config?.family ?? "scenario"), fidelity: String(r.fidelity ?? ""),
++      narrative: String(r.config?.narrative ?? "ssp2"), date: String(r.created_at ?? "").slice(0, 16).replace("T", " "),
++    });
++
++  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
++    { id: "globe", label: t("world4.tabs.globe"), icon: <Globe2 size={14} /> },
++    { id: "graph", label: t("world4.tabs.graph"), icon: <Workflow size={14} /> },
++    { id: "ask", label: t("world4.tabs.ask"), icon: <MessageSquareText size={14} /> },
++  ];
++
++  return (
++    <Panel>
++      <div className="flex flex-wrap items-start justify-between gap-3">
++        <div className="flex flex-col gap-1">
++          <div className="flex flex-wrap items-center gap-2">
++            <h2 style={{ fontFamily: "var(--quasar-font-display)", fontSize: "20px", fontWeight: 600, color: "var(--ink-primary)" }}>
++              {t("world4.title")}
++            </h2>
++            <Badge tone="warn">{t("world4.badges.exploratory")}</Badge>
++            {data && !data.world.l1 ? <Badge tone="dim">{t("world4.badges.l0only")}</Badge> : null}
++            {data?.world.l1 ? <Badge tone="dim">{t("world4.badges.members", { n: data.world.l1.members })}</Badge> : null}
++            {data ? <Badge tone="dim">{t("world4.badges.states", { n: data.world.l0.members })}</Badge> : null}
++          </div>
++          <span style={{ ...monoStyle, fontSize: "12px" }}>{t("world4.subtitle")}</span>
++        </div>
++        <div className="flex items-center gap-2">
++          <label className="flex items-center gap-2">
++            <span style={labelStyle}>{t("world4.run")}</span>
++            <select value={runId ?? ""} onChange={(e) => setRunId(e.target.value || null)} disabled={!runs.length}
++              style={{ fontFamily: "var(--quasar-font-mono)", fontSize: "12px", color: "var(--ink-primary)", background: "var(--surface-0)",
++                border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, padding: "5px 8px", maxWidth: 360 }}>
++              {runs.map((r) => <option key={r.run_id} value={r.run_id}>{runLabel(r)}</option>)}
++            </select>
++          </label>
++          <button type="button" onClick={() => setTick((k) => k + 1)} aria-label={t("world4.refresh")} title={t("world4.refresh")}
++            className="flex h-8 w-8 items-center justify-center rounded-md" style={{ border: "1px solid rgba(255,255,255,0.12)", color: "var(--ink-muted)" }}>
++            <RefreshCw size={14} />
++          </button>
++        </div>
++      </div>
++
++      <span style={{ ...monoStyle, fontSize: "11px", color: "var(--warning)" }}>{t("world4.honesty")}</span>
++
++      {!runs.length && !runId ? (
++        <Notice tone="info">{t("world4.noRuns")}</Notice>
++      ) : state === "loading" && !data ? (
++        <span style={{ ...monoStyle, fontSize: "12px" }}>{t("world4.loading")}</span>
++      ) : state === "missing" ? (
++        <Notice tone="warn">{t("world4.missing")}</Notice>
++      ) : data ? (
++        <>
++          <div role="tablist" aria-label={t("world4.tabs.label")} className="flex gap-1 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
++            {tabs.map((x) => (
++              <button key={x.id} type="button" role="tab" aria-selected={tab === x.id} onClick={() => setTab(x.id)}
++                className="flex items-center gap-1.5 px-3 py-2"
++                style={{ fontFamily: "var(--quasar-font-mono)", fontSize: "12px", color: tab === x.id ? "var(--ink-primary)" : "var(--ink-dim)",
++                  borderBottom: `2px solid ${tab === x.id ? "var(--electric)" : "transparent"}`, marginBottom: -1 }}>
++                {x.icon} {x.label}
++              </button>
++            ))}
++          </div>
++          <div role="tabpanel" style={{ display: tab === "globe" ? "block" : "none" }}>
++            <GlobeView key={data.runId} data={data} onAsk={onAsk} />
++          </div>
++          {tab === "graph" ? <RunGraph data={data} /> : null}
++          {tab === "ask" ? <AskPanel data={data} family={family} fidelity={fidelity} focus={focus} /> : null}
++        </>
++      ) : null}
++    </Panel>
++  );
++}
++
++export default WorldExplorer;
+diff --git a/frontend/src/components/world4/charts.tsx b/frontend/src/components/world4/charts.tsx
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/components/world4/charts.tsx
+@@ -0,0 +1,110 @@
++"use client";
++
++// Gráficos pequeños del explorador de World4: SVG propio (sin librería), tokens de Studio.
++
++import { CHANNEL_COLORS, fmt } from "./scales";
++
++type Num = number | null | undefined;
++
++function finite(v: Num): v is number {
++  return typeof v === "number" && Number.isFinite(v);
++}
++
++/** Línea p50 con banda p10-p90 (opcional) y un año marcado. */
++export function BandSparkline({
++  years,
++  p50,
++  p10,
++  p90,
++  baseline,
++  mark,
++  width = 300,
++  height = 84,
++  color = "var(--electric)",
++}: {
++  years: number[];
++  p50: Num[];
++  p10?: Num[];
++  p90?: Num[];
++  baseline?: Num[];
++  mark?: number | null;
++  width?: number;
++  height?: number;
++  color?: string;
++}) {
++  const vals = [...p50, ...(p10 ?? []), ...(p90 ?? []), ...(baseline ?? [])].filter(finite);
++  if (!vals.length || years.length < 2) return null;
++  let lo = Math.min(...vals);
++  let hi = Math.max(...vals);
++  if (hi === lo) { hi += 1; lo -= 1; }
++  const pad = { l: 34, r: 6, t: 6, b: 16 };
++  const X = (i: number) => pad.l + (i / (years.length - 1)) * (width - pad.l - pad.r);
++  const Y = (v: number) => pad.t + (1 - (v - lo) / (hi - lo)) * (height - pad.t - pad.b);
++  const path = (s: Num[]) =>
++    s.reduce<string>((acc, v, i) => (finite(v) ? acc + `${acc && !acc.endsWith("M") ? "L" : "M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}` : acc), "");
++  let band = "";
++  if (p10 && p90) {
++    const up = p90.map((v, i) => (finite(v) ? `${X(i).toFixed(1)},${Y(v).toFixed(1)}` : null)).filter(Boolean);
++    const dn = p10.map((v, i) => (finite(v) ? `${X(i).toFixed(1)},${Y(v).toFixed(1)}` : null)).filter(Boolean).reverse();
++    if (up.length && dn.length) band = `M${up.join("L")}L${dn.join("L")}Z`;
++  }
++  const mi = mark !== null && mark !== undefined ? years.indexOf(mark) : -1;
++  return (
++    <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: "block" }} role="img">
++      <text x={2} y={pad.t + 8} fill="var(--ink-dim)" fontSize="9" fontFamily="var(--quasar-font-mono)">{fmt(hi)}</text>
++      <text x={2} y={height - pad.b} fill="var(--ink-dim)" fontSize="9" fontFamily="var(--quasar-font-mono)">{fmt(lo)}</text>
++      <text x={pad.l} y={height - 3} fill="var(--ink-dim)" fontSize="9" fontFamily="var(--quasar-font-mono)">{years[0]}</text>
++      <text x={width - pad.r} y={height - 3} textAnchor="end" fill="var(--ink-dim)" fontSize="9" fontFamily="var(--quasar-font-mono)">{years[years.length - 1]}</text>
++      {band ? <path d={band} fill={color} opacity={0.18} /> : null}
++      {baseline ? <path d={path(baseline)} fill="none" stroke="var(--ink-dim)" strokeWidth={1.2} strokeDasharray="3 3" /> : null}
++      <path d={path(p50)} fill="none" stroke={color} strokeWidth={1.8} />
++      {mi >= 0 ? <line x1={X(mi)} x2={X(mi)} y1={pad.t} y2={height - pad.b} stroke="var(--ink-muted)" strokeWidth={1} strokeDasharray="2 2" /> : null}
++      {mi >= 0 && finite(p50[mi]) ? <circle cx={X(mi)} cy={Y(p50[mi] as number)} r={3} fill={color} /> : null}
++    </svg>
++  );
++}
++
++/** Reparto de la renta de un agente entre los seis canales, una columna apilada por año. */
++export function DecisionColumns({
++  years,
++  shares,
++  names,
++  mark,
++  width = 300,
++  height = 110,
++}: {
++  years: number[];
++  shares: Num[][]; // [año][canal]
++  names: string[];
++  mark?: number | null;
++  width?: number;
++  height?: number;
++}) {
++  const totals = shares.map((row) => row.reduce<number>((a, v) => a + (finite(v) ? v : 0), 0));
++  const top = Math.max(...totals, 1e-9);
++  const pad = { l: 4, r: 4, t: 4, b: 14 };
++  const cw = (width - pad.l - pad.r) / years.length;
++  return (
++    <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: "block" }} role="img">
++      {shares.map((row, i) => {
++        let y = height - pad.b;
++        const x = pad.l + i * cw + cw * 0.12;
++        const w = cw * 0.76;
++        return (
++          <g key={years[i]} opacity={mark === undefined || mark === null || mark === years[i] ? 1 : 0.55}>
++            {row.map((v, j) => {
++              if (!finite(v) || v <= 0) return null;
++              const h = (v / top) * (height - pad.t - pad.b);
++              y -= h;
++              return <rect key={names[j]} x={x} y={y} width={w} height={h} fill={CHANNEL_COLORS[names[j]] ?? "#64748b"} />;
++            })}
++            {i === 0 || i === years.length - 1 ? (
++              <text x={x + w / 2} y={height - 2} textAnchor="middle" fill="var(--ink-dim)" fontSize="9"
++                fontFamily="var(--quasar-font-mono)">{years[i]}</text>
++            ) : null}
++          </g>
++        );
++      })}
++    </svg>
++  );
++}
+diff --git a/frontend/src/components/world4/scales.ts b/frontend/src/components/world4/scales.ts
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/components/world4/scales.ts
+@@ -0,0 +1,104 @@
++// Escalas de color y formato del explorador de World4. Paletas fijas pensadas para el fondo oscuro de
++// Studio: secuencial (azul profundo → cian → ámbar) y divergente (azul ↔ gris ↔ rojo) alrededor de 0.
++
++import type { CountrySeries, World4L1 } from "@/lib/world4";
++import { centralValue } from "@/lib/world4";
++
++const SEQ = ["#1b2a4a", "#1d4e89", "#1f7fb4", "#2fb3c9", "#7fd3b0", "#e5d36a", "#f59e0b"];
++const DIV = ["#2563eb", "#60a5fa", "#a5c7f0", "#64748b", "#f2a6a0", "#f87171", "#dc2626"];
++
++export const CHANNEL_COLORS: Record<string, string> = {
++  k: "#3AA0FF", // capital
++  r: "#a78bfa", // tecnología
++  m: "#5CC8E8", // importar del centro
++  x: "#f59e0b", // extracción propia
++  f: "#E23EC0", // recursos fuera
++  w: "#22C55E", // redistribución
++};
++
++export const FLOW_COLORS = { trade: "#5CC8E8", drain: "#f97316" } as const;
++
++function lerpHex(a: string, b: string, t: number): string {
++  const pa = parseInt(a.slice(1), 16);
++  const pb = parseInt(b.slice(1), 16);
++  const ch = (p: number, s: number) => (p >> s) & 255;
++  const mix = (s: number) => Math.round(ch(pa, s) + (ch(pb, s) - ch(pa, s)) * t);
++  return `rgb(${mix(16)},${mix(8)},${mix(0)})`;
++}
++
++function ramp(stops: string[], t: number): string {
++  const x = Math.min(Math.max(t, 0), 1) * (stops.length - 1);
++  const i = Math.min(Math.floor(x), stops.length - 2);
++  return lerpHex(stops[i], stops[i + 1], x - i);
++}
++
++export interface Scale {
++  lo: number;
++  hi: number;
++  log: boolean;
++  diverging: boolean;
++  color: (v: number | null) => string | null;
++}
++
++/** Escala sobre TODOS los años (así la evolución se ve) con los percentiles 5-95 de los valores. */
++export function makeScale(values: number[], opts: { log?: boolean; diverging?: boolean } = {}): Scale {
++  const log = Boolean(opts.log) && values.every((v) => v > 0);
++  const xs = values.filter((v) => Number.isFinite(v) && (!log || v > 0)).map((v) => (log ? Math.log10(v) : v));
++  xs.sort((a, b) => a - b);
++  const q = (p: number) => (xs.length ? xs[Math.min(xs.length - 1, Math.max(0, Math.floor(p * (xs.length - 1))))] : 0);
++  let lo = q(0.05);
++  let hi = q(0.95);
++  if (opts.diverging) {
++    const m = Math.max(Math.abs(lo), Math.abs(hi)) || 1;
++    lo = -m;
++    hi = m;
++  }
++  if (hi === lo) hi = lo + 1;
++  return {
++    lo: log ? 10 ** lo : lo,
++    hi: log ? 10 ** hi : hi,
++    log,
++    diverging: Boolean(opts.diverging),
++    color: (v) => {
++      if (v === null || !Number.isFinite(v) || (log && v <= 0)) return null;
++      const x = log ? Math.log10(v) : v;
++      return ramp(opts.diverging ? DIV : SEQ, (x - lo) / (hi - lo));
++    },
++  };
++}
++
++export function legendStops(diverging: boolean): string[] {
++  return diverging ? DIV : SEQ;
++}
++
++/** Capas cuyo valor conviene en escala logarítmica (muy sesgadas entre países). */
++export const LOG_LAYERS = new Set(["gdp_pc", "population", "co2", "primary_energy"]);
++/** Capas con signo, en escala divergente alrededor de 0. */
++export const DIVERGING_LAYERS = new Set(["growth", "net_rents"]);
++
++/** Crecimiento del PIB per cápita (p50 contra el año anterior), % por año; año 0 = null. */
++export function growthGrid(l1: World4L1): (number | null)[][] {
++  const s = l1.series.gdp_pc as CountrySeries | undefined;
++  if (!s) return [];
++  return l1.countries.map((_, i) =>
++    l1.years.map((_, k) => {
++      if (k === 0) return null;
++      const a = centralValue(s, i, k - 1);
++      const b = centralValue(s, i, k);
++      return a && b ? (b / a - 1) * 100 : null;
++    }),
++  );
++}
++
++export function fmt(v: number | null | undefined, digits = 3): string {
++  if (v === null || v === undefined || !Number.isFinite(v)) return "—";
++  const a = Math.abs(v);
++  if (a !== 0 && (a >= 1e6 || a < 1e-3)) return v.toExponential(2);
++  if (a >= 1000) return Math.round(v).toLocaleString("en-US");
++  return Number(v.toPrecision(digits)).toString();
++}
++
++export function pct(v: number | null | undefined): string {
++  if (v === null || v === undefined || !Number.isFinite(v)) return "—";
++  return `${Math.round(v * 100)} %`;
++}
+diff --git a/backend/app/services/platform_tools.py b/backend/app/services/platform_tools.py
+--- a/backend/app/services/platform_tools.py
++++ b/backend/app/services/platform_tools.py
+@@ -3556,6 +3556,135 @@ def phy_cancel_run(model: str, run_id: str, tool_context: ToolContext = None) ->
+     return {"model": model, "run_id": run_id, **outcome}
+ 
+ 
++# ── Phy-World (World4), F10: lecturas de QUO ────────────────────────────────────
++# Las MISMAS funciones puras que el servidor MCP de World4 (``world4.mcp.tools``: HTTP, MCP y QUO no pueden
++# divergir) más la lectura de una corrida de Studio terminada (``world.json``: los países como agentes).
++_W4_RUN_TOOLS = ("run_country", "run_summary")
++
++
++def world4_read(tool: str, arguments_json: str = "{}") -> dict:
++    """Pregunta a Phy-World (World4) sin lanzar corridas: catálogo, consultas del L1, palancas, una política,
++    bandas del L0, lazos dominantes, y lo que una corrida de Studio terminada dice de un país.
++
++    Herramientas (``tool``) y sus argumentos (``arguments_json``, un objeto JSON):
++
++    - ``w4_catalog`` ``{}``: variables con unidad, fidelidad y horizonte medido.
++    - ``w4_query`` ``{"variable", "region" (ISO3 o WLD), "as_of" (1970-2018), "target" (1-10 años después),
++      "members"?}``: distribución p10/p50/p90 del L1 con unidad y salvedades. Unos segundos.
++    - ``w4_levers`` ``{}``: las 7 palancas (caja, unidad, signo declarado) y las narrativas SSP.
++    - ``w4_evaluate_policy`` ``{"theta": {palanca: valor}, "narrative"?, "members"?, "vulnerability"?}``: una
++      política sobre el ensemble del L0 a 2100 (exploratorio). Unos segundos.
++    - ``w4_l0r_bands`` ``{"start"?, "years"?, "members"?, "explore"?}``: bandas mundiales del L0 regional.
++    - ``w4_loop_dominance`` ``{"top"?, "step"?}``: lazos dominantes del L0 por década.
++    - ``run_summary`` ``{"run_id"}``: resumen de una corrida de World4 de Studio (objetivos, límites, política,
++      mundo en 2100).
++    - ``run_country`` ``{"run_id", "iso3"}``: la trayectoria de un país-agente en esa corrida (estado con
++      bandas, sus seis canales de decisión y sus mayores flujos de comercio y drenaje).
++
++    Todo resultado lleva unidad y banda (o dice por qué no) y ``exploratory``; nada es un pronóstico más allá de
++    10 años.
++
++    Args:
++        tool: Nombre de la herramienta (ver la lista).
++        arguments_json: Sus argumentos como objeto JSON (``"{}"`` si no lleva).
++
++    Returns:
++        El resultado de la herramienta, o ``{"error"}`` con el motivo (World4 no disponible, argumento
++        desconocido, dato sin instalar con su remedio…).
++    """
++    import json as _json
++
++    try:
++        args = _json.loads(arguments_json or "{}")
++    except ValueError as exc:
++        return {"error": f"arguments_json no es JSON válido: {exc}"}
++    if not isinstance(args, dict):
++        return {"error": "arguments_json debe ser un objeto JSON"}
++    svc = _phy_service("world4")
++    if isinstance(svc, dict):
++        return svc
++    if tool in _W4_RUN_TOOLS:
++        return _world4_run_read(svc, tool, args)
++    try:
++        ns = svc._ns
++        with ns.isolation.activate():
++            from world4.mcp import tools as w4tools
++
++            if tool not in w4tools.TOOLS:
++                return {"error": f"herramienta desconocida {tool!r}; herramientas: "
++                                 f"{sorted([*w4tools.TOOLS, *_W4_RUN_TOOLS])}"}
++            return _jsonable_w4(w4tools.call(tool, args))
++    except (ValueError, KeyError) as exc:
++        return {"error": str(exc), "tool": tool}
++    except Exception as exc:  # dato sin instalar, QueryError…: el mensaje trae el remedio
++        return {"error": f"{type(exc).__name__}: {exc}", "tool": tool}
++
++
++def _jsonable_w4(obj):
++    import json as _json
++
++    return _json.loads(_json.dumps(obj, default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o)))
++
++
++def _world4_run_read(svc, tool: str, args: dict) -> dict:
++    import json as _json
++
++    run_id = str(args.get("run_id") or "")
++    try:
++        snap = svc.get_run(run_id)
++    except ValueError as exc:
++        return {"error": str(exc)}
++    if snap is None:
++        return {"error": f"corrida world4 {run_id!r} no encontrada"}
++    if snap.get("status") != "done":
++        return {"error": f"la corrida {run_id} no ha terminado (status {snap.get('status')})"}
++    try:
++        world = _json.loads((svc.run_dir(run_id) / "world.json").read_text(encoding="utf-8"))
++    except (OSError, ValueError):
++        return {"error": f"la corrida {run_id} no tiene world.json"}
++    result = snap.get("result") or {}
++    if tool == "run_summary":
++        l0 = world.get("l0") or {}
++        last = {k: {"unit": v.get("unit"), "p10": (v.get("p10") or [None])[-1], "p50": (v.get("p50") or [None])[-1],
++                    "p90": (v.get("p90") or [None])[-1]} for k, v in (l0.get("world") or {}).items()}
++        return {"run_id": run_id, "family": snap.get("family"), "fidelity": snap.get("fidelity"),
++                "narrative": world.get("narrative"), "theta": world.get("theta"),
++                "record": result.get("record"), "pareto": result.get("pareto"),
++                "world_2100": last, "l1_origin": (world.get("l1") or {}).get("origin"),
++                "units": {"record": "World4 robust objectives and limits (log 2017 USD, degC, fractions; see w4_levers)"},
++                "exploratory": True}
++    iso3 = str(args.get("iso3") or "").upper()
++    l1 = world.get("l1")
++    if not l1:
++        return {"error": "la corrida es L0: no tiene los países-agente (lánzala a L1)"}
++    codes = [c["iso3"] for c in l1["countries"]]
++    if iso3 not in codes:
++        return {"error": f"{iso3!r} no está entre los {len(codes)} países del L1"}
++    i = codes.index(iso3)
++    state = {}
++    for name, s in l1["series"].items():
++        row = {k: s[k][i] for k in ("p10", "p50", "p90", "mean") if k in s}
++        state[name] = {"unit": s["unit"], **row, **({"band": s["band"]} if "band" in s else {})}
++    ch = l1["channels"]
++    flows = {}
++    own = l1["flows"].get("partners") or {}
++    for kind in ("trade", "drain"):
++        out_, in_ = {}, {}
++        for direction, acc in (("out", out_), ("in", in_)):
++            for year_rows in ((own.get(f"{kind}_{direction}") or [])[i:i + 1] or [[]])[0]:
++                for j, v in year_rows:
++                    acc[codes[j]] = max(acc.get(codes[j], 0.0), v or 0.0)
++        flows[kind] = {"to": dict(sorted(out_.items(), key=lambda kv: -kv[1])[:5]),
++                       "from": dict(sorted(in_.items(), key=lambda kv: -kv[1])[:5])}
++    return {"run_id": run_id, "iso3": iso3, "region": l1["countries"][i].get("region"), "years": l1["years"],
++            "state": state,
++            "channels": {"unit": ch["unit"], "labels": ch["labels"], "names": ch["names"], "share": ch["share"][i],
++                         "band": ch["band"]},
++            "flows": {**flows, "unit": "million 2017 USD per year (largest yearly value among the shown links)",
++                      "band": "none: flows on ensemble medians"},
++            "caveats": l1.get("caveats"), "exploratory": False, "horizon_note": l1.get("horizon_note")}
++
++
+ # ── Fase 11 (plan 11-23, D-212): tools de la ola 4 ──────────────────────────────
+ # Las funciones viven en sus módulos (11-07, 11-13, 11-16, 11-19); aquí sólo se adaptan
+ # para el registro. Las que ejecutan el sandbox tardan segundos: en ADK una tool síncrona
+@@ -4128,6 +4257,9 @@ _PLATFORM_FUNCS = {
+     "phy_launch_run": phy_launch_run,
+     "phy_run_status": phy_run_status,
+     "phy_cancel_run": phy_cancel_run,
++    # F10 de World4: lecturas de Phy-World para QUO (mismas funciones puras que su servidor MCP). Clase
++    # lectura: no lanza corridas ni gasta dinero; ``w4_query``/``w4_evaluate_policy`` tardan unos segundos.
++    "world4_read": world4_read,
+     # 260913-dqw (DW-4): artefactos de dashboard. Las tres son INERTES (clase lectura):
+     # el catálogo se lee in-process y las propuestas sólo se validan estáticamente; el
+     # JS corre en el navegador y únicamente cuando el ingeniero lo añade al builder.
+diff --git a/backend/app/services/agents/permissions.py b/backend/app/services/agents/permissions.py
+--- a/backend/app/services/agents/permissions.py
++++ b/backend/app/services/agents/permissions.py
+@@ -147,6 +147,9 @@ TOOL_CLASSES: dict[str, str] = {
+     # snapshot pollable de una corrida — consultas puras, sin fricción.
+     "list_phy_models": "lectura",
+     "phy_run_status": "lectura",
++    # F10 de World4: catálogo, consultas, palancas, una política, bandas, lazos y la lectura de una corrida
++    # de Studio terminada. Sin corridas ni dinero; deriva a quo y design_copilot como las demás lecturas.
++    "world4_read": "lectura",
+     # 260913-dqw (DW-4): artefactos de dashboard. INERTES puros como ``propose_strategy``:
+     # el catálogo es una consulta in-process y las dos propuestas sólo validan
+     # estáticamente (tamaño, esquema de parámetros, denylist de red/storage/eval) y
+diff --git a/backend/app/prompts/quo_system.md b/backend/app/prompts/quo_system.md
+--- a/backend/app/prompts/quo_system.md
++++ b/backend/app/prompts/quo_system.md
+@@ -14,6 +14,7 @@ You operate the platform directly for data science (loading data, building pipel
+ - `set_session_mode(mode)` — Switch the workspace between `production` and `research` (HITL).
+ - `generate_geometry(run_id, ...)` / `phy_evaluate(model, theta_json, fidelity)` — Costly actions with a cost card: geometry for a verified, recommended candidate; one-point evaluation with a Phy model's real physics.
+ - `list_phy_models()` / `phy_run_status(model, run_id)` — Registered Phy models and the state of a native Phy run.
++- `world4_read(tool, arguments_json)` — Ask Phy-World (World4), the world-system model, WITHOUT launching runs: `w4_catalog`, `w4_query` (an L1 p10/p50/p90 for a country 1-10 years after an origin 1970-2018), `w4_levers`, `w4_evaluate_policy` (one policy over the L0 ensemble to 2100), `w4_l0r_bands`, `w4_loop_dominance`, and for a finished Studio run of `world4`: `run_summary {run_id}` and `run_country {run_id, iso3}` (the country as an agent: state with bands, its six decision channels, its largest trade and value-drain partners). Quote every World4 number with its unit and band; beyond 10 years it is a behaviour mode, never a forecast.
+ - `list_workspace_files(fields, limit, offset)` / `read_workspace_file(path)` / `run_workspace_command(...)` — Browse (paginated; `next_offset` gives the next page), read and run allow-listed commands under the session workspace jail.
+ - `read_result(result_handle, offset, limit)` — If a tool output comes back with `truncated: true`, you only saw its `preview`: read the rest with `read_result(result_handle, offset)` only if you need it.
+ - `write_workspace_file(path, content, encoding)` / `export_document(source | markdown, format)` — Write a file in the session workspace (no approval, jailed) and export Markdown to DOCX/PDF under `outputs/` (see "Workspace files").
+diff --git a/frontend/src/lib/i18n/en.ts b/frontend/src/lib/i18n/en.ts
+--- a/frontend/src/lib/i18n/en.ts
++++ b/frontend/src/lib/i18n/en.ts
+@@ -15,6 +15,7 @@ import { confirmEn } from "./cards/confirm";
+ import { planEn } from "./cards/plan";
+ import { cockpitEn } from "./cards/cockpit";
+ import { primeRadiantEn } from "./primeRadiant";
++import { world4En } from "./world4";
+ import { composerEn } from "./cards/composer";
+ 
+ export const en = {
+@@ -2161,6 +2162,8 @@ export const en = {
+   },
+   // Vista Prime Radiant (src/lib/i18n/primeRadiant.ts).
+   primeRadiant: primeRadiantEn,
++  // Explorador de World4 (F10; src/lib/i18n/world4.ts).
++  world4: world4En,
+   // Tarjetas del stream del Agente: un fragmento por grupo (src/lib/i18n/cards/*).
+   cards: {
+     hitl: hitlEn,
+diff --git a/frontend/src/lib/i18n/es.ts b/frontend/src/lib/i18n/es.ts
+--- a/frontend/src/lib/i18n/es.ts
++++ b/frontend/src/lib/i18n/es.ts
+@@ -11,6 +11,7 @@ import { confirmEs } from "./cards/confirm";
+ import { planEs } from "./cards/plan";
+ import { cockpitEs } from "./cards/cockpit";
+ import { primeRadiantEs } from "./primeRadiant";
++import { world4Es } from "./world4";
+ import { composerEs } from "./cards/composer";
+ 
+ export const es: Dictionary = {
+@@ -2123,6 +2124,8 @@ export const es: Dictionary = {
+   },
+   // Vista Prime Radiant (src/lib/i18n/primeRadiant.ts).
+   primeRadiant: primeRadiantEs,
++  // Explorador de World4 (F10; src/lib/i18n/world4.ts).
++  world4: world4Es,
+   // Tarjetas del stream del Agente: un fragmento por grupo (src/lib/i18n/cards/*).
+   cards: {
+     hitl: hitlEs,
+diff --git a/frontend/src/components/phy/PhyGenericView.tsx b/frontend/src/components/phy/PhyGenericView.tsx
+--- a/frontend/src/components/phy/PhyGenericView.tsx
++++ b/frontend/src/components/phy/PhyGenericView.tsx
+@@ -590,6 +590,7 @@ export function PhyGenericView({
+         siblingRun,
+         setSiblingRun,
+         modelNames: modelNames ?? {},
++        run,
+       }
+     : null;
+ 
+@@ -770,6 +771,16 @@ export function PhyGenericView({
+           onRetry={retry}
+         />
+       ) : (
++        <>
++        {/* Slots de stage "explorer" (World4, F10): una vista propia del modelo, a todo el
++            ancho y antes del riel; el resto de etapas sigue igual debajo. */}
++        {slotCtx
++          ? slots.map((s, i) =>
++              s.stage === "explorer" ? (
++                <SlotRenderer key={slotKey(s, i)} slot={s} ctx={slotCtx} index={i} />
++              ) : null,
++            )
++          : null}
+         <div className="flex flex-col gap-6 xl:flex-row xl:gap-8">
+           <PhyStageRail
+             states={stageStates}
+@@ -990,6 +1001,7 @@ export function PhyGenericView({
+             </div>
+           </div>
+         </div>
++        </>
+       )}
+     </div>
+   );
+diff --git a/frontend/src/components/phy/slots/SlotRenderer.tsx b/frontend/src/components/phy/slots/SlotRenderer.tsx
+--- a/frontend/src/components/phy/slots/SlotRenderer.tsx
++++ b/frontend/src/components/phy/slots/SlotRenderer.tsx
+@@ -9,9 +9,12 @@
+ //   field_select   → FieldSelectSlot    (stage "result": el contenedor decide dónde va)
+ //   note           → NoteSlot
+ //   sibling_run    → SiblingRunSlot     (historial unificado S3 como selector; sólo {model_id, run_id})
++//   world_explorer → WorldExplorer      (stage "explorer": globo 3D, grafo de la corrida y preguntas; World4, F10)
+ //   (otro)         → Notice info honesto: nunca pantalla en blanco ni `undefined`.
+ 
+-import type { PhyDesignVar, PhySchema, PhySlot } from "@/lib/phyModels";
++import dynamic from "next/dynamic";
++
++import type { PhyDesignVar, PhyRunSnapshot, PhySchema, PhySlot } from "@/lib/phyModels";
+ import { Notice } from "../ui";
+ import { ChoiceFamilySlot, familyChoices } from "./ChoiceFamilySlot";
+ import { FieldSelectSlot } from "./FieldSelectSlot";
+@@ -19,6 +22,9 @@ import { FixedVarsSlot } from "./FixedVarsSlot";
+ import { NoteSlot } from "./NoteSlot";
+ import { SiblingRunSlot, type SiblingRunValue } from "./SiblingRunSlot";
+ 
++// three.js y @xyflow sólo en el cliente y sólo para el modelo que declara el slot.
++const WorldExplorer = dynamic(() => import("@/components/world4/WorldExplorer"), { ssr: false });
++
+ /** Todo lo que un slot puede leer o mutar del estado de `PhyGenericView`. */
+ export interface SlotContext {
+   modelId: string;
+@@ -41,6 +47,8 @@ export interface SlotContext {
+   setSiblingRun: (next: SiblingRunValue | null) => void;
+   /** Nombres de modelo del índice (`id → nombre`) para el copy de los slots. */
+   modelNames: Record<string, string>;
++  /** Corrida abierta en la vista (la del explorador por defecto); null antes de lanzar. */
++  run?: PhyRunSnapshot | null;
+ }
+ 
+ /** Clave estable de un slot dentro del schema (título + kind; sin ids de modelo). */
+@@ -90,6 +98,8 @@ export function SlotRenderer({
+     }
+     case "note":
+       return <NoteSlot slot={slot} />;
++    case "world_explorer":
++      return <WorldExplorer slot={slot} modelId={ctx.modelId} run={ctx.run ?? null} />;
+     case "sibling_run":
+       return (
+         <SiblingRunSlot
+diff --git a/frontend/src/lib/phyModels.ts b/frontend/src/lib/phyModels.ts
+--- a/frontend/src/lib/phyModels.ts
++++ b/frontend/src/lib/phyModels.ts
+@@ -140,7 +140,8 @@ export interface PhySlot {
+   kind: "fixed_vars" | "choice_family" | "field_select" | "sibling_run" | "note" | string;
+   title: string;
+   note?: string;
+-  stage: "spec" | "result";
++  /** `explorer` (F10, World4): una vista propia del modelo a todo el ancho, antes del riel. */
++  stage: "spec" | "result" | "explorer";
+   [k: string]: unknown;
+ }
+ 
