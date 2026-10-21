@@ -1,0 +1,778 @@
+<title>El árbol de los futuros</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: informe largo de una columna (máx. 1120px), capítulos numerados en orden de lectura;
+   las figuras anchas (árboles) viven en su propio contenedor con scroll horizontal. */
+:root {
+  --bg: #f3f5f4;
+  --surface: #fbfcfb;
+  --ink: #0f1c19;
+  --ink-2: #3f4c48;
+  --ink-3: #6b7773;
+  --rule: #d9e0dd;
+  --rule-2: #e8edeb;
+  --accent: #0b6e55;
+  --accent-soft: #d6ebe3;
+  --neutral-mark: #8a9692;
+  --d0: #b3302b; --d1: #eb8a7f; --d2: #78aee8; --d3: #1c5cab;
+  --f-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --f-body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --s-1: 12px; --s-2: 13.5px; --s-3: 15.5px; --s-4: 19px; --s-5: 26px; --s-6: 40px; --s-7: clamp(44px, 7vw, 76px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1413; --surface: #141c1a; --ink: #e5ebe8; --ink-2: #b7c2be; --ink-3: #8a9692;
+    --rule: #2a3532; --rule-2: #1e2826; --accent: #46c49c; --accent-soft: #173a30; --neutral-mark: #75817d;
+    --d0: #e8604f; --d1: #9a3d36; --d2: #33609f; --d3: #4a96e0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1413; --surface: #141c1a; --ink: #e5ebe8; --ink-2: #b7c2be; --ink-3: #8a9692;
+  --rule: #2a3532; --rule-2: #1e2826; --accent: #46c49c; --accent-soft: #173a30; --neutral-mark: #75817d;
+  --d0: #e8604f; --d1: #9a3d36; --d2: #33609f; --d3: #4a96e0;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: var(--s-3); line-height: 1.6; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0; }
+h1, h2, h3 { text-wrap: balance; font-weight: 400; margin: 0; }
+h1 { font-family: var(--f-display); font-size: var(--s-7); line-height: 1; letter-spacing: -0.01em; }
+h1 em { font-style: italic; color: var(--accent); }
+h2 { font-family: var(--f-display); font-size: var(--s-6); line-height: 1.08; }
+h3 { font-family: var(--f-body); font-weight: 600; font-size: var(--s-4); }
+p { margin: 0; max-width: 68ch; }
+.mono, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font-family: var(--f-mono); font-size: var(--s-1); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header.hero { padding-block: 56px 32px; border-bottom: 1px solid var(--rule); }
+.hero-grid { display: grid; gap: 28px; }
+.lede { font-size: var(--s-4); color: var(--ink-2); max-width: 62ch; line-height: 1.5; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.kpi { background: var(--surface); padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.kpi .v { font-family: var(--f-display); font-size: 48px; line-height: 1; }
+.kpi .v small { font-size: 22px; }
+.kpi .l { font-size: var(--s-2); color: var(--ink-2); line-height: 1.4; }
+.kpi .tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+
+section.ch { padding-block: 56px 8px; display: grid; gap: 20px; }
+.ch-head { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 16px; align-items: baseline; }
+.ch-n { font-family: var(--f-mono); font-size: var(--s-2); color: var(--accent); }
+.ch-head p { grid-column: 2; color: var(--ink-2); }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 18px; min-width: 0; }
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.note { font-size: var(--s-2); color: var(--ink-3); max-width: 80ch; }
+.callout { border-left: 3px solid var(--accent); padding: 4px 0 4px 16px; display: grid; gap: 8px; }
+.callout p { color: var(--ink-2); }
+.cols-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: var(--s-2); color: var(--ink-2); align-items: center; }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.ln { width: 18px; height: 2px; display: inline-block; }
+
+/* destinos */
+.destinies { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.dest { padding: 14px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); display: grid; gap: 6px; align-content: start; min-width: 0; }
+.dest b { font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.dest p { font-size: var(--s-2); color: var(--ink-2); }
+
+/* árbol */
+.tree-shell { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.tree-box { max-height: 660px; overflow: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+svg text { fill: var(--ink); font-family: var(--f-body); }
+.axis text { fill: var(--ink-3); font-family: var(--f-mono); font-size: 10.5px; }
+.axis path, .axis line { stroke: var(--rule); }
+.grid line { stroke: var(--rule-2); }
+.grid path { display: none; }
+.tnode { cursor: pointer; }
+.tnode .box { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.tnode.onpath .box { stroke: var(--accent); stroke-width: 2; }
+.tnode.best .box { fill: var(--accent-soft); }
+.tnode:hover .box { stroke: var(--ink-2); }
+.tlink { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+.tlink.best { stroke: var(--accent); stroke-opacity: .45; stroke-width: 2; }
+.tlink.onpath { stroke: var(--accent); stroke-opacity: 1; stroke-width: 3; }
+.inspector { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr) minmax(0, 1.2fr); gap: 14px 28px; align-items: start; }
+.inspector > .eyebrow { grid-column: 1 / -1; }
+.ins-col { display: grid; gap: 12px; min-width: 0; }
+#builder { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ctl { display: grid; gap: 6px; }
+.ctl label, .ctl .lab { font-size: var(--s-2); color: var(--ink-2); }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; width: 100%; }
+.seg button { flex: 1; font: inherit; font-size: var(--s-2); padding: 6px 8px; border: 0; background: var(--surface); color: var(--ink-2); cursor: pointer; border-right: 1px solid var(--rule); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.bigbar { display: flex; gap: 2px; height: 26px; border-radius: 4px; overflow: hidden; }
+.bigbar div { height: 100%; }
+.dl { display: grid; grid-template-columns: auto auto; gap: 4px 12px; font-size: var(--s-2); }
+.dl dt { color: var(--ink-2); }
+.dl dd { margin: 0; text-align: right; white-space: nowrap; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.pct-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; font-size: 11.5px; color: var(--ink-2); }
+.pct-row span b { display: block; font-family: var(--f-mono); font-size: var(--s-3); color: var(--ink); font-weight: 500; }
+
+/* small multiples */
+.multiples { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.mult { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 10px 10px 4px; min-width: 0; }
+.mult h4 { margin: 0; font-size: var(--s-2); font-weight: 600; }
+.mult .u { font-size: 11px; color: var(--ink-3); }
+.mult svg { display: block; width: 100%; height: auto; }
+
+/* ranking */
+.rank { width: 100%; border-collapse: collapse; font-size: var(--s-2); min-width: 720px; }
+.rank th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 11.5px; padding: 6px 8px; border-bottom: 1px solid var(--rule); font-family: var(--f-mono); text-transform: uppercase; letter-spacing: .04em; }
+.rank td { padding: 4px 8px; border-bottom: 1px solid var(--rule-2); vertical-align: middle; }
+.rank tr { cursor: pointer; }
+.rank tbody tr:hover td { background: var(--rule-2); }
+.rank tr.sel td { background: var(--accent-soft); }
+.dot { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--ink-3); display: inline-block; vertical-align: middle; }
+.dot.on { background: var(--ink); border-color: var(--ink); }
+.yr { font-family: var(--f-mono); font-size: 11.5px; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--rule); }
+.yr.now { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.sbar { display: flex; gap: 2px; height: 14px; min-width: 220px; }
+.sbar div { height: 100%; }
+.sbar div:first-child { border-radius: 3px 0 0 3px; } .sbar div:last-child { border-radius: 0 3px 3px 0; }
+
+.tip { position: fixed; pointer-events: none; z-index: 20; background: var(--ink); color: var(--bg); font-size: 12px; line-height: 1.45; padding: 8px 10px; border-radius: 5px; max-width: 280px; opacity: 0; transition: opacity .12s; }
+.tip b { font-weight: 600; }
+.tip .mono { font-size: 11.5px; }
+
+.findings { display: grid; gap: 14px; counter-reset: f; }
+.finding { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; padding: 14px 0; border-top: 1px solid var(--rule); }
+.finding::before { counter-increment: f; content: counter(f, decimal-leading-zero); font-family: var(--f-mono); color: var(--accent); font-size: var(--s-2); padding-top: 3px; }
+.finding h3 { margin-bottom: 4px; }
+.finding p { color: var(--ink-2); }
+.method { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.method div { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.method p, .method li { font-size: var(--s-2); color: var(--ink-2); }
+.method ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+code { font-family: var(--f-mono); font-size: .9em; background: var(--rule-2); padding: 1px 5px; border-radius: 3px; word-break: break-word; }
+pre { font-family: var(--f-mono); font-size: 12px; background: var(--rule-2); padding: 12px; border-radius: 5px; overflow-x: auto; margin: 0; }
+footer { padding-block: 40px 56px; color: var(--ink-3); font-size: var(--s-2); border-top: 1px solid var(--rule); margin-top: 56px; }
+table.tv { border-collapse: collapse; font-size: 12px; }
+table.tv td, table.tv th { padding: 3px 8px; border-bottom: 1px solid var(--rule-2); text-align: right; font-family: var(--f-mono); }
+table.tv th:first-child, table.tv td:first-child { text-align: left; font-family: var(--f-body); }
+details summary { cursor: pointer; color: var(--ink-2); font-size: var(--s-2); }
+
+@media (max-width: 920px) {
+  .tree-shell { grid-template-columns: minmax(0, 1fr); }
+  .inspector { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .inspector .ins-col:first-of-type { grid-column: 1 / -1; }
+  .multiples { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .destinies { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .cols-2, .method { grid-template-columns: minmax(0, 1fr); }
+  .ch-head { grid-template-columns: minmax(0, 1fr); }
+  .ch-head p { grid-column: 1; }
+  .inspector, #builder { grid-template-columns: minmax(0, 1fr); }
+  .kpi .v { font-size: 38px; }
+}
+@media (max-width: 420px) {
+  .multiples, .destinies { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="tip" id="tip" role="tooltip"></div>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div class="eyebrow">QUASAR Phy-World · núcleo L0 (World3-03) · proyección 2026 → 2100</div>
+    <h1>El árbol de los <em>futuros</em></h1>
+    <p class="lede">Cinco decisiones que la humanidad puede tomar desde 2027, una incertidumbre que no controla y 500 mundos simulados cuya historia coincide con la población real. Cada rama del árbol es una política; cada hoja, la probabilidad de cuatro destinos posibles para 2100.</p>
+    <div class="kpis" id="kpis"></div>
+    <p class="note">Esto es un <b>modo de comportamiento</b> del modelo World3-03 de <i>Limits to Growth</i> (2004), reimplementado y verificado en Phy-World contra Vensim (error máximo 6,9·10⁻⁶). No es un pronóstico: es un mapa de qué decisiones cambian la forma del siglo y cuáles no.</p>
+  </div>
+</header>
+
+<main>
+<section class="ch wrap" id="destinos">
+  <div class="ch-head"><span class="ch-n">01</span><h2>Cuatro destinos para 2100</h2>
+    <p>Cada uno de los 500 mundos termina en una de estas cuatro clases. Los umbrales son declarados, no estimados: cambiarlos cambia los porcentajes, no el orden de las ramas.</p></div>
+  <div class="destinies" id="destCards"></div>
+</section>
+
+<section class="ch wrap" id="ancla">
+  <div class="ch-head"><span class="ch-n">02</span><h2>Primero, que el pasado cuadre</h2>
+    <p>Muestreamos 6.000 combinaciones de seis parámetros inciertos de World3-03 y nos quedamos sólo con las que reproducen la población mundial observada (UN WPP 2024) en 2000 y en 2020 con un error menor al 6 %. Es el mismo principio de <i>history matching</i> que usa la calibración F7 de Phy-World.</p></div>
+  <div class="cols-2">
+    <div class="panel"><div class="eyebrow" style="margin-bottom:8px">Población mundial 1950–2023, miles de millones</div><div id="histChart"></div>
+      <div class="legend" style="margin-top:6px"><span><i class="sw" style="background:var(--accent);opacity:.25"></i>Modelo, p10–p90</span><span><i class="ln" style="background:var(--accent)"></i>Modelo, mediana</span><span><i class="sw" style="background:var(--ink);border-radius:50%"></i>Observado (WPP 2024)</span></div></div>
+    <div class="panel" style="display:grid;gap:12px;align-content:start">
+      <div class="eyebrow">Filtro de historia</div>
+      <div id="hmStats"></div>
+      <details><summary>Cajas de incertidumbre (previas uniformes)</summary><div class="scroll-x" style="margin-top:8px"><table class="tv" id="priorTable"></table></div></details>
+    </div>
+  </div>
+</section>
+
+<section class="ch wrap" id="arbol">
+  <div class="ch-head"><span class="ch-n">03</span><h2>El árbol de decisión</h2>
+    <p>Se lee de izquierda a derecha: cinco decisiones (cuadrados) y al final la geología, un nodo de azar (círculo) que nadie elige. Cada nodo muestra el bienestar esperado (índice HWI medio 2027–2100) y la mezcla de destinos. Por retro-inducción, el azar promedia y cada decisión toma la rama con más bienestar: esa es la <b style="color:var(--accent)">ruta óptima</b>. Toque un nodo para abrirlo o una hoja para inspeccionarla.</p></div>
+  <div class="tree-shell">
+    <div class="tree-box" id="treeBox"><svg id="treeSvg"></svg></div>
+    <aside class="inspector panel" id="inspector" aria-label="Inspector de la ruta">
+      <div class="eyebrow">Ruta seleccionada · cambie cualquier decisión</div>
+      <div class="ins-col"><div id="builder" style="display:grid;gap:10px 16px"></div></div>
+      <div class="ins-col"><div class="lab" style="font-size:var(--s-2);color:var(--ink-2)">Destinos de esta hoja</div><div class="bigbar" id="leafBar"></div><div class="pct-row" id="leafPct"></div>
+        <button id="toBest" type="button" style="font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--accent);color:var(--accent);background:transparent;border-radius:5px;cursor:pointer;justify-self:start">Volver a la ruta óptima</button></div>
+      <div class="ins-col"><dl class="dl" id="leafStats"></dl><p class="note">Mediana y, entre paréntesis, p10–p90 de los 500 mundos.</p></div>
+    </aside>
+  </div>
+  <div class="legend" id="treeLegend"></div>
+</section>
+
+<section class="ch wrap" id="trayectorias">
+  <div class="ch-head"><span class="ch-n">04</span><h2>Cómo se ve esa ruta, año por año</h2>
+    <p>La ruta elegida en el inspector (banda p10–p90 y mediana) contra la inercia, sin ninguna palanca (gris), en la misma geología. Pase el cursor por cualquier panel: el cursor se sincroniza en los ocho.</p></div>
+  <div class="legend"><span><i class="sw" style="background:var(--accent);opacity:.25"></i>Ruta seleccionada, p10–p90</span><span><i class="ln" style="background:var(--accent)"></i>Mediana</span><span><i class="ln" style="background:var(--neutral-mark)"></i>Inercia, mediana</span><span><i class="sw" style="background:var(--ink);border-radius:50%"></i>Población observada</span><span id="trajLabel" class="mono" style="color:var(--ink-3)"></span></div>
+  <div class="multiples" id="multiples"></div>
+</section>
+
+<section class="ch wrap" id="politicas">
+  <div class="ch-head"><span class="ch-n">05</span><h2>Las 32 políticas, de mejor a peor</h2>
+    <p>Promediadas sobre la geología (50 % recursos base, 50 % abundantes). Los puntos llenos son palancas activas. Toque una fila para llevarla al árbol y a las trayectorias.</p></div>
+  <div class="panel scroll-x"><table class="rank" id="rankTable"></table></div>
+</section>
+
+<section class="ch wrap" id="palancas">
+  <div class="ch-head"><span class="ch-n">06</span><h2>¿Qué palanca pesa más?</h2>
+    <p>Efecto medio de activar cada palanca, promediado sobre las 16 combinaciones de las otras cuatro y sobre la geología. Para «momento», activar significa esperar a 2045.</p></div>
+  <div class="cols-2">
+    <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Cambio en la probabilidad de colapso (puntos)</div><div id="tornCollapse"></div></div>
+    <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Cambio en la huella ecológica 2100 (planetas)</div><div id="tornHef"></div></div>
+  </div>
+</section>
+
+<section class="ch wrap" id="esperar">
+  <div class="ch-head"><span class="ch-n">07</span><h2>El coste de esperar</h2>
+    <p>Mismo paquete, distinto año de arranque, del 2027 al 2070. Tres paquetes: todas las palancas, sólo las tecnológicas (limpia + agro-suelos) y sólo las sociales (demografía + suficiencia).</p></div>
+  <div class="legend"><span><i class="ln" style="background:var(--accent)"></i>Todas las palancas</span><span><i class="ln" style="background:var(--ink)"></i>Sólo tecnología</span><span><i class="ln" style="background:var(--neutral-mark)"></i>Sólo sociales</span></div>
+  <div class="cols-2">
+    <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Probabilidad de transición sostenible</div><div id="waitSust"></div></div>
+    <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Probabilidad de colapso</div><div id="waitCol"></div></div>
+  </div>
+</section>
+
+<section class="ch wrap" id="cart">
+  <div class="ch-head"><span class="ch-n">08</span><h2>Lo que aprendió un árbol de clasificación</h2>
+    <p>El árbol de arriba lo diseñamos nosotros. Este lo aprende la máquina: 16.000 simulaciones con decisiones al azar, año de acción continuo entre 2027 y 2070 e incertidumbre en todos los parámetros (filtradas por la historia). Un árbol CART de profundidad 4 busca las preguntas que mejor separan los destinos.</p></div>
+  <div class="panel scroll-x" id="cartBox"><svg id="cartSvg"></svg></div>
+  <div class="cols-2">
+    <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Importancia de cada variable (reducción de Gini)</div><div id="importance"></div></div>
+    <div class="panel" style="display:grid;gap:10px;align-content:start"><div class="eyebrow">Calidad del árbol</div><div id="cartStats"></div></div>
+  </div>
+</section>
+
+<section class="ch wrap" id="nube">
+  <div class="ch-head"><span class="ch-n">09</span><h2>El espacio de los futuros</h2>
+    <p>Izquierda: 2.500 mundos del Monte Carlo, por su huella ecológica en 2100 y su bienestar medio en el siglo. Derecha: cómo fluye la probabilidad desde la geología, por el número de palancas activadas, hasta cada destino.</p></div>
+  <div class="cols-2">
+    <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Huella 2100 (planetas) × bienestar medio 2027–2100</div><div id="cloud"></div></div>
+    <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Geología → palancas activas → destino</div><div id="sankey"></div></div>
+  </div>
+  <div class="legend" id="cloudLegend"></div>
+</section>
+
+<section class="ch wrap" id="conclusiones">
+  <div class="ch-head"><span class="ch-n">10</span><h2>Lo que dice el árbol</h2></div>
+  <div class="findings">
+    <div class="finding"><div><h3>Sin decisiones, el modelo colapsa en el 99 % de los mundos</h3><p>La inercia reproduce el escenario 1 de <i>Limits to Growth</i>: la población toca techo cerca de 8,2 mil millones hacia 2029 y cae a unos 3,5 mil millones en 2100, con la esperanza de vida mediana en 27 años. El detonante es el agotamiento de los recursos no renovables, que encarece el capital y arrastra a la industria, la agricultura y los servicios.</p></div></div>
+    <div class="finding"><div><h3>La geología decide antes que nosotros</h3><p>Con los recursos de base de World3 (10¹² unidades), ninguna de las 32 políticas evita el colapso cuando se activa en 2027: la probabilidad es 100 % en todas. Con el doble de recursos y mejor tecnología de extracción, la ruta óptima no colapsa nunca: 46 % de transición sostenible y 53 % de crisis con recuperación. Es la primera pregunta del árbol aprendido y explica casi la mitad de su capacidad de separar destinos.</p></div></div>
+    <div class="finding"><div><h3>La ruta óptima es activar todo, ya</h3><p>Actuar en 2027 con tecnología limpia, agro-tecnología y suelos, transición demográfica y suficiencia material da el mayor bienestar esperado (HWI 0,503 frente a 0,424 de la inercia). En el mundo abundante, la población de 2100 queda en 7,9 mil millones con 80 años de esperanza de vida y una huella de 1,03 planetas.</p></div></div>
+    <div class="finding"><div><h3>La agro-tecnología salva vidas; la tecnología limpia salva el planeta</h3><p>Activar agro-tecnología y suelos baja el colapso 28 puntos de media; ninguna otra palanca se le acerca. La tecnología limpia apenas suma bienestar (0,498 → 0,503 en la ruta óptima), pero sin ella la huella de 2100 sube a 1,76 planetas y la transición sostenible cae del 46 % al 3 %. La demografía, por sí sola, mueve la población y casi nada del destino.</p></div></div>
+    <div class="finding"><div><h3>Cada cinco años de espera cuestan unos siete puntos de futuro sostenible</h3><p>Con todas las palancas, la probabilidad de transición sostenible es 23 % si se arranca en 2027, 16 % en 2032, 8 % en 2037 y 2 % en 2042. Baja del 5 % para arranques desde 2039 y es cero desde 2048. La probabilidad de colapso aguanta en 50 % hasta mediados de siglo y después sube: esperar no sólo cierra la puerta buena, también abre la mala.</p></div></div>
+    <div class="finding"><div><h3>Lo que el árbol no puede decir</h3><p>World3-03 es un mundo de una sola región, sin precios, sin clima explícito y con la tecnología como tablas. Su inercia toca techo de población en 2029, antes que las proyecciones de la ONU (≈ 10,3 mil millones hacia 2084). Úselo para comparar ramas, no para fechar el futuro. La capa regional de Phy-World (F6–F8: 10 regiones, FaIR, alimentos) daría el siguiente nivel de detalle; ver Metodología.</p></div></div>
+  </div>
+</section>
+
+<section class="ch wrap" id="metodo">
+  <div class="ch-head"><span class="ch-n">11</span><h2>Metodología y límites</h2></div>
+  <div class="method">
+    <div><h3>Modelo</h3><p>Núcleo L0 de Phy-World: World3-03 reimplementado en NumPy, vectorizado sobre los 500 miembros, paso de 0,5 años, 1900–2100. Cada palanca reproduce un cambio de los escenarios 2–9 de <i>Limits to Growth: The 30-Year Update</i>, con el año de política en 2027 o 2045:</p>
+      <ul>
+        <li><b>Tecnología limpia y eficiencia:</b> tecnología de contaminación (<code>pptcm</code> −4 %/año) y de conservación de recursos (<code>rtcm</code>).</li>
+        <li><b>Agro-tecnología y suelos:</b> rendimiento (<code>lytcrm</code> +4 %/año) y protección contra la erosión (<code>llmytm</code>).</li>
+        <li><b>Transición demográfica:</b> familia deseada de 2 hijos y control natal plenamente eficaz (<code>zpgt</code>, <code>fcest</code>).</li>
+        <li><b>Suficiencia material:</b> producción industrial per cápita deseada de 350 (<code>iet</code>, <code>iopcd</code>).</li>
+        <li><b>Geología (azar, 50/50 declarado):</b> recursos base o el doble con mejor extracción (<code>nri</code>, <code>fcaortm</code>), como el escenario 2.</li>
+      </ul></div>
+    <div><h3>Destinos, árbol y CART</h3>
+      <ul>
+        <li><b>Colapso:</b> esperanza de vida en 2100 menor de 55 años.</li>
+        <li><b>Crisis y recuperación:</b> no hay colapso, pero la población cae más de 20 % desde su pico o la esperanza de vida baja de 45 en algún año.</li>
+        <li><b>Meseta en sobregiro:</b> sin crisis, con huella ecológica en 2100 mayor de 1,1 planetas.</li>
+        <li><b>Transición sostenible:</b> el resto.</li>
+      </ul>
+      <p>Bienestar = índice de bienestar humano (HWI) de World3-03, medio 2027–2100. El árbol de decisión usa números aleatorios comunes: todas las hojas ven los mismos 500 mundos. El CART es <code>sklearn.tree.DecisionTreeClassifier</code> (profundidad 4, hoja mínima 150), con validación cruzada de 5 particiones.</p></div>
+    <div><h3>Límites declarados</h3>
+      <ul>
+        <li>Modos de comportamiento, no pronósticos. Las cajas de incertidumbre y los umbrales de destino son supuestos [M].</li>
+        <li>La capa regional L0R y la búsqueda robusta F8 de Phy-World necesitan FAOSTAT y el conjunto FaIR de Zenodo; la red de esta sesión bloqueó esas descargas, así que este informe usa el núcleo global.</li>
+        <li>En <code>world4/core/l0.py</code> el flujo de la tecnología de recursos es <code>-rctcr</code>: con la tabla <code>[-0.04, 0]</code> del escenario 6 la tecnología <i>aumentaría</i> el uso de recursos. Aquí se usa <code>[+0.04, 0]</code> para que ahorre, como en el libro. Conviene revisarlo en el port.</li>
+        <li>El L1 del Atlas (180 países) sólo pronostica hasta 2019 y a 10 años; no entra en esta proyección.</li>
+      </ul></div>
+    <div><h3>Reproducir</h3>
+      <pre>pip install -e . scikit-learn
+python world4_cli.py --install-atlas --install-wpp
+PYTHONPATH=. python reports/arbol_decision/proyeccion.py
+python reports/arbol_decision/construir.py</pre>
+      <p id="metaLine" class="mono" style="font-size:12px"></p></div>
+  </div>
+</section>
+</main>
+<footer><div class="wrap">QUASAR Phy-World (World4) · núcleo L0 World3-03 · datos de población UN WPP 2024 (CC BY 3.0 IGO). Informe generado a partir de <code>reports/arbol_decision/data.json</code>.</div></footer>
+
+<script id="w4data" type="application/json">__DATA__</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+<script>
+(function () {
+"use strict";
+const D = JSON.parse(document.getElementById("w4data").textContent);
+const DEST = D.destinies;
+const DVAR = ["--d0", "--d1", "--d2", "--d3"];
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const dcol = (i) => `var(${DVAR[i]})`;
+const fmt = { p: d3.format(".0%"), p1: d3.format(".1%"), n2: d3.format(".2f"), n3: d3.format(".3f"), n1: d3.format(".1f"), s: (v) => d3.format(".3~s")(v) };
+const pct = (v) => (v < 0.005 && v > 0 ? "<1 %" : Math.round(v * 100) + " %");
+const DEC_SHORT = ["Momento", "Tec. limpia", "Agro-suelos", "Demografía", "Suficiencia", "Geología", "Destino"];
+const tip = document.getElementById("tip");
+function showTip(html, ev) {
+  tip.innerHTML = html; tip.style.opacity = 1;
+  const r = tip.getBoundingClientRect();
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + r.width > window.innerWidth - 8) x = ev.clientX - r.width - 14;
+  if (y + r.height > window.innerHeight - 8) y = ev.clientY - r.height - 14;
+  tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px";
+}
+function hideTip() { tip.style.opacity = 0; }
+function stackHTML(p) { return p.map((v, i) => v > 0 ? `<div style="flex:${v};background:${dcol(i)}"></div>` : "").join(""); }
+function destRows(p) { return p.map((v, i) => `<div><i class="sw" style="background:${dcol(i)}"></i> ${DEST[i]}: <span class="mono">${pct(v)}</span></div>`).join(""); }
+
+/* ── estado: la ruta seleccionada ── */
+const policyByKey = Object.fromEntries(D.policies.map((p) => [p.key, p]));
+const BEST = D.policies[0].key;
+let sel = { key: BEST, res: 1 };
+
+/* ── KPIs ── */
+(function kpis() {
+  const bau = policyByKey["00000"], best = policyByKey[BEST];
+  const closing = D.wait.find((w) => w.all.p_sust < 0.05);
+  const items = [
+    { v: pct(bau.p_destiny[0]), l: "de los mundos colapsan si no se activa ninguna palanca", tag: "Inercia", c: 0 },
+    { v: pct(best.p_destiny[0]), l: "colapsan con la ruta óptima: todos son los de recursos base", tag: "Ruta óptima", c: 0 },
+    { v: pct(best.by_res[1].p_destiny[3]), l: "llegan a una transición sostenible con la ruta óptima y recursos abundantes", tag: "Mejor caso", c: 3 },
+    { v: closing ? String(closing.year) : "—", l: "año de arranque desde el que la transición sostenible baja del 5 %", tag: "La ventana", c: null },
+  ];
+  document.getElementById("kpis").innerHTML = items.map((k) => `<div class="kpi"><span class="tag">${k.c !== null ? `<i class="sw" style="background:${dcol(k.c)}"></i>` : ""}${k.tag}</span><span class="v">${k.v.replace(" %", "<small>%</small>")}</span><span class="l">${k.l}</span></div>`).join("");
+})();
+
+/* ── destinos ── */
+(function cards() {
+  const txt = [
+    "La esperanza de vida no vuelve a 55 años antes de 2100. La sociedad pierde su base material y no se recupera.",
+    "Hay una caída fuerte (más de 20 % de la población o esperanza de vida por debajo de 45), pero en 2100 se vive más de 55 años.",
+    "Sin crisis, pero la huella ecológica en 2100 sigue por encima de 1,1 planetas: el bienestar se sostiene a crédito.",
+    "Sin crisis y dentro de la capacidad de la Tierra en 2100 (huella ≤ 1,1 planetas).",
+  ];
+  document.getElementById("destCards").innerHTML = DEST.map((d, i) => `<div class="dest"><b><i class="sw" style="background:${dcol(i)};width:14px;height:14px"></i>${d}</b><p>${txt[i]}</p></div>`).join("");
+  const lg = DEST.map((d, i) => `<span><i class="sw" style="background:${dcol(i)}"></i>${d}</span>`).join("");
+  document.getElementById("treeLegend").innerHTML = lg + `<span><i class="ln" style="background:var(--accent);height:3px"></i>Ruta seleccionada</span><span><i class="sw" style="background:var(--accent-soft);border:1px solid var(--rule)"></i>Mejor opción en su nodo</span>`;
+  document.getElementById("cloudLegend").innerHTML = lg;
+})();
+
+/* ── historia ── */
+(function history() {
+  const H = D.history, el = document.getElementById("histChart");
+  const W = 520, Hh = 260, m = { t: 10, r: 12, b: 26, l: 36 };
+  const x = d3.scaleLinear().domain([1950, 2023]).range([m.l, W - m.r]);
+  const y = d3.scaleLinear().domain([2, 9]).range([Hh - m.b, m.t]);
+  const svg = d3.select(el).append("svg").attr("viewBox", `0 0 ${W} ${Hh}`).attr("width", "100%");
+  svg.append("g").attr("class", "grid").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(7).tickSize(-(W - m.l - m.r)).tickFormat(""));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(0,${Hh - m.b})`).call(d3.axisBottom(x).ticks(7).tickFormat(d3.format("d")));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(7));
+  const yrs = H.years;
+  svg.append("path").attr("fill", "var(--accent)").attr("fill-opacity", .22).attr("d", d3.area().x((d, i) => x(yrs[i])).y0((d, i) => y(H.model[0][i])).y1((d, i) => y(H.model[2][i]))(yrs));
+  svg.append("path").attr("fill", "none").attr("stroke", "var(--accent)").attr("stroke-width", 2).attr("d", d3.line().x((d, i) => x(yrs[i])).y((d, i) => y(H.model[1][i]))(yrs));
+  svg.append("g").selectAll("circle").data(yrs.map((yy, i) => [yy, H.observed[i]]).filter((d) => d[0] % 5 === 0 || d[0] === 2023))
+    .join("circle").attr("cx", (d) => x(d[0])).attr("cy", (d) => y(d[1])).attr("r", 3).attr("fill", "var(--ink)");
+  const ov = svg.append("rect").attr("x", m.l).attr("y", m.t).attr("width", W - m.l - m.r).attr("height", Hh - m.t - m.b).attr("fill", "transparent");
+  const cross = svg.append("line").attr("stroke", "var(--ink-3)").attr("y1", m.t).attr("y2", Hh - m.b).style("opacity", 0);
+  ov.on("pointermove", (ev) => {
+    const [px] = d3.pointer(ev); const yy = Math.round(x.invert(px)); const i = yrs.indexOf(yy); if (i < 0) return;
+    cross.attr("x1", x(yy)).attr("x2", x(yy)).style("opacity", 1);
+    showTip(`<b>${yy}</b><br>Observado: <span class="mono">${fmt.n2(H.observed[i])}</span><br>Modelo mediana: <span class="mono">${fmt.n2(H.model[1][i])}</span><br>p10–p90: <span class="mono">${fmt.n2(H.model[0][i])}–${fmt.n2(H.model[2][i])}</span>`, ev);
+  }).on("pointerleave", () => { cross.style("opacity", 0); hideTip(); });
+  const hm = D.history_matching;
+  document.getElementById("hmStats").innerHTML = `<dl class="dl">
+    <dt>Mundos candidatos</dt><dd>${hm.candidates.toLocaleString("es")}</dd>
+    <dt>Aceptados por la historia</dt><dd>${hm.accepted.toLocaleString("es")} (${pct(hm.accepted / hm.candidates)})</dd>
+    <dt>Usados en el árbol</dt><dd>${hm.used}</dd>
+    <dt>Población 2000, observada</dt><dd>${fmt.n2(hm.obs2000)} mm</dd>
+    <dt>Población 2000, modelo p10–p90</dt><dd>${fmt.n2(hm.pop2000_q[0])}–${fmt.n2(hm.pop2000_q[2])}</dd>
+    <dt>Población 2020, observada</dt><dd>${fmt.n2(hm.obs2020)} mm</dd>
+    <dt>Población 2020, modelo p10–p90</dt><dd>${fmt.n2(hm.pop2020_q[0])}–${fmt.n2(hm.pop2020_q[2])}</dd></dl>
+    <p class="note">mm = miles de millones de personas.</p>`;
+  document.getElementById("priorTable").innerHTML = `<tr><th>Parámetro</th><th>mín.</th><th>máx.</th></tr>` +
+    Object.entries(hm.prior).map(([k, v]) => `<tr><td>${v[2]} <code>${k}</code></td><td>${v[0]}</td><td>${v[1]}</td></tr>`).join("");
+})();
+
+/* ── árbol de decisión ── */
+const treeSvg = d3.select("#treeSvg");
+const root = d3.hierarchy(D.tree, (d) => d.children);
+root.each((n) => { n._children = n.children; n.id = n.data.key + "|" + n.depth + "|" + (n.data.type === "leaf" ? n.data.label : ""); });
+const NODE_W = 124, NODE_H = 46, COL = 150, ROW = 54;
+function bestPathKeys() {
+  // decisiones óptimas desde la raíz
+  const keys = new Set(); let n = root;
+  while (n && n.data.type === "decision") { keys.add(n.data.key); n = n._children[n.data.best_choice]; }
+  if (n) keys.add(n.data.key);
+  return keys;
+}
+function expandForSelection() {
+  // abre la ruta seleccionada y la óptima; cierra el resto
+  const sk = sel.key; const bk = bestPathKeys();
+  root.each((n) => {
+    if (!n._children) return;
+    const k = n.data.key;
+    const onSel = sk.startsWith(k), onBest = bk.has(k);
+    n.children = (onSel || onBest || n.userOpen) ? n._children : null;
+  });
+}
+function nodeOnPath(n) {
+  const k = n.data.key;
+  if (n.data.type === "leaf") return k === sel.key + sel.res;
+  return sel.key.startsWith(k);
+}
+function drawTree() {
+  const layout = d3.tree().nodeSize([ROW, COL]).separation((a, b) => (a.parent === b.parent ? 1 : 1.15));
+  layout(root);
+  let x0 = Infinity, x1 = -Infinity;
+  root.each((n) => { x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); });
+  const top = 34, W = COL * 6 + NODE_W + 24, H = x1 - x0 + NODE_H + top + 20;
+  treeSvg.attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`);
+  treeSvg.selectAll("*").remove();
+  const g = treeSvg.append("g").attr("transform", `translate(12,${top + NODE_H / 2 - x0})`);
+  const hdr = treeSvg.append("g");
+  ["Inicio"].concat(DEC_SHORT.slice(0, 6)).forEach((t, i) => hdr.append("text").attr("x", 12 + i * COL).attr("y", 18).attr("class", "eyebrow").style("font-family", "var(--f-mono)").style("font-size", "10.5px").style("letter-spacing", ".08em").style("fill", "var(--ink-3)").text(t.toUpperCase()));
+  const links = root.links();
+  g.selectAll("path.tlink").data(links).join("path")
+    .attr("class", (l) => "tlink" + (l.target.data.best && l.source.data.type === "decision" ? " best" : "") + (nodeOnPath(l.target) ? " onpath" : ""))
+    .attr("d", (l) => `M${l.source.y + NODE_W},${l.source.x}C${l.source.y + NODE_W + 18},${l.source.x} ${l.target.y - 18},${l.target.x} ${l.target.y},${l.target.x}`);
+  const nodes = g.selectAll("g.tnode").data(root.descendants()).join("g")
+    .attr("class", (n) => "tnode" + (nodeOnPath(n) ? " onpath" : "") + (n.data.best ? " best" : ""))
+    .attr("transform", (n) => `translate(${n.y},${n.x - NODE_H / 2})`)
+    .attr("tabindex", 0).attr("role", "button");
+  nodes.append("rect").attr("class", "box").attr("width", NODE_W).attr("height", NODE_H).attr("rx", (n) => n.data.type === "chance" ? NODE_H / 2 : n.data.type === "leaf" ? 4 : 2);
+  nodes.append("text").attr("x", 10).attr("y", 17).style("font-size", "12.5px").style("font-weight", 600)
+    .text((n) => n.depth === 0 ? "Hoy" : (n.data.type === "leaf" ? n.data.label : `${n.data.edge}`));
+  nodes.append("text").attr("x", NODE_W - 10).attr("y", 17).attr("text-anchor", "end").style("font-family", "var(--f-mono)").style("font-size", "11px").style("fill", "var(--ink-2)")
+    .text((n) => fmt.n3(n.data.value));
+  nodes.each(function (n) {
+    const p = n.data.p_destiny; let x = 10; const w = NODE_W - 20; const gg = d3.select(this);
+    p.forEach((v, i) => { if (v <= 0) return; const ww = Math.max(0, v * w - (v * w > 3 ? 2 : 0)); gg.append("rect").attr("x", x).attr("y", 26).attr("width", ww).attr("height", 10).attr("rx", 1.5).attr("fill", dcol(i)); x += v * w; });
+    if (n._children && !n.children) gg.append("text").attr("x", NODE_W + 6).attr("y", NODE_H / 2 + 4).style("font-family", "var(--f-mono)").style("font-size", "12px").style("fill", "var(--ink-3)").text("+");
+  });
+  nodes.on("click", (ev, n) => onNodeClick(n)).on("keydown", (ev, n) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onNodeClick(n); } })
+    .on("pointermove", (ev, n) => {
+      const title = n.depth === 0 ? "Todas las decisiones por tomar" : (n.data.type === "leaf" ? `Hoja · recursos ${n.data.label.toLowerCase()} (p = ${n.data.p})` : `${DEC_SHORT[n.depth - 1]}: ${n.data.edge}`);
+      const next = n.data.type === "decision" ? `<br>Siguiente: ${n.data.label}` : n.data.type === "chance" ? "<br>Siguiente: la geología (azar)" : "";
+      showTip(`<b>${title}</b>${next}<br>Bienestar esperado: <span class="mono">${fmt.n3(n.data.value)}</span>${destRows(n.data.p_destiny)}`, ev);
+    }).on("pointerleave", hideTip);
+}
+function onNodeClick(n) {
+  if (n.data.type === "leaf") { sel = { key: n.data.key.slice(0, 5), res: +n.data.key[5] }; updateAll(); return; }
+  // un nodo de decisión o de azar: se abre y la selección sigue su mejor rama hacia abajo
+  n.userOpen = true;
+  let m = n;
+  while (m.data.type === "decision") m = m._children[m.data.best_choice];
+  sel = { key: m.data.key.slice(0, 5), res: sel.res };
+  updateAll();
+}
+
+/* ── inspector ── */
+const builder = document.getElementById("builder");
+const DEFS = D.decisions.map((d, j) => ({ ...d, j })).concat([{ key: "res", label: D.chance.label, options: ["Base", "Abundantes"], j: 5 }]);
+builder.innerHTML = DEFS.map((d) => `<div class="ctl"><span class="lab" id="lab-${d.key}">${d.label}</span><div class="seg" role="group" aria-labelledby="lab-${d.key}">${d.options.map((o, i) => `<button type="button" id="b-${d.key}-${i}" data-j="${d.j}" data-v="${i}">${o}</button>`).join("")}</div></div>`).join("");
+builder.addEventListener("click", (ev) => {
+  const b = ev.target.closest("button"); if (!b) return;
+  const j = +b.dataset.j, v = b.dataset.v;
+  if (j === 5) sel.res = +v; else sel.key = sel.key.slice(0, j) + v + sel.key.slice(j + 1);
+  updateAll();
+});
+document.getElementById("toBest").addEventListener("click", () => { sel = { key: BEST, res: 1 }; root.each((n) => (n.userOpen = false)); updateAll(); });
+function updateInspector() {
+  DEFS.forEach((d) => d.options.forEach((o, i) => {
+    const v = d.j === 5 ? sel.res : +sel.key[d.j];
+    document.getElementById(`b-${d.key}-${i}`).setAttribute("aria-pressed", String(v === i));
+  }));
+  const L = D.leaves[sel.key + sel.res];
+  document.getElementById("leafBar").innerHTML = stackHTML(L.p_destiny);
+  document.getElementById("leafPct").innerHTML = L.p_destiny.map((v, i) => `<span><b>${pct(v)}</b>${["Colapso", "Crisis", "Sobregiro", "Sostenible"][i]}</span>`).join("");
+  const r = (k, f) => `${f(L[k].q[1])} <span style="color:var(--ink-3)">(${f(L[k].q[0])}–${f(L[k].q[2])})</span>`;
+  document.getElementById("leafStats").innerHTML = `
+    <dt>Bienestar medio 2027–2100</dt><dd>${r("hwi_mean", fmt.n3)}</dd>
+    <dt>Pico de población (mm)</dt><dd>${r("pop_peak", fmt.n1)}</dd>
+    <dt>Año del pico</dt><dd>${r("pop_peak_year", d3.format("d"))}</dd>
+    <dt>Población 2100 (mm)</dt><dd>${r("pop_2100", fmt.n1)}</dd>
+    <dt>Esperanza de vida 2100</dt><dd>${r("le_2100", d3.format(".0f"))}</dd>
+    <dt>Huella 2100 (planetas)</dt><dd>${r("hef_2100", fmt.n2)}</dd>
+    <dt>Pico de contaminación (×1970)</dt><dd>${r("ppolx_peak", d3.format(".0f"))}</dd>`;
+}
+
+/* ── small multiples ── */
+const VORDER = ["pop", "le", "hwi", "hef", "iopc", "fpc", "ppolx", "nrfr"];
+const mults = {};
+(function buildMultiples() {
+  const host = document.getElementById("multiples");
+  VORDER.forEach((v) => {
+    const div = document.createElement("div"); div.className = "mult";
+    div.innerHTML = `<h4>${D.vars[v].label}</h4><div class="u">${D.vars[v].unit}</div>`;
+    host.appendChild(div);
+    const W = 260, H = 150, m = { t: 8, r: 8, b: 20, l: 34 };
+    const svg = d3.select(div).append("svg").attr("viewBox", `0 0 ${W} ${H}`);
+    mults[v] = { svg, W, H, m, x: d3.scaleLinear().domain([1950, 2100]).range([m.l, W - m.r]) };
+  });
+})();
+let hoverYear = null;
+function drawMultiples() {
+  const F = D.fans[sel.key + sel.res], B = D.fans["00000" + sel.res];
+  const yrs = F.years;
+  const obs = D.history;
+  document.getElementById("trajLabel").textContent = "· " + routeName(sel.key) + " · recursos " + (sel.res ? "abundantes" : "base");
+  VORDER.forEach((v) => {
+    const { svg, W, H, m, x } = mults[v];
+    svg.selectAll("*").remove();
+    const all = F[v][2].concat(B[v][1], F[v][0]);
+    let hi = d3.max(all); if (v === "pop") hi = Math.max(hi, 9);
+    const y = d3.scaleLinear().domain([0, hi * 1.05]).nice(4).range([H - m.b, m.t]);
+    svg.append("g").attr("class", "grid").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(""));
+    svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues([1950, 2000, 2050, 2100]).tickFormat(d3.format("d")));
+    svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(d3.format(hi >= 1000 ? "~s" : "~g")));
+    svg.append("line").attr("x1", x(2026)).attr("x2", x(2026)).attr("y1", m.t).attr("y2", H - m.b).attr("stroke", "var(--ink-3)").attr("stroke-width", 1);
+    if (v === "pop") svg.append("text").attr("x", x(2026) + 3).attr("y", m.t + 9).style("font-size", "9.5px").style("fill", "var(--ink-3)").style("font-family", "var(--f-mono)").text("hoy");
+    const pyear = sel.key[0] === "0" ? 2027 : 2045;
+    if (sel.key.slice(1) !== "0000") svg.append("line").attr("x1", x(pyear)).attr("x2", x(pyear)).attr("y1", m.t).attr("y2", H - m.b).attr("stroke", "var(--accent)").attr("stroke-width", 1).attr("stroke-dasharray", "2 3");
+    svg.append("path").attr("fill", "var(--accent)").attr("fill-opacity", .2).attr("d", d3.area().x((d, i) => x(yrs[i])).y0((d, i) => y(F[v][0][i])).y1((d, i) => y(F[v][2][i]))(yrs));
+    svg.append("path").attr("fill", "none").attr("stroke", "var(--neutral-mark)").attr("stroke-width", 1.6).attr("d", d3.line().x((d, i) => x(yrs[i])).y((d, i) => y(B[v][1][i]))(yrs));
+    svg.append("path").attr("fill", "none").attr("stroke", "var(--accent)").attr("stroke-width", 2).attr("d", d3.line().x((d, i) => x(yrs[i])).y((d, i) => y(F[v][1][i]))(yrs));
+    if (v === "pop") svg.append("g").selectAll("circle").data(obs.years.map((yy, i) => [yy, obs.observed[i]]).filter((d) => d[0] % 5 === 0)).join("circle").attr("cx", (d) => x(d[0])).attr("cy", (d) => y(d[1])).attr("r", 2.2).attr("fill", "var(--ink)");
+    if (v === "hef") svg.append("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", y(1)).attr("y2", y(1)).attr("stroke", "var(--ink-2)").attr("stroke-width", 1).attr("stroke-dasharray", "4 3");
+    const cross = svg.append("g").style("opacity", 0);
+    cross.append("line").attr("class", "cl").attr("y1", m.t).attr("y2", H - m.b).attr("stroke", "var(--ink-2)");
+    cross.append("circle").attr("class", "cf").attr("r", 3.5).attr("fill", "var(--accent)").attr("stroke", "var(--surface)").attr("stroke-width", 2);
+    cross.append("circle").attr("class", "cb").attr("r", 3).attr("fill", "var(--neutral-mark)").attr("stroke", "var(--surface)").attr("stroke-width", 2);
+    mults[v].y = y; mults[v].cross = cross;
+    svg.append("rect").attr("x", m.l).attr("y", m.t).attr("width", W - m.l - m.r).attr("height", H - m.t - m.b).attr("fill", "transparent")
+      .on("pointermove", (ev) => {
+        const [px] = d3.pointer(ev); let yy = Math.round(x.invert(px) / 2) * 2; yy = Math.max(1950, Math.min(2100, yy));
+        hoverYear = yy; syncCross(); const i = yrs.indexOf(yy);
+        const f = v === "pop" || v === "hwi" || v === "hef" || v === "nrfr" ? fmt.n2 : d3.format(",.0f");
+        showTip(`<b>${D.vars[v].label} · ${yy}</b><br>Ruta: <span class="mono">${f(F[v][1][i])}</span> <span class="mono" style="opacity:.75">(${f(F[v][0][i])}–${f(F[v][2][i])})</span><br>Inercia: <span class="mono">${f(B[v][1][i])}</span>`, ev);
+      })
+      .on("pointerleave", () => { hoverYear = null; syncCross(); hideTip(); });
+  });
+  syncCross();
+}
+function syncCross() {
+  const F = D.fans[sel.key + sel.res], B = D.fans["00000" + sel.res];
+  VORDER.forEach((v) => {
+    const c = mults[v]; if (!c.cross) return;
+    if (hoverYear === null) { c.cross.style("opacity", 0); return; }
+    const i = F.years.indexOf(hoverYear); const X = c.x(hoverYear);
+    c.cross.style("opacity", 1);
+    c.cross.select(".cl").attr("x1", X).attr("x2", X);
+    c.cross.select(".cf").attr("cx", X).attr("cy", c.y(F[v][1][i]));
+    c.cross.select(".cb").attr("cx", X).attr("cy", c.y(B[v][1][i]));
+  });
+}
+function routeName(k) {
+  const on = [];
+  if (k[1] === "1") on.push("tec. limpia"); if (k[2] === "1") on.push("agro-suelos"); if (k[3] === "1") on.push("demografía"); if (k[4] === "1") on.push("suficiencia");
+  if (!on.length) return "Inercia";
+  return on.join(" + ") + (k[0] === "0" ? " en 2027" : " en 2045");
+}
+
+/* ── ranking ── */
+(function ranking() {
+  const t = document.getElementById("rankTable");
+  const head = `<thead><tr><th>#</th><th>Año</th><th title="Tecnología limpia">Limp.</th><th title="Agro-tecnología y suelos">Agro</th><th title="Transición demográfica">Demo.</th><th title="Suficiencia material">Sufi.</th><th>Destinos (colapso → sostenible)</th><th style="text-align:right">Bienestar</th><th style="text-align:right">Pob. 2100</th><th style="text-align:right">Huella 2100</th></tr></thead>`;
+  const rows = D.policies.map((p, i) => {
+    const none = p.key.slice(1) === "0000";
+    return `<tr data-key="${p.key}" tabindex="0"><td class="num">${i + 1}</td><td><span class="yr ${p.year === "2027" && !none ? "now" : ""}">${none ? "—" : p.year}</span></td>${["clean", "agro", "demo", "suff"].map((k) => `<td><i class="dot ${p[k] ? "on" : ""}" aria-label="${p[k] ? "activa" : "inactiva"}"></i></td>`).join("")}<td><div class="sbar" title="${p.p_destiny.map((v, j) => DEST[j] + " " + pct(v)).join(" · ")}">${stackHTML(p.p_destiny)}</div></td><td class="num" style="text-align:right">${fmt.n3(p.value)}</td><td class="num" style="text-align:right">${fmt.n1(p.pop_2100)}</td><td class="num" style="text-align:right">${fmt.n2(p.hef_2100)}</td></tr>`;
+  }).join("");
+  t.innerHTML = head + "<tbody>" + rows + "</tbody>";
+  const pick = (tr) => { sel.key = tr.dataset.key; updateAll(); document.getElementById("arbol").scrollIntoView({ behavior: "smooth", block: "start" }); };
+  t.addEventListener("click", (ev) => { const tr = ev.target.closest("tr[data-key]"); if (tr) pick(tr); });
+  t.addEventListener("keydown", (ev) => { const tr = ev.target.closest("tr[data-key]"); if (tr && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); pick(tr); } });
+  t.querySelectorAll("tbody tr").forEach((tr) => {
+    tr.addEventListener("pointermove", (ev) => { const p = policyByKey[tr.dataset.key]; showTip(`<b>${routeName(p.key)}</b>${destRows(p.p_destiny)}<br>Con recursos base: colapso ${pct(p.by_res[0].p_destiny[0])}<br>Con recursos abundantes: sostenible ${pct(p.by_res[1].p_destiny[3])}`, ev); });
+    tr.addEventListener("pointerleave", hideTip);
+  });
+})();
+function markRanking() { document.querySelectorAll("#rankTable tbody tr").forEach((tr) => tr.classList.toggle("sel", tr.dataset.key === sel.key)); }
+
+/* ── tornado ── */
+function tornado(el, key, fmtv, unit) {
+  const SHORT = { year: "Esperar a 2045", clean: "Tecnología limpia", agro: "Agro-tecnología y suelos", demo: "Transición demográfica", suff: "Suficiencia material" };
+  const rows = D.marginal.map((m) => ({ label: SHORT[m.key], v: m[key] })).sort((a, b) => a.v - b.v);
+  const W = 520, rowH = 34, m = { t: 6, r: 50, b: 24, l: 200 }, H = m.t + m.b + rowH * rows.length;
+  const ext = d3.max(rows, (r) => Math.abs(r.v)) * 1.1;
+  const x = d3.scaleLinear().domain([-ext, ext]).range([m.l + 44, W - m.r]);
+  const svg = d3.select(el).append("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("width", "100%");
+  svg.append("g").attr("class", "grid").attr("transform", `translate(0,${m.t})`).call(d3.axisTop(x).ticks(5).tickSize(-(H - m.t - m.b)).tickFormat(""));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(5).tickFormat(fmtv));
+  svg.append("line").attr("x1", x(0)).attr("x2", x(0)).attr("y1", m.t).attr("y2", H - m.b).attr("stroke", "var(--ink-3)");
+  const g = svg.selectAll("g.r").data(rows).join("g").attr("transform", (d, i) => `translate(0,${m.t + i * rowH})`);
+  g.append("text").attr("x", m.l - 10).attr("y", rowH / 2 + 4).attr("text-anchor", "end").style("font-size", "12px").style("fill", "var(--ink-2)").text((d) => d.label.length > 30 ? d.label.slice(0, 29) + "…" : d.label);
+  g.append("rect").attr("x", (d) => Math.min(x(0), x(d.v))).attr("y", 9).attr("height", rowH - 18).attr("width", (d) => Math.abs(x(d.v) - x(0))).attr("rx", 3)
+    .attr("fill", (d) => d.v < 0 ? "var(--accent)" : "var(--d0)");
+  g.append("text").attr("x", (d) => d.v < 0 ? x(d.v) - 5 : x(d.v) + 5).attr("text-anchor", (d) => d.v < 0 ? "end" : "start").attr("y", rowH / 2 + 4).style("font-family", "var(--f-mono)").style("font-size", "11px").style("fill", "var(--ink)").text((d) => fmtv(d.v));
+  g.on("pointermove", (ev, d) => showTip(`<b>${d.label}</b><br>${fmtv(d.v)} ${unit}`, ev)).on("pointerleave", hideTip);
+}
+tornado(document.getElementById("tornCollapse"), "d_collapse", (v) => (v > 0 ? "+" : "") + Math.round(v * 100), "puntos de probabilidad de colapso");
+tornado(document.getElementById("tornHef"), "d_hef", (v) => (v > 0 ? "+" : "") + d3.format(".2f")(v), "planetas en 2100");
+
+/* ── el coste de esperar ── */
+function waitChart(el, key) {
+  const W = 520, H = 250, m = { t: 12, r: 70, b: 26, l: 38 };
+  const x = d3.scaleLinear().domain([2027, 2070]).range([m.l, W - m.r]);
+  const vmax = key === "p_sust" ? 0.25 : 1;
+  const y = d3.scaleLinear().domain([0, vmax]).range([H - m.b, m.t]);
+  const svg = d3.select(el).append("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("width", "100%");
+  svg.append("g").attr("class", "grid").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickSize(-(W - m.l - m.r)).tickFormat(""));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(8).tickFormat(d3.format("d")));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d3.format(".0%")));
+  const S = [["all", "var(--accent)", "Todas"], ["tech", "var(--ink)", "Tecnología"], ["social", "var(--neutral-mark)", "Sociales"]];
+  const last = D.wait[D.wait.length - 1];
+  const labs = S.map(([k, c, lab]) => ({ lab, y: y(last[k][key]) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < labs.length; i++) labs[i].y = Math.max(labs[i].y, labs[i - 1].y + 13);
+  const over = labs[labs.length - 1].y - (H - m.b); if (over > 0) labs.forEach((l) => (l.y -= over));
+  S.forEach(([k, c]) => svg.append("path").attr("fill", "none").attr("stroke", c).attr("stroke-width", 2).attr("d", d3.line().x((d) => x(d.year)).y((d) => y(d[k][key]))(D.wait)));
+  labs.forEach((l) => svg.append("text").attr("x", W - m.r + 6).attr("y", l.y + 4).style("font-size", "11px").style("fill", "var(--ink-2)").text(l.lab));
+  const first = D.wait[0];
+  svg.append("circle").attr("cx", x(2027)).attr("cy", y(first.all[key])).attr("r", 4).attr("fill", "var(--accent)").attr("stroke", "var(--surface)").attr("stroke-width", 2);
+  svg.append("text").attr("x", x(2027) + 8).attr("y", y(first.all[key]) + (key === "p_sust" ? 4 : -8)).style("font-family", "var(--f-mono)").style("font-size", "11px").text(pct(first.all[key]));
+  const cross = svg.append("line").attr("stroke", "var(--ink-3)").attr("y1", m.t).attr("y2", H - m.b).style("opacity", 0);
+  svg.append("rect").attr("x", m.l).attr("y", m.t).attr("width", W - m.l - m.r).attr("height", H - m.t - m.b).attr("fill", "transparent")
+    .on("pointermove", (ev) => {
+      const [px] = d3.pointer(ev); const yy = Math.max(2027, Math.min(2070, Math.round(x.invert(px)))); const w = D.wait.find((r) => r.year === yy);
+      cross.attr("x1", x(yy)).attr("x2", x(yy)).style("opacity", 1);
+      showTip(`<b>Arranque en ${yy}</b><br>Todas: <span class="mono">${pct(w.all[key])}</span><br>Sólo tecnología: <span class="mono">${pct(w.tech[key])}</span><br>Sólo sociales: <span class="mono">${pct(w.social[key])}</span>`, ev);
+    }).on("pointerleave", () => { cross.style("opacity", 0); hideTip(); });
+}
+waitChart(document.getElementById("waitSust"), "p_sust");
+waitChart(document.getElementById("waitCol"), "p_collapse");
+
+/* ── CART ── */
+(function cart() {
+  const C = D.cart;
+  const h = d3.hierarchy(C.tree, (d) => (d.left ? [d.left, d.right] : null));
+  const leaves = h.leaves().length;
+  const BW = 140, BH = 64, GX = 148, GY = 108;
+  const W = Math.max(leaves * GX + 20, 600), H = (h.height + 1) * GY + 10;
+  d3.tree().size([W - BW - 20, h.height * GY]).separation(() => 1)(h);
+  const svg = d3.select("#cartSvg").attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`);
+  const g = svg.append("g").attr("transform", `translate(${BW / 2 + 10},8)`);
+  g.selectAll("path").data(h.links()).join("path").attr("fill", "none").attr("stroke", "var(--rule)").attr("stroke-width", (l) => 1 + 6 * l.target.data.n / C.samples)
+    .attr("d", (l) => `M${l.source.x},${l.source.y + BH}C${l.source.x},${l.source.y + BH + 20} ${l.target.x},${l.target.y - 20} ${l.target.x},${l.target.y}`);
+  g.selectAll("text.edge").data(h.links()).join("text").attr("class", "edge").attr("x", (l) => (l.source.x + l.target.x) / 2 + (l.target === l.source.children[0] ? -6 : 6)).attr("y", (l) => (l.source.y + BH + l.target.y) / 2 + 4)
+    .attr("text-anchor", (l) => (l.target === l.source.children[0] ? "end" : "start")).style("font-family", "var(--f-mono)").style("font-size", "10.5px").style("fill", "var(--ink-3)")
+    .text((l) => { const s = l.source.data; const left = l.target === l.source.children[0]; return s.binary ? (left ? "no" : "sí") : (left ? "≤" : ">"); });
+  const nd = g.selectAll("g.cn").data(h.descendants()).join("g").attr("transform", (n) => `translate(${n.x - BW / 2},${n.y})`);
+  nd.append("rect").attr("width", BW).attr("height", BH).attr("rx", (n) => (n.children ? 2 : 6)).attr("fill", "var(--surface)").attr("stroke", (n) => (n.children ? "var(--rule)" : `var(${DVAR[n.data.cls]})`)).attr("stroke-width", (n) => (n.children ? 1 : 2));
+  const q = (d) => {
+    if (!d.feature) return [DEST[d.cls], ""];
+    if (d.binary) return [`¿${d.feature_label}?`, ""];
+    const th = d.feature === "year" ? Math.round(d.threshold) : d3.format(".2f")(d.threshold);
+    const short = { nri_mult: "Recurso inicial", pptd: "Retardo contaminación", tdd: "Retardo tecnológico", ahl70: "Absorción contaminación", dcfsn: "Familia deseada", imef: "Emisión industrial", year: "Año de acción" }[d.feature] || d.feature_label;
+    return [short, `≤ ${th}`];
+  };
+  nd.append("text").attr("x", 8).attr("y", 16).style("font-size", "11px").style("font-weight", 600).text((n) => { const t = q(n.data)[0]; return t.length > 23 ? t.slice(0, 22) + "…" : t; });
+  nd.append("text").attr("x", 8).attr("y", 30).style("font-family", "var(--f-mono)").style("font-size", "10.5px").style("fill", "var(--ink-2)").text((n) => (q(n.data)[1] || "") + (q(n.data)[1] ? "  " : "") + "n=" + n.data.n);
+  nd.each(function (n) { const gg = d3.select(this); let x = 8; const w = BW - 16; n.data.dist.forEach((v, i) => { if (v <= 0) return; gg.append("rect").attr("x", x).attr("y", 40).attr("width", Math.max(0, v * w - (v * w > 3 ? 2 : 0))).attr("height", 12).attr("rx", 1.5).attr("fill", dcol(i)); x += v * w; }); });
+  nd.on("pointermove", (ev, n) => { const d = n.data; const head = d.feature ? (d.binary ? `¿${d.feature_label}?` : `${d.feature_label} ≤ ${d.feature === "year" ? Math.round(d.threshold) : d3.format(".3f")(d.threshold)}`) : `Hoja: ${DEST[d.cls]}`; showTip(`<b>${head}</b><br>${d.n.toLocaleString("es")} mundos${destRows(d.dist)}`, ev); }).on("pointerleave", hideTip);
+  // importancia
+  const imp = C.importance.filter((r) => r.importance > 0.001);
+  const IW = 520, rowH = 28, m = { t: 4, r: 50, b: 20, l: 230 }, IH = m.t + m.b + rowH * imp.length;
+  const x = d3.scaleLinear().domain([0, d3.max(imp, (r) => r.importance)]).range([m.l, IW - m.r]);
+  const s2 = d3.select("#importance").append("svg").attr("viewBox", `0 0 ${IW} ${IH}`).attr("width", "100%");
+  const rg = s2.selectAll("g").data(imp).join("g").attr("transform", (d, i) => `translate(0,${m.t + i * rowH})`);
+  rg.append("text").attr("x", m.l - 10).attr("y", rowH / 2 + 4).attr("text-anchor", "end").style("font-size", "12px").style("fill", "var(--ink-2)").text((d) => d.label.length > 34 ? d.label.slice(0, 33) + "…" : d.label);
+  rg.append("rect").attr("x", m.l).attr("y", 7).attr("height", rowH - 14).attr("width", (d) => x(d.importance) - m.l).attr("rx", 3).attr("fill", "var(--accent)");
+  rg.append("text").attr("x", (d) => x(d.importance) + 5).attr("y", rowH / 2 + 4).style("font-family", "var(--f-mono)").style("font-size", "11px").text((d) => pct(d.importance));
+  document.getElementById("cartStats").innerHTML = `<dl class="dl"><dt>Simulaciones (tras el filtro de historia)</dt><dd>${C.samples.toLocaleString("es")}</dd><dt>Profundidad máxima</dt><dd>${C.max_depth}</dd><dt>Hoja mínima</dt><dd>${C.min_samples_leaf}</dd><dt>Exactitud en entrenamiento</dt><dd>${pct(C.accuracy)}</dd><dt>Exactitud en validación cruzada (5)</dt><dd>${pct(C.cv_accuracy)}</dd></dl><p class="note">Con cuatro preguntas como máximo, el árbol acierta el destino de ${Math.round(C.cv_accuracy * 100)} de cada 100 mundos que no vio. Las ramas izquierdas responden «no» o «≤ umbral».</p>`;
+})();
+
+/* ── nube ── */
+(function cloud() {
+  const c = D.cloud, W = 520, H = 330, m = { t: 10, r: 12, b: 34, l: 42 };
+  const x = d3.scaleLinear().domain([0.4, d3.max(c.hef) * 1.03]).range([m.l, W - m.r]);
+  const y = d3.scaleLinear().domain([d3.min(c.hwi) * 0.95, d3.max(c.hwi) * 1.02]).range([H - m.b, m.t]);
+  const svg = d3.select("#cloud").append("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("width", "100%");
+  svg.append("g").attr("class", "grid").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(6).tickSize(-(W - m.l - m.r)).tickFormat(""));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(6));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(6));
+  svg.append("text").attr("x", W - m.r).attr("y", H - 4).attr("text-anchor", "end").style("font-size", "10.5px").style("fill", "var(--ink-3)").text("huella ecológica 2100 (planetas) →");
+  svg.append("line").attr("x1", x(1.1)).attr("x2", x(1.1)).attr("y1", m.t).attr("y2", H - m.b).attr("stroke", "var(--ink-2)").attr("stroke-dasharray", "4 3");
+  svg.append("text").attr("x", x(1.1) + 4).attr("y", m.t + 10).style("font-size", "10px").style("fill", "var(--ink-2)").style("font-family", "var(--f-mono)").text("1,1");
+  const pts = c.hef.map((h, i) => ({ h, w: c.hwi[i], d: c.destiny[i], yr: c.year[i], n: c.levers[i] }));
+  const order = [0, 1, 2, 3];
+  svg.append("g").selectAll("circle").data(pts.sort((a, b) => order.indexOf(a.d) - order.indexOf(b.d))).join("circle")
+    .attr("cx", (p) => x(p.h)).attr("cy", (p) => y(p.w)).attr("r", 2.6).attr("fill", (p) => dcol(p.d)).attr("fill-opacity", .8).attr("stroke", "var(--surface)").attr("stroke-width", .6);
+  const del = d3.Delaunay.from(pts, (p) => x(p.h), (p) => y(p.w));
+  const ring = svg.append("circle").attr("r", 6).attr("fill", "none").attr("stroke", "var(--ink)").attr("stroke-width", 1.5).style("opacity", 0);
+  svg.append("rect").attr("x", m.l).attr("y", m.t).attr("width", W - m.l - m.r).attr("height", H - m.t - m.b).attr("fill", "transparent")
+    .on("pointermove", (ev) => { const [px, py] = d3.pointer(ev); const p = pts[del.find(px, py)]; ring.attr("cx", x(p.h)).attr("cy", y(p.w)).style("opacity", 1);
+      showTip(`<b>${DEST[p.d]}</b><br>Huella 2100: <span class="mono">${fmt.n2(p.h)}</span><br>Bienestar medio: <span class="mono">${fmt.n3(p.w)}</span><br>Palancas activas: ${p.n} · año ${Math.round(p.yr)}`, ev); })
+    .on("pointerleave", () => { ring.style("opacity", 0); hideTip(); });
+})();
+
+/* ── sankey ── */
+(function sankey() {
+  const el = document.getElementById("sankey");
+  if (!d3.sankey) { el.innerHTML = '<p class="note">No se pudo cargar d3-sankey.</p>'; return; }
+  const nodes = [{ name: "Recursos base" }, { name: "Recursos abundantes" }];
+  for (let k = 0; k <= 4; k++) nodes.push({ name: k + (k === 1 ? " palanca" : " palancas") });
+  DEST.forEach((d) => nodes.push({ name: d }));
+  const L = new Map(); const add = (a, b, v) => { const k = a + "-" + b; L.set(k, (L.get(k) || 0) + v); };
+  Object.entries(D.leaves).forEach(([key, leaf]) => {
+    const res = +key[5], k = [1, 2, 3, 4].reduce((s, j) => s + +key[j], 0);
+    const w = D.chance.p[res] / 32;
+    add(res, 2 + k, w);
+    leaf.p_destiny.forEach((p, d) => { if (p > 0) add(2 + k, 7 + d, w * p); });
+  });
+  const links = [...L].map(([k, v]) => { const [s, t] = k.split("-").map(Number); return { source: s, target: t, value: v }; });
+  const W = 520, H = 330;
+  const sk = d3.sankey().nodeWidth(10).nodePadding(10).nodeSort(null).extent([[2, 8], [W - 168, H - 8]]);
+  const g = sk({ nodes: nodes.map((d) => ({ ...d })), links: links.map((d) => ({ ...d })) });
+  const svg = d3.select(el).append("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("width", "100%");
+  const ncol = (n) => (n.index >= 7 ? dcol(n.index - 7) : "var(--ink-2)");
+  svg.append("g").selectAll("path").data(g.links).join("path").attr("d", d3.sankeyLinkHorizontal()).attr("fill", "none")
+    .attr("stroke", (l) => (l.target.index >= 7 ? dcol(l.target.index - 7) : "var(--neutral-mark)")).attr("stroke-opacity", .38).attr("stroke-width", (l) => Math.max(1, l.width))
+    .on("pointermove", (ev, l) => showTip(`<b>${l.source.name} → ${l.target.name}</b><br><span class="mono">${pct(l.value)}</span> de la probabilidad total`, ev)).on("pointerleave", hideTip);
+  svg.append("g").selectAll("rect").data(g.nodes).join("rect").attr("x", (n) => n.x0).attr("y", (n) => n.y0).attr("width", (n) => n.x1 - n.x0).attr("height", (n) => Math.max(1, n.y1 - n.y0)).attr("rx", 2).attr("fill", ncol);
+  svg.append("g").selectAll("text").data(g.nodes).join("text").attr("x", (n) => n.x1 + 6).attr("y", (n) => (n.y0 + n.y1) / 2 + 4).style("font-size", "11px").style("fill", "var(--ink-2)")
+    .text((n) => n.name + (n.index >= 7 ? " · " + pct(n.value) : ""));
+})();
+
+document.getElementById("metaLine").textContent = `Generado ${D.meta.generated} · semilla ${D.meta.seed} · ${D.meta.members} miembros · ${D.meta.runtime_s} s de cómputo`;
+
+function updateAll() {
+  expandForSelection(); drawTree(); updateInspector(); drawMultiples(); markRanking();
+}
+updateAll();
+// centra la vista del árbol en la ruta seleccionada
+const box = document.getElementById("treeBox");
+const onps = document.querySelectorAll(".tnode.onpath"); const onp = onps[onps.length - 1];
+if (onp) { const r = onp.getBoundingClientRect(), b = box.getBoundingClientRect(); box.scrollTop = Math.max(0, r.top - b.top - 200); }
+})();
+</script>
