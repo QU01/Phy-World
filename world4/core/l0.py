@@ -25,7 +25,7 @@ CONSTANTS: dict[str, float] = {
     # población
     "p1i": 65e7, "p2i": 70e7, "p3i": 19e7, "p4i": 6e7,
     "len": 28.0, "sfpc": 230.0, "hsid": 20.0, "rlt": 30.0, "pet": 4000.0,
-    "mtfn": 12.0, "lpd": 20.0, "zpgt": 4000.0, "dcfsn": 3.8, "sad": 20.0, "ieat": 3.0,
+    "mtfn": 12.0, "lpd": 20.0, "zpgt": 4000.0, "dcfszpg": 2.0, "dcfsn": 3.8, "sad": 20.0, "ieat": 3.0,
     "fcest": 4000.0, "lmhs_year": 1940.0,
     # capital
     "ici": 2.1e11, "icor1": 3.0, "alic1": 14.0, "alic2": 14.0, "iet": 4000.0,
@@ -331,7 +331,7 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
         mtf = c["mtfn"] * tab("fm", le)
         aiopc = sm["aiopc"].out(c["ieat"])
         fie = (iopc - aiopc) / aiopc
-        dcfs = np.where(after("zpgt", t), 2.0,
+        dcfs = np.where(after("zpgt", t), c["dcfszpg"],
                         c["dcfsn"] * tab("frsn", fie) * tab("sfsn", sm["diopc"].out(c["sad"])))
         dtf = dcfs * tab("cmple", sm["ple"].out(c["lpd"]))
         nfc = mtf / dtf - 1
