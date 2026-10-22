@@ -432,7 +432,7 @@ class Doc(BaseDocTemplate):
         c.saveState()
         c.setFont("Mono", 6.8)
         c.setFillColor(INK3)
-        c.drawString(MARGIN, H_PAGE - 12 * mm, "ESCALAS DEL FUTURO · PHY-WORLD L0 (WORLD3-03)")
+        c.drawString(MARGIN, H_PAGE - 12 * mm, "ESCALAS DEL FUTURO · QUASAR PHY-WORLD")
         c.drawRightString(W_PAGE - MARGIN, H_PAGE - 12 * mm, self.section.upper()[:60])
         c.setStrokeColor(RULE)
         c.setLineWidth(0.5)
@@ -483,7 +483,8 @@ class Doc(BaseDocTemplate):
         c.setFont("Sans", 11.5)
         lines = ["Cada palanca de política, modelada a siete intensidades distintas,",
                  "sola y en combinación, en dos geologías y a lo largo de 2027–2060;",
-                 "por qué aparece el valle de mitad de siglo, y cómo implementar y medir cada medida.",
+                 "por qué aparece el valle de mitad de siglo, cómo implementar y medir cada medida,",
+                 "y cómo evolucionan la sociedad y la geopolítica en 180 países.",
                  "Núcleo L0 de Phy-World (World3-03) · 500 mundos calibrados con la historia."]
         for i, l in enumerate(lines):
             c.drawString(MARGIN, H_PAGE - 98 * mm - i * 16, l)
@@ -546,6 +547,10 @@ def build():
         f"<b>El valle de 2040–2060 tiene causa.</b> Con recursos abundantes, el {round(vcase('ltg_abund')['share']['comida'] * 100)} % de la "
         "caída de la esperanza de vida es comida: la contaminación de hoy llega a los suelos dos décadas después. Los retrasos de "
         "≈ 20 años del modelo y una tecnología que reacciona en vez de anticipar fijan la fecha (capítulo «Anatomía del valle»).",
+        "<b>La sociedad amplificaría el valle.</b> En la capa de 180 países (L1), un simple estancamiento económico lleva la "
+        f"presión política a {GP['world']['estancamiento']['psi_index'][1][GP['years'].index(2050)]:.0f} en 2050 (2019 = 100; "
+        f"{GP['world']['inercia']['psi_index'][1][GP['years'].index(2050)]:.0f} sin estancamiento), añade conflictos civiles y "
+        "frena la democracia; la transición y la redistribución la bajan (capítulo «Geopolítica y sociedad»).",
         "<b>La geología fija el techo.</b> Con los recursos de World3, el colapso alcanza al menos al 95 % de los mundos en cualquier escala y fecha; con 1,5 veces "
         f"esos recursos y el paquete 1×, la transición sostenible ya es posible ({pct(D['geology']['grid'][2][2]['p_destiny'][4])}).",
     ])
@@ -792,6 +797,8 @@ def build():
                       "marca el año de arranque.", "cap"))
     story.append(PageBreak())
 
+    story += geo_chapter()
+
     # ── conclusiones ──
     story += [para("Síntesis", "eyebrow"), para("Qué escala elegir", "h2"),
               para("Ordenando lo que muestran los capítulos, la escala mínima eficaz de cada palanca, la que se acerca al máximo "
@@ -840,6 +847,9 @@ def build():
         "<b>F. Anatomía del valle:</b> 6 casos con trayectorias de 14 variables; la caída de ln(esperanza de vida) entre 2026 y "
         "el valle se separa en los multiplicadores de World3-03 (comida, contaminación y hacinamiento calculados de sus tablas; "
         "servicios de salud por residuo) y se resume con la mediana sobre los mundos con caída mayor del 5 %.",
+        "<b>G. Geopolítica y sociedad:</b> el L1 (Atlas, 180 países) con población, capital humano, mercados de recursos y "
+        "energía endógenos (F1–F3), del origen 2019 a 2100, 5 escenarios × 64 mundos con números aleatorios comunes "
+        "(<font name='Mono'>geopolitica.py</font>). El PSI por país se lee del simulador del Atlas sin modificar el port.",
     ])
     story += [para("Paquete a escala s", "h3"),
               para("Contaminación, recursos y agro-tecnología = 4 % × s por año; suelos protegidos si s > 0; tamaño de familia "
@@ -866,7 +876,9 @@ def build():
         "sus datos no se pudieron descargar en esta sesión (red restringida).",
     ])
     story += [para("Reproducir", "h3"),
-              para("<font name='Mono' size='8'>PYTHONPATH=. python reports/escenarios/estudio.py</font> (≈ 2 min) y "
+              para("<font name='Mono' size='8'>PYTHONPATH=. python reports/escenarios/geopolitica.py</font> (≈ 1,5 min en 4 núcleos; "
+                   "requiere <font name='Mono' size='8'>--install-atlas --install-wpp --install-energy</font>), "
+                   "<font name='Mono' size='8'>PYTHONPATH=. python reports/escenarios/estudio.py</font> (≈ 2 min) y "
                    "<font name='Mono' size='8'>python reports/escenarios/informe_pdf.py</font>. "
                    f"Semilla {D['meta']['seed']}; {D['meta']['members']} mundos; cálculo de {D['meta']['runtime_s']} s.")]
 
@@ -1395,6 +1407,251 @@ def impl_flowables(lv):
                   [[Paragraph(r[0], S["cell"]), r[1], r[2], r[3]] for r in d["measure"]],
                   [52 * mm, 40 * mm, 38 * mm, TEXT_W - 130 * mm], zebra=True),
             Spacer(1, 6), callout(d["alert"], "Señal de alerta")]
+    return out
+
+
+# ── geopolítica y sociedad (capa L1) ──
+GP = json.loads((HERE / "geopolitica.json").read_text(encoding="utf-8")) if (HERE / "geopolitica.json").is_file() else None
+GCOL = {"inercia": G.NEUTRAL, "transicion": G.ACCENT, "autonomia": "#6250d6", "combinado": "#0d366b",
+        "estancamiento": "#b3302b"}
+REG_ES = {"NAM": "Norteamérica", "LAM": "América Latina y Caribe", "EUR": "Europa", "REF": "Antigua URSS",
+          "MEA": "Oriente Medio y Norte de África", "SSA": "África subsahariana", "SAS": "Asia meridional",
+          "CHN": "China y Asia oriental", "SEA": "Sudeste asiático y Pacífico", "OPA": "OCDE del Pacífico"}
+ISO_ES = {"YEM": "Yemen", "AGO": "Angola", "CAF": "Rep. Centroafricana", "MMR": "Myanmar", "IRN": "Irán", "TCD": "Chad",
+          "CMR": "Camerún", "MOZ": "Mozambique", "ETH": "Etiopía", "IRQ": "Irak", "COG": "Congo", "PHL": "Filipinas",
+          "THA": "Tailandia", "NER": "Níger", "SDN": "Sudán", "COD": "R. D. del Congo", "NGA": "Nigeria", "MLI": "Malí",
+          "SOM": "Somalia", "AFG": "Afganistán", "PAK": "Pakistán", "IND": "India", "SYR": "Siria", "UKR": "Ucrania",
+          "COL": "Colombia", "BFA": "Burkina Faso", "SSD": "Sudán del Sur", "LBY": "Libia", "BDI": "Burundi",
+          "VEN": "Venezuela", "LBR": "Liberia", "KEN": "Kenia", "UGA": "Uganda", "TUR": "Turquía", "EGY": "Egipto",
+          "DZA": "Argelia", "MEX": "México", "BGD": "Bangladés", "RUS": "Rusia", "ZWE": "Zimbabue", "GIN": "Guinea"}
+
+
+def _gw(key, var, p=1):
+    return np.array(GP["world"][key][var][p], float)
+
+
+def fig_geo_world():
+    yrs = np.array(GP["years"])
+    panels = [("conflicts", "Países en conflicto civil (esperados)", None),
+              ("pop_conflict", "Riesgo anual de conflicto por persona", "pct"),
+              ("demo_pop", "Población que vive en democracia", "pct"),
+              ("psi_index", "Índice de presión política (2019 = 100)", None),
+              ("debt", "Deuda pública mundial (% del PIB)", "pct"),
+              ("crises", "Crisis de deuda por año", None),
+              ("gdp_pc", "PIB per cápita mundial (USD 2017)", "k"),
+              ("pop", "Población (miles de millones, 180 países)", None),
+              ("gap", "Brecha centro / periferia (PIB p. c.)", None)]
+    fig, axes = plt.subplots(3, 3, figsize=(7.2, 6.0))
+    for ax, (v, title, fmt) in zip(axes.flat, panels):
+        lo, hi = _gw("inercia", v, 0), _gw("inercia", v, 2)
+        ax.fill_between(yrs, lo, hi, color=G.NEUTRAL, alpha=0.16, lw=0)
+        for k in GP["world"]:
+            ys = _gw(k, v)
+            if v in ("conflicts", "crises"):          # media móvil de 5 años: son conteos ruidosos
+                ys = np.convolve(np.pad(ys, 2, mode="edge"), np.ones(5) / 5, mode="valid")
+            ax.plot(yrs, ys, color=GCOL[k], lw=1.7 if k in ("inercia", "estancamiento") else 1.3,
+                    label=GP["scenarios"][k]["name"])
+        ax.set_title(title, fontsize=7.2)
+        ax.set_xlim(2019, 2100)
+        ax.set_xticks([2020, 2040, 2060, 2080, 2100])
+        ax.tick_params(labelsize=6.2)
+        if fmt == "pct":
+            ax.yaxis.set_major_formatter(plt.matplotlib.ticker.PercentFormatter(1, decimals=0))
+        if fmt == "k":
+            ax.yaxis.set_major_formatter(plt.matplotlib.ticker.FuncFormatter(lambda x, _: f"{x / 1000:.0f} mil"))
+        if v == "psi_index":
+            ax.axhline(100, color=G.INK3, lw=0.7, ls=(0, (3, 2)))
+    h, lab = axes[0, 0].get_legend_handles_labels()
+    fig.legend(h, lab, loc="lower center", ncol=5, bbox_to_anchor=(0.5, -0.02), fontsize=6.8)
+    fig.tight_layout(h_pad=1.1, w_pad=0.8, rect=(0, 0.03, 1, 1))
+    return G.save(fig, FIG / "geo_world.png")
+
+
+def fig_geo_coups():
+    dec = GP["decades"]
+    fig, ax = plt.subplots(figsize=(7.2, 1.9))
+    keys = list(GP["world"])
+    w = 0.16
+    x = np.arange(len(dec))
+    for i, k in enumerate(keys):
+        ax.bar(x + (i - 2) * w, _gw(k, "coups_decade"), width=w - 0.02, color=GCOL[k], label=GP["scenarios"][k]["name"])
+    ax.set_xticks(x, [d.replace("s", "") + "–" + str(int(d[:4]) + 9)[2:] for d in dec], fontsize=6.6)
+    ax.set_title("Golpes de Estado exitosos por década (mediana de 64 mundos, 180 países)", fontsize=7.4)
+    ax.grid(axis="x", visible=False)
+    ax.legend(ncol=5, fontsize=6.4, loc="upper center", bbox_to_anchor=(0.5, -0.16))
+    fig.tight_layout()
+    return G.save(fig, FIG / "geo_coups.png")
+
+
+def fig_geo_regions():
+    snap = [str(y) for y in GP["meta"]["snap"]]
+    codes = list(GP["regions"])
+    labels = [REG_ES[c] for c in codes]
+    fig, axes = plt.subplots(2, 2, figsize=(7.2, 5.4))
+    for col, key in enumerate(("inercia", "estancamiento")):
+        R = GP["region"][key]
+        G.heat(axes[0, col], [R[c]["psi_rel"] for c in codes][::-1], snap, labels[::-1], G.REDS, 30, 300, fmt="{:.0f}",
+               title=f"Presión política (2019 = 100) · {GP['scenarios'][key]['name']}")
+        G.heat(axes[1, col], [R[c]["hazard"] for c in codes][::-1], snap, labels[::-1], G.REDS, 0, 0.6, fmt="{:.0%}",
+               title=f"Riesgo anual de conflicto civil · {GP['scenarios'][key]['name']}")
+    for ax in axes[:, 1]:
+        ax.set_yticklabels([])
+    for ax in axes.flat:
+        ax.tick_params(labelsize=6.4)
+    fig.tight_layout(h_pad=1.4, w_pad=0.8)
+    return G.save(fig, FIG / "geo_regions.png")
+
+
+def fig_geo_countries():
+    iso = GP["iso3"]
+    snap = GP["meta"]["snap"]
+    h = np.array(GP["country"]["inercia"]["hazard"], float)
+    hs = np.array(GP["country"]["estancamiento"]["hazard"], float)
+    i50 = snap.index(2050)
+    order = np.argsort(-np.nan_to_num(h[:, i50]))[:15]
+    fig, ax = plt.subplots(figsize=(7.2, 3.4))
+    y = np.arange(len(order))[::-1]
+    for yi, i in zip(y, order):
+        vals = [h[i, snap.index(s)] for s in (2030, 2050, 2100)]
+        ax.plot([min(vals + [hs[i, -1]]), max(vals + [hs[i, -1]])], [yi, yi], color=G.RULE, lw=1.2, zorder=1)
+        for s, c, mk in ((2030, G.RAMP[2], "o"), (2050, G.RAMP[4], "o"), (2100, G.RAMP[6], "o")):
+            ax.plot(h[i, snap.index(s)], yi, mk, color=c, ms=5, mec="white", mew=0.7, zorder=3,
+                    label=f"{s} · inercia" if yi == y[0] else None)
+        ax.plot(hs[i, -1], yi, "D", color="#b3302b", ms=4.2, mec="white", mew=0.6, zorder=4,
+                label="2100 · estancamiento" if yi == y[0] else None)
+    ax.set_yticks(y, [ISO_ES.get(iso[i], iso[i]) for i in order], fontsize=7)
+    ax.xaxis.set_major_formatter(plt.matplotlib.ticker.PercentFormatter(1, decimals=0))
+    ax.set_xlim(0, 0.85)
+    ax.grid(axis="y", visible=False)
+    ax.set_title("Probabilidad anual de conflicto civil: los 15 países con más riesgo en 2050 (inercia)", fontsize=7.6)
+    ax.legend(fontsize=6.4, loc="lower right")
+    fig.tight_layout()
+    return G.save(fig, FIG / "geo_countries.png")
+
+
+def geo_chapter():
+    if GP is None:
+        return []
+    f_w, f_c, f_r, f_k = fig_geo_world(), fig_geo_coups(), fig_geo_regions(), fig_geo_countries()
+    y = GP["years"]
+    i = {yy: y.index(yy) for yy in (2030, 2050, 2075, 2100)}
+    v = lambda k, m, yy: _gw(k, m)[i[yy]]  # noqa: E731
+    R = GP["region"]
+    rel = lambda k, c, j: R[k][c]["psi_rel"][j]  # noqa: E731
+    sn = GP["scenarios"]
+    out = [para("Sociedad", "eyebrow"), para("Geopolítica y sociedad 2019–2100", "h2"),
+           para("Todo lo anterior sale de World3, que no tiene Estados, élites ni conflicto. Este capítulo usa la otra capa de "
+                "Phy-World, el <b>L1</b>: el Atlas del Sistema-Mundo, con 180 países que comercian, se endeudan, extraen "
+                "recursos, se democratizan o no y entran en conflicto. Lo corrimos desde los datos de 2019 hasta 2100, 64 "
+                "mundos por escenario, para ver cómo evolucionan la sociedad y la geopolítica.", "lede"),
+           para("Qué mide el L1", "h3")]
+    out += bullets([
+        "<b>Presión política (PSI)</b>, según la teoría estructural-demográfica de Goldstone y Turchin: movilización de las "
+        "masas (sube cuando su ingreso se estanca y hay muchos jóvenes) × competencia entre élites (sube cuando hay más "
+        "aspirantes que posiciones) × estrés fiscal del Estado (deuda, crisis, falta de cohesión).",
+        "<b>Conflicto civil</b> (≥ 25 muertes al año, como en UCDP/PRIO): su probabilidad sube con la presión política y la "
+        "anomalía de temperatura; destruye producción y productividad.",
+        "<b>Golpes de Estado</b>, <b>democracia</b> (régimen democrático según V-Dem), <b>crisis de deuda</b>, "
+        "<b>centro y periferia</b> (productividad relativa e intercambio desigual) y <b>cohesión colectiva</b> (asabiya).",
+    ])
+    out += [para("Cinco escenarios", "h3"),
+            table([["Escenario", "Qué cambia en el L1", "Analogía con el estudio"],
+                   [sn["inercia"]["name"], "La regla de conducta aprendida de los datos: lo que los países «harían».", "Inercia"],
+                   [sn["transicion"]["name"], "Intensidad energética −1 %/año, cuota no fósil +0,05 logit/año, fecundidad −0,5 %/año.",
+                    "Palancas tecnológicas y demográficas"],
+                   [sn["autonomia"]["name"], "La conducta que «les convendría» según el problema inverso del Atlas: más tecnología "
+                    "y extracción propias, menos importación del centro y menos inversión fuera, más redistribución.",
+                    "Suficiencia y redistribución"],
+                   [sn["combinado"]["name"], "Las dos anteriores juntas.", "Paquete completo"],
+                   [sn["estancamiento"]["name"], "Desde 2020, la frontera tecnológica retrocede 0,5 %/año en lugar de avanzar.",
+                    "Puente con el valle de World3"]],
+                  [32 * mm, TEXT_W - 82 * mm, 50 * mm], zebra=True),
+            Spacer(1, 6),
+            callout("El L1 está validado para pronósticos de 1 a 10 años; a 2100 es un modo de comportamiento. En esta corrida no "
+                    "hay clima (FaIR) ni alimentos (FAOSTAT) porque la red bloqueó sus datos: la temperatura es la del Atlas y no "
+                    "responde a la transición energética, y la crisis alimentaria del valle de World3 no aparece. Por eso el L1, "
+                    "solo, sigue creciendo hasta 2100. El escenario de estancamiento es la forma de preguntarle qué pasaría con la "
+                    "sociedad si el crecimiento se detiene.", "Antes de leer"),
+            PageBreak(),
+            para("El mundo en nueve indicadores", "h3"), img(f_w),
+            para("Mediana de 64 mundos por escenario; banda gris: p10–p90 de la inercia. Conflictos y crisis, media móvil de 5 años.", "cap"),
+            img(f_c)]
+    out += [para("Lectura", "h3")]
+    out += bullets([
+        f"<b>Con crecimiento, el siglo se pacifica despacio.</b> En la inercia, el riesgo de conflicto por persona baja de "
+        f"{pct(v('inercia', 'pop_conflict', 2030))} en 2030 a {pct(v('inercia', 'pop_conflict', 2075))} en 2075, y los golpes "
+        f"pasan de {_gw('inercia', 'coups_decade')[0]:.0f} por década a {_gw('inercia', 'coups_decade')[-1]:.0f}. El número de "
+        f"países en conflicto civil, en cambio, apenas baja (≈ {v('inercia', 'conflicts', 2030):.0f} en 2030, "
+        f"{v('inercia', 'conflicts', 2100):.0f} en 2100): el conflicto se concentra en los países que no despegan.",
+        f"<b>La presión política sube a mitad de siglo.</b> El índice PSI mundial baja hasta 2030 y sube a "
+        f"{v('inercia', 'psi_index', 2050):.0f} en 2050 (2019 = 100), sobre todo por competencia entre élites en los países "
+        "ricos y emergentes. Es la misma ventana temporal que el valle de World3, por causas distintas.",
+        f"<b>La transición y la autonomía bajan la presión.</b> En 2100 el PSI queda en {v('transicion', 'psi_index', 2100):.0f} "
+        f"con la transición, {v('autonomia', 'psi_index', 2100):.0f} con autonomía y redistribución y "
+        f"{v('combinado', 'psi_index', 2100):.0f} con ambas, frente a {v('inercia', 'psi_index', 2100):.0f} en la inercia. "
+        f"La autonomía además baja la deuda pública ({pct(v('autonomia', 'debt', 2100))} del PIB frente a "
+        f"{pct(v('inercia', 'debt', 2100))}).",
+        f"<b>El estancamiento lo empeora todo.</b> Con la frontera tecnológica retrocediendo, el PIB per cápita mundial se queda "
+        f"en ≈ {v('estancamiento', 'gdp_pc', 2100) / 1000:.0f} mil dólares (frente a {v('inercia', 'gdp_pc', 2100) / 1000:.0f} mil), "
+        f"la presión política llega a {v('estancamiento', 'psi_index', 2050):.0f} en 2050, hay "
+        f"{v('estancamiento', 'conflicts', 2100):.0f} países en conflicto en 2100 (frente a {v('inercia', 'conflicts', 2100):.0f}), "
+        f"el riesgo por persona es {pct(v('estancamiento', 'pop_conflict', 2100))} (frente a {pct(v('inercia', 'pop_conflict', 2100))}), "
+        f"los golpes no bajan de {min(_gw('estancamiento', 'coups_decade')):.0f} por década y la población en democracia se "
+        f"queda en {pct(v('estancamiento', 'demo_pop', 2100))} (frente a {pct(v('inercia', 'demo_pop', 2100))}).",
+        f"<b>La democracia se expande con el ingreso.</b> En la inercia, la población que vive en democracia pasa de "
+        f"{pct(_gw('inercia', 'demo_pop')[0])} en 2019 a {pct(v('inercia', 'demo_pop', 2050))} en 2050. Es la ecuación de "
+        "modernización del Atlas: con más ingreso, más probabilidad de transición. A treinta años o más es especulativa, y es "
+        "lo primero que el estancamiento frena.",
+    ])
+    out += [CondPageBreak(150 * mm), para("Dónde se concentra la tensión", "h3"), img(f_r),
+            para("Mediana de 64 mundos (presión política, relativa al valor de cada región en 2019) y probabilidad media de "
+                 "conflicto civil por persona.", "cap")]
+    out += bullets([
+        f"<b>La presión política migra del sur al norte.</b> Crece en las regiones ricas por competencia entre élites: "
+        f"Norteamérica {rel('inercia', 'NAM', 4) - 100:+.0f} %, Europa {rel('inercia', 'EUR', 4) - 100:+.0f} %, OCDE del "
+        f"Pacífico {rel('inercia', 'OPA', 4) - 100:+.0f} % en 2100. También en Asia meridional "
+        f"({rel('inercia', 'SAS', 4) - 100:+.0f} %) y el Sudeste asiático ({rel('inercia', 'SEA', 4) - 100:+.0f} %), y se "
+        f"multiplica en la antigua URSS desde un nivel muy bajo. Baja en Oriente Medio ({rel('inercia', 'MEA', 4) - 100:+.0f} %), "
+        f"África subsahariana ({rel('inercia', 'SSA', 4) - 100:+.0f} %) y América Latina ({rel('inercia', 'LAM', 4) - 100:+.0f} %), "
+        "donde el ingreso de las masas crece.",
+        f"<b>El conflicto se queda en la periferia.</b> El riesgo por persona sigue alto en África subsahariana "
+        f"({pct(R['inercia']['SSA']['hazard'][4])} en 2100) y en Oriente Medio ({pct(R['inercia']['MEA']['hazard'][4])}), cae "
+        f"en Asia meridional y el Sudeste asiático, y aparece, todavía bajo, en los países ricos "
+        f"(Norteamérica {pct(R['inercia']['NAM']['hazard'][4])}).",
+        f"<b>Con estancamiento, el norte también se tensa.</b> El riesgo de conflicto en Norteamérica llega a "
+        f"{pct(R['estancamiento']['NAM']['hazard'][4])} y en la OCDE del Pacífico a {pct(R['estancamiento']['OPA']['hazard'][4])} "
+        f"en 2100, y el PIB per cápita de Norteamérica cae a {R['estancamiento']['NAM']['gdp_pc'][4] / 1000:.0f} mil dólares "
+        f"(frente a {R['inercia']['NAM']['gdp_pc'][4] / 1000:.0f} mil en la inercia).",
+    ])
+    out += [CondPageBreak(95 * mm), para("Los países con más riesgo", "h3"), img(f_k),
+            para("Probabilidad anual de conflicto civil, media de 64 mundos. Los países que en 2019 ya estaban en conflicto parten "
+                 "cerca del 95 % (la persistencia es alta) y bajan a medida que los conflictos terminan.", "cap"),
+            para("Qué significa para el valle", "h3")]
+    out += bullets([
+        "<b>El valle de World3 sería mucho más que un problema biofísico.</b> Un simple estancamiento, con el PIB per cápita "
+        f"plano, ya lleva la presión política a {v('estancamiento', 'psi_index', 2050):.0f} en 2050 (frente a "
+        f"{v('inercia', 'psi_index', 2050):.0f}), añade conflictos y frena la democracia. En el valle de World3, la "
+        "producción industrial por persona cae entre 50 % y 70 % y el alimento por persona casi a la mitad: la reacción social "
+        "sería, previsiblemente, mucho más fuerte que la de este escenario.",
+        "<b>La reacción social retroalimentaría el valle.</b> En el L1 el conflicto destruye producción y productividad y las "
+        "crisis de deuda recortan inversión: justo lo que hace falta para sostener las políticas de transición durante dos "
+        "décadas. La clase «crisis humanitaria y recuperación» del estudio es, por eso, una cota optimista.",
+        "<b>Las políticas también son políticas sociales.</b> La transición y la redistribución bajan la presión política aun "
+        "sin valle. Combinadas con las palancas biofísicas, son la mejor protección contra el círculo vicioso escasez → "
+        "conflicto → menos capacidad de respuesta.",
+    ])
+    out += [para("Límites de esta sección", "h3")]
+    out += bullets([
+        "El L1 está validado a 1–10 años (49 orígenes fuera de muestra); a 2100 sus resultados son modos de comportamiento. "
+        "Sus bandas de incertidumbre son demasiado estrechas (cubren 60–70 % en lugar de 80 %).",
+        "Sólo modela conflicto civil: no hay guerras entre Estados, terrorismo ni migraciones masivas. Tampoco alcoholismo, "
+        "suicidio ni homicidios.",
+        "La democracia sigue una ecuación de modernización: a largo plazo tiende a democratizar a los países que se "
+        "enriquecen (incluida China hacia 2050 en la mayoría de los mundos). Es una hipótesis, no un hallazgo.",
+        "Sin FaIR ni alimentos, la temperatura no responde a la transición y la comida no entra en la presión política. El "
+        "estancamiento es una prueba de estrés genérica, no la traducción exacta del valle de World3.",
+    ])
+    out.append(PageBreak())
     return out
 
 
