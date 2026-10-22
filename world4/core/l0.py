@@ -25,7 +25,7 @@ CONSTANTS: dict[str, float] = {
     # población
     "p1i": 65e7, "p2i": 70e7, "p3i": 19e7, "p4i": 6e7,
     "len": 28.0, "sfpc": 230.0, "hsid": 20.0, "rlt": 30.0, "pet": 4000.0,
-    "mtfn": 12.0, "lpd": 20.0, "zpgt": 4000.0, "dcfsn": 3.8, "sad": 20.0, "ieat": 3.0,
+    "mtfn": 12.0, "lpd": 20.0, "zpgt": 4000.0, "dcfszpg": 2.0, "dcfsn": 3.8, "sad": 20.0, "ieat": 3.0,
     "fcest": 4000.0, "lmhs_year": 1940.0,
     # capital
     "ici": 2.1e11, "icor1": 3.0, "alic1": 14.0, "alic2": 14.0, "iet": 4000.0,
@@ -178,11 +178,16 @@ RECORD = STOCKS + ("pop", "f", "fpc", "io", "iopc", "so", "sopc", "ppolx", "le",
 
 def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None = None,
         t0: float = 1900.0, t1: float = 2100.0, dt: float = 0.5, n: int = 1,
-        record: tuple[str, ...] = RECORD) -> World3Run:
+        record: tuple[str, ...] = RECORD, hook=None) -> World3Run:
     """Corre World3-03 de ``t0`` a ``t1`` (ambos incluidos) con paso ``dt``.
 
     ``constants`` y ``tables`` sustituyen a las del escenario; cada constante puede ser un
     escalar o un array de forma (n,) para regiones o miembros de un ensemble.
+
+    ``hook(t, stocks, aux)`` (opcional) se llama en cada paso, ya calculados los auxiliares y antes
+    de integrar, para acoplar un módulo externo por separación de operadores (``world4.core.social``).
+    Puede devolver ``{"flow": {stock: m}, "scale": {stock: m}}``: ``flow`` multiplica el flujo de ese
+    stock en este paso; ``scale`` multiplica el stock ya integrado. Sin gancho nada cambia.
     """
     sc_c, sc_t = SCENARIOS[scenario]
     C = {**CONSTANTS, **sc_c, **(constants or {})}
@@ -331,7 +336,7 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
         mtf = c["mtfn"] * tab("fm", le)
         aiopc = sm["aiopc"].out(c["ieat"])
         fie = (iopc - aiopc) / aiopc
-        dcfs = np.where(after("zpgt", t), 2.0,
+        dcfs = np.where(after("zpgt", t), c["dcfszpg"],
                         c["dcfsn"] * tab("frsn", fie) * tab("sfsn", sm["diopc"].out(c["sad"])))
         dtf = dcfs * tab("cmple", sm["ple"].out(c["lpd"]))
         nfc = mtf / dtf - 1
@@ -355,6 +360,7 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
 
         for name in record:
             out[name][k] = st[name] if name in st else a[name]
+        adj = hook(t, st, a) if hook is not None else None
         if k == steps:
             break
 
@@ -376,8 +382,12 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
             "ppapr": (ppgr, c["pptd"]),
         }
         derivs = {k2: sm[k2].deriv(x, dl) for k2, (x, dl) in smooth_in.items()}
+        for k2, m in ((adj or {}).get("flow") or {}).items():
+            flows[k2] = flows[k2] * m
         for k2, fl in flows.items():
             st[k2] = st[k2] + dt * fl
+        for k2, m in ((adj or {}).get("scale") or {}).items():
+            st[k2] = st[k2] * m
         for k2, dv in derivs.items():
             sm[k2].s = sm[k2].s + dt * dv
 
