@@ -62,7 +62,7 @@ def package(s: float) -> dict:
             "suff": max(200.0, 500 - 150 * s)}
 
 
-def run(U, pol: dict, *, geo: float = 1.0, year: float = YEAR, rec=REC):
+def run(U, pol: dict, *, geo: float = 1.0, year: float = YEAR, rec=REC, hook=None):
     """Una política (dict de niveles) sobre el ensemble ``U``; ``geo`` multiplica el recurso inicial
     (> 1 incluye la mejor tecnología de extracción del escenario 2)."""
     n = len(U["nri_mult"])
@@ -76,7 +76,7 @@ def run(U, pol: dict, *, geo: float = 1.0, year: float = YEAR, rec=REC):
          "iet": full(year if pol["suff"] else NEVER), "iopcd": full(pol["suff"] or 400.0)}
     t = {"pptcm": (-1, 0, 1, [-pol["poll"], 0]), "rtcm": (-1, 0, 1, [pol["res"], 0]),
          "lytcrm": (0, 1, 1, [0, pol["agro"]]), **base.RICH_TABLE}
-    r = l0.run(constants=c, tables=t, n=n, t1=base.T1, dt=base.DT, record=rec)
+    r = l0.run(constants=c, tables=t, n=n, t1=base.T1, dt=base.DT, record=rec, hook=hook)
     yearly = np.isclose(r.time % 1.0, 0.0)
     return r.time[yearly].astype(int), {k: r.series[k][yearly] for k in rec}
 
