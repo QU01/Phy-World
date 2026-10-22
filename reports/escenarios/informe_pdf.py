@@ -71,6 +71,8 @@ PAPER = colors.HexColor("#f3f5f4")
 S = {
     "h1": ParagraphStyle("h1", fontName="Serif", fontSize=30, leading=32, textColor=INK, spaceAfter=6),
     "h2": ParagraphStyle("h2", fontName="Serif", fontSize=19, leading=22, textColor=INK, spaceBefore=4, spaceAfter=6),
+    "h2b": ParagraphStyle("h2b", fontName="Serif", fontSize=16, leading=19, textColor=INK, spaceBefore=2, spaceAfter=4,
+                          keepWithNext=1),
     "h3": ParagraphStyle("h3", fontName="Sans-Sb", fontSize=10.2, leading=13.5, textColor=INK, spaceBefore=8, spaceAfter=3,
                          keepWithNext=1),
     "eyebrow": ParagraphStyle("eb", fontName="Mono", fontSize=7.4, leading=10, textColor=ACC, spaceAfter=2),
@@ -480,7 +482,8 @@ class Doc(BaseDocTemplate):
         c.setFillColor(colors.HexColor("#b7c2be"))
         c.setFont("Sans", 11.5)
         lines = ["Cada palanca de política, modelada a siete intensidades distintas,",
-                 "sola y en combinación, en dos geologías y a lo largo de 2027–2060.",
+                 "sola y en combinación, en dos geologías y a lo largo de 2027–2060;",
+                 "por qué aparece el valle de mitad de siglo, y cómo implementar y medir cada medida.",
                  "Núcleo L0 de Phy-World (World3-03) · 500 mundos calibrados con la historia."]
         for i, l in enumerate(lines):
             c.drawString(MARGIN, H_PAGE - 98 * mm - i * 16, l)
@@ -540,6 +543,9 @@ def build():
         "<b>Esperar cuesta más que quedarse corto.</b> El paquete 1× arrancado en 2045 (sostenible "
         f"{pct(P(A('tardio'), 4))}) rinde menos que el paquete al 75 % arrancado en 2027 "
         f"({pct(D['timing']['grid']['abund'][3][0]['p_destiny'][4])}).",
+        f"<b>El valle de 2040–2060 tiene causa.</b> Con recursos abundantes, el {round(vcase('ltg_abund')['share']['comida'] * 100)} % de la "
+        "caída de la esperanza de vida es comida: la contaminación de hoy llega a los suelos dos décadas después. Los retrasos de "
+        "≈ 20 años del modelo y una tecnología que reacciona en vez de anticipar fijan la fecha (capítulo «Anatomía del valle»).",
         "<b>La geología fija el techo.</b> Con los recursos de World3, el colapso alcanza al menos al 95 % de los mundos en cualquier escala y fecha; con 1,5 veces "
         f"esos recursos y el paquete 1×, la transición sostenible ya es posible ({pct(D['geology']['grid'][2][2]['p_destiny'][4])}).",
     ])
@@ -589,6 +595,7 @@ def build():
                    "industrial acumulada 2027–2060 frente a la inercia. Recursos base = el recurso no renovable de World3; recursos "
                    "abundantes = el doble y mejor tecnología de extracción (escenario 2 del libro)."),
               PageBreak()]
+    story += valley_chapter()
 
     # ── capítulos por palanca ──
     chapters = [
@@ -667,7 +674,7 @@ def build():
                            "y presión sobre ella. Es la palanca más barata del estudio (coste en producción industrial casi nulo) y "
                            "la que más pierde quien la omite. La huella de 2100 sin ella (≈ "
                            f"{num(med(sd[0], 'hef_2100'), 2)} planetas) parece buena, pero es engañosa: es tierra perdida, no tierra liberada.")]
-        story.append(PageBreak())
+        story += [CondPageBreak(150 * mm)] + impl_flowables(lv) + [PageBreak()]
 
     # ── momento × intensidad ──
     T = D["timing"]["grid"]["abund"]
@@ -830,6 +837,9 @@ def build():
         "<b>C. Geología continua:</b> recurso inicial de 1 a 3 veces × 4 intensidades del paquete.",
         "<b>D. Interacciones:</b> agro × contaminación (7 × 7) y familia × suficiencia (7 × 7), con recursos abundantes.",
         "<b>E. Escenarios compuestos:</b> 9 escenarios × 2 geologías, con trayectorias completas.",
+        "<b>F. Anatomía del valle:</b> 6 casos con trayectorias de 14 variables; la caída de ln(esperanza de vida) entre 2026 y "
+        "el valle se separa en los multiplicadores de World3-03 (comida, contaminación y hacinamiento calculados de sus tablas; "
+        "servicios de salud por residuo) y se resume con la mediana sobre los mundos con caída mayor del 5 %.",
     ])
     story += [para("Paquete a escala s", "h3"),
               para("Contaminación, recursos y agro-tecnología = 4 % × s por año; suelos protegidos si s > 0; tamaño de familia "
@@ -981,6 +991,411 @@ SCEN_TEXT = {
     "verde_sin_comida": "Mucha tecnología limpia y de recursos, pero sin agro-tecnología ni suelos: el colapso casi desaparece, pero la "
                         "crisis humanitaria domina. Sin comida, no hay transición, por limpia que sea.",
 }
+
+
+# ── anatomía del valle ──
+VCOL = {"bau_base": "#5f6b67", "bau_abund": "#a7b0ad", "ltg_base": "#eb6834", "ltg_abund": G.ACCENT,
+        "amb_abund": "#0d366b", "late_abund": "#6250d6"}
+
+
+def vcase(key):
+    return next(c for c in D["valley"]["cases"] if c["key"] == key)
+
+
+def fig_valley_chain(key, panels, fname):
+    c = vcase(key)
+    yrs = np.array(c["years"])
+    fig, axes = plt.subplots(2, 3, figsize=(7.2, 3.9))
+    vy = c["valley_year"]
+    for ax, (v, title) in zip(axes.flat, panels):
+        ax.axvspan(vy[0], vy[2], color=G.INK3, alpha=0.10, lw=0)
+        ax.axvline(vy[1], color=G.INK3, lw=0.8, ls=(0, (2, 2)))
+        ax.axvline(2026, color=G.INK3, lw=0.7)
+        if isinstance(v, list):
+            for vv, col, lab in zip(v, (G.ACCENT, "#6250d6"), ("Agro-tecnología", "Contaminación por unidad")):
+                ax.plot(yrs, c["median"][vv], color=col, lw=1.6, label=lab)
+            ax.legend(fontsize=6.2, loc="upper left")
+        else:
+            if v == "le":
+                ax.fill_between(yrs, c["le_band"][0], c["le_band"][1], color=G.ACCENT, alpha=0.16, lw=0)
+            ax.plot(yrs, c["median"][v], color=G.ACCENT if v == "le" else G.INK, lw=1.7)
+        ax.set_title(title, fontsize=7.4)
+        ax.set_xlim(1990, 2100)
+        ax.set_xticks([2000, 2026, 2050, 2075, 2100])
+        ax.tick_params(axis="x", labelsize=6.2)
+        ax.set_ylim(bottom=0)
+    fig.tight_layout(h_pad=1.0, w_pad=0.8)
+    return G.save(fig, FIG / fname)
+
+
+def fig_valley_le():
+    fig, ax = plt.subplots(figsize=(7.2, 2.7))
+    ends = []
+    for c in D["valley"]["cases"]:
+        col = VCOL[c["key"]]
+        ax.plot(c["years"], c["median"]["le"], color=col, lw=1.8 if "abund" in c["key"] and "bau" not in c["key"] else 1.4,
+                label=c["name"])
+        vy = c["valley_year"][1]
+        i = c["years"].index(int(vy)) if int(vy) in c["years"] else int(np.argmin(np.abs(np.array(c["years"]) - vy)))
+        ax.plot(c["years"][i], c["median"]["le"][i], "o", color=col, ms=4.5, mec="white", mew=0.8)
+        ends.append([c["median"]["le"][-1], c["name"], col])
+    ax.axvline(2026, color=G.INK3, lw=0.7)
+    ax.text(2027, 4, "hoy", fontsize=6.4, color=G.INK3)
+    ends.sort(key=lambda e: e[0])
+    for k in range(1, len(ends)):
+        ends[k][0] = max(ends[k][0], ends[k - 1][0] + 4.2)
+    for y, name, col in ends:
+        ax.text(2102, y, name.replace(" · recursos ", " · "), fontsize=6.2, color=G.INK2, va="center")
+        ax.plot([2100, 2101.5], [y, y], color=col, lw=1.2)
+    ax.set_xlim(1990, 2100)
+    ax.set_ylim(0, 90)
+    ax.set_ylabel("años", fontsize=7)
+    ax.set_title("Esperanza de vida (mediana de 500 mundos); el punto marca el año mediano del valle", fontsize=7.6)
+    fig.tight_layout(rect=(0, 0, 0.8, 1))
+    return G.save(fig, FIG / "valley_le.png")
+
+
+SHARE_COL = {"comida": "#2a78d6", "salud": "#eb6834", "contaminacion": "#1baf7a", "hacinamiento": "#eda100"}
+SHARE_LAB = {"comida": "Comida", "salud": "Servicios de salud", "contaminacion": "Contaminación (directa)",
+             "hacinamiento": "Hacinamiento sin industria"}
+
+
+def fig_valley_share():
+    cases = D["valley"]["cases"]
+    fig, ax = plt.subplots(figsize=(7.2, 2.5))
+    y = np.arange(len(cases))[::-1]
+    for yi, c in zip(y, cases):
+        pos, neg = 0.0, 0.0
+        for k in ("comida", "salud", "contaminacion", "hacinamiento"):
+            v = c["share"][k]
+            if v >= 0:
+                ax.barh(yi, max(v - 0.006, 0), left=pos + 0.003, color=SHARE_COL[k], height=0.6, lw=0)
+                if v >= 0.1:
+                    ax.text(pos + v / 2, yi, f"{v:.0%}", ha="center", va="center", fontsize=6.4,
+                            color="white" if k in ("comida",) else G.INK)
+                pos += v
+            else:
+                ax.barh(yi, v, left=neg, color=SHARE_COL[k], height=0.6, lw=0, alpha=0.55)
+                neg += v
+    ax.axvline(0, color=G.INK3, lw=0.8)
+    ax.set_yticks(y, [c["name"] for c in cases], fontsize=7)
+    ax.xaxis.set_major_formatter(plt.matplotlib.ticker.PercentFormatter(1, decimals=0))
+    ax.set_xlim(-0.15, 1.12)
+    ax.grid(axis="y", visible=False)
+    ax.set_title("Reparto de la caída de la esperanza de vida entre 2026 y el valle (mediana por mundo)", fontsize=7.6)
+    handles = [plt.matplotlib.patches.Patch(color=SHARE_COL[k], label=SHARE_LAB[k]) for k in SHARE_COL]
+    fig.legend(handles=handles, loc="lower center", ncol=4, bbox_to_anchor=(0.55, -0.06), fontsize=6.8)
+    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    return G.save(fig, FIG / "valley_share.png")
+
+
+def valley_chapter():
+    f_le, f_share = fig_valley_le(), fig_valley_share()
+    f_a = fig_valley_chain("ltg_abund", [("ppolx", "Contaminación persistente (×1970)"), ("lfert", "Fertilidad del suelo"),
+                                         ("ly", "Rendimiento de la tierra"), ("fpc", "Alimento per cápita"),
+                                         (["lyt", "ppt"], "Tecnologías (índice, 2026 = 1)"), ("le", "Esperanza de vida (años)")],
+                           "valley_chain_a.png")
+    f_b = fig_valley_chain("ltg_base", [("nrfr", "Recursos no renovables restantes"),
+                                        ("fcaor", "Fracción del capital usada en obtener recursos"),
+                                        ("iopc", "Producción industrial p. c."), ("sopc", "Servicios p. c."),
+                                        ("fpc", "Alimento per cápita"), ("le", "Esperanza de vida (años)")],
+                           "valley_chain_b.png")
+    V = D["valley"]
+    a, b, amb, late = vcase("ltg_abund"), vcase("ltg_base"), vcase("amb_abund"), vcase("late_abund")
+    dl = V["delays"]
+    rg = V["ranges"]
+    at = lambda c, y, k: c["at"][str(y)][k]  # noqa: E731
+    out = [para("Mecanismo", "eyebrow"), para("Anatomía del valle: por qué 2040–2060", "h2"),
+           para("En casi todas las trayectorias del estudio, las variables se hunden entre 2040 y 2060 y luego, si las "
+                "políticas alcanzan, se recuperan. No es un artefacto ni azar: es la forma típica de World3-03, un "
+                "<b>sobregiro seguido de corrección</b>. Este capítulo la desarma: qué factor hunde la esperanza de vida en cada "
+                "caso, por qué en esas fechas y qué produce la recuperación.", "lede"),
+           img(f_le),
+           para(f"Con el paquete 1× y recursos abundantes, el valle cae en {round(a['valley_year'][1])} "
+                f"(p10–p90: {round(a['valley_year'][0])}–{round(a['valley_year'][2])}). Con el paquete al 150 % llega antes "
+                f"({round(amb['valley_year'][1])}) y es menos profundo; con el paquete tardío, la esperanza de vida mediana baja a "
+                f"{num(late['le_valley'], 0)} años.", "cap"),
+           para("Tres ingredientes", "h3")]
+    out += bullets([
+        f"<b>En 2026 el modelo ya está en sobregiro.</b> La contaminación persistente está en ≈ {num(at(a, 2026, 'ppolx'), 0)} veces "
+        "el nivel de 1970 y subiendo, y la huella ecológica pasa de 1. Parte del daño ya está «en tránsito»: llegará aunque se actúe hoy.",
+        f"<b>Retrasos de unos 20 años.</b> La contaminación tarda ≈ {dl['pptd']:g} años en transmitirse al ambiente "
+        f"(entre {rg['pptd'][0]:g} y {rg['pptd'][1]:g} en el ensemble), una tecnología ≈ {dl['tdd']:g} años en desarrollarse y "
+        f"aplicarse ({rg['tdd'][0]:g}–{rg['tdd'][1]:g}), el capital industrial dura {dl['alic1']:g} años y la población sigue "
+        "creciendo por inercia hasta su pico. 2026 más dos décadas de retraso más la inercia demográfica dan un valle en 2045–2060.",
+        "<b>La tecnología es reactiva.</b> En World3-03 las tecnologías agrícola y de contaminación sólo avanzan <i>mientras</i> "
+        "el problema existe (comida por debajo de la deseada, contaminación por encima de la deseada) y luego tardan en hacer "
+        "efecto. Primero llega el daño y después la solución.",
+    ])
+    out += [para("Retrasos del modelo que fijan la fecha", "h3"),
+            table([["Retraso", "Parámetro", "Valor", "Qué retrasa"],
+                   ["Transmisión de la contaminación", "pptd", f"{dl['pptd']:g} años ({rg['pptd'][0]:g}–{rg['pptd'][1]:g})",
+                    "Entre que se emite un contaminante persistente y que llega a suelos, agua y personas."],
+                   ["Desarrollo tecnológico", "tdd", f"{dl['tdd']:g} años ({rg['tdd'][0]:g}–{rg['tdd'][1]:g})",
+                    "Entre que una tecnología mejora en el laboratorio y que se aplica en la producción."],
+                   ["Vida media de absorción", "ahl70", f"{dl['ahl70']:g} años en 1970 ({rg['ahl70'][0]:g}–{rg['ahl70'][1]:g})",
+                    "Cuánto tarda el ambiente en limpiar la contaminación; crece cuando la contaminación es alta."],
+                   ["Vida del capital industrial", "alic", f"{dl['alic1']:g} años", "Cuánto tarda en reponerse o desaparecer la base industrial."],
+                   ["Vida del capital de servicios", "alsc", f"{dl['alsc1']:g} años", "Hospitales, escuelas, infraestructura social."],
+                   ["Percepción y ajuste social", "lpd, hsid, sad", f"{dl['lpd']:g} años",
+                    "Cuánto tardan la natalidad y los servicios en reaccionar a cambios de esperanza de vida e ingreso."]],
+                  [42 * mm, 22 * mm, 34 * mm, TEXT_W - 98 * mm], zebra=True),
+            PageBreak(),
+            para("Mecanismo A: contaminación → suelos → comida", "h3"),
+            para("Es el que domina con recursos abundantes, y el único con recuperación. Paquete 1× desde 2027:"),
+            img(f_a),
+            para("Mediana de 500 mundos. Banda gris: años del valle de esperanza de vida (p10–p90); línea discontinua: año mediano "
+                 "del valle; línea fina: 2026.", "cap")]
+    rows = [["Año", "Contaminación (×1970)", "Fertilidad del suelo", "Rendimiento de la tierra", "Alimento p. c.", "Esperanza de vida"]]
+    for y in (2026, 2045, 2055, 2070, 2100):
+        rows.append([str(y), num(at(a, y, "ppolx"), 0), num(at(a, y, "lfert"), 0), num(at(a, y, "ly"), 0),
+                     num(at(a, y, "fpc"), 0), num(at(a, y, "le"), 0)])
+    out += [table(rows, [18 * mm] + [(TEXT_W - 18 * mm) / 5] * 5, zebra=True), Spacer(1, 4)]
+    out += bullets([
+        f"<b>El {round(a['share']['comida'] * 100)} % de la caída es comida.</b> La contaminación emitida en las décadas de 2020 y "
+        f"2030 llega a la tierra en 2040–2060. Con 20–30 veces el nivel de 1970, la fertilidad se degrada mucho más rápido de "
+        f"lo que se regenera (de {num(at(a, 2026, 'lfert'), 0)} a {num(at(a, 2055, 'lfert'), 0)}), el rendimiento se reduce "
+        f"a la mitad y el alimento por persona cae de {num(at(a, 2026, 'fpc'), 0)} a {num(at(a, 2055, 'fpc'), 0)}. La "
+        "contaminación casi no mata directamente: mata a través de los suelos.",
+        f"<b>La política ya está actuando, pero va por detrás.</b> En 2055 la contaminación por unidad producida ya bajó a "
+        f"{num(at(a, 2055, 'ppt'), 2)} de su valor inicial, pero la emitida antes sigue llegando.",
+        f"<b>La recuperación.</b> La agro-tecnología madura (rendimiento tecnológico ×{num(at(a, 2055, 'lyt'), 1)} en 2055 y "
+        f"×{num(at(a, 2070, 'lyt'), 1)} en 2070), la contaminación se absorbe y el suelo se regenera "
+        f"({num(at(a, 2100, 'lfert'), 0)} en 2100). Además, hay menos población presionando ({num(at(a, 2070, 'pop'), 1)} mil "
+        "millones en 2070). Los mismos retrasos que causan el valle sostienen la salida.",
+    ])
+    out += [CondPageBreak(110 * mm), para("Mecanismo B: agotamiento → capital → todo", "h3"),
+            para("Domina con los recursos de World3 y casi no tiene recuperación. Paquete 1× desde 2027:"),
+            img(f_b),
+            para("Mismas convenciones que la figura anterior.", "cap")]
+    out += bullets([
+        f"<b>Extraer cuesta cada vez más capital.</b> La fracción del capital que se va en obtener recursos sube de "
+        f"{pct(at(b, 2026, 'fcaor'))} en 2026 a {pct(at(b, 2035, 'fcaor'))} en 2035 y {pct(at(b, 2055, 'fcaor'))} en 2055.",
+        f"<b>La industria se descapitaliza.</b> La producción industrial por persona cae de {num(at(b, 2026, 'iopc'), 0)} a "
+        f"{num(at(b, 2055, 'iopc'), 0)}, y con ella los insumos agrícolas, los servicios de salud y la infraestructura. La caída "
+        f"se reparte entre hacinamiento sin industria ({pct(b['share']['hacinamiento'])}), salud ({pct(b['share']['salud'])}) "
+        f"y comida ({pct(b['share']['comida'])}).",
+        f"<b>Sin recuperación.</b> Los recursos no renovables no se regeneran y el capital se deprecia más rápido de lo que se "
+        f"repone: la esperanza de vida se queda en ≈ {num(b['le_2100'], 0)} años.",
+    ])
+    out += [CondPageBreak(90 * mm), para("Qué cambia el valle", "h3"), img(f_share),
+            para("Caída de ln(esperanza de vida) entre 2026 y el año del valle, separada en los cuatro multiplicadores de "
+                 "World3-03. Los valores negativos (a la izquierda) son factores que mejoraron mientras los otros empeoraban.", "cap")]
+    out += bullets([
+        f"<b>Más intensidad, valle más corto y menos hondo.</b> Con el paquete al 150 % la tecnología avanza más rápido mientras "
+        f"dura el problema y la contaminación llega a {num(at(amb, 2055, 'ppolx'), 0)} en lugar de {num(at(a, 2055, 'ppolx'), 0)} "
+        f"veces 1970 en 2055. El valle llega en {round(amb['valley_year'][1])} y la esperanza de vida no baja de "
+        f"{num(amb['le_valley'], 0)} años: lo que se ataca son los retrasos.",
+        f"<b>Esperar a 2045 no mueve el valle, lo ahonda.</b> El valle llega casi en la misma fecha "
+        f"({round(late['valley_year'][1])}) porque el daño ya estaba en tránsito, pero la esperanza de vida mediana baja a "
+        f"{num(late['le_valley'], 0)} años antes de recuperarse.",
+    ])
+    out += [para("Cómo detectarlo a tiempo", "h3"),
+            para("Si el mecanismo A es el relevante, estas señales deberían moverse antes que la esperanza de vida:"),
+            table([["Señal temprana", "Variable del modelo", "Cómo se mide hoy"],
+                   ["Contaminantes persistentes en el ambiente", "ppolx",
+                    "Monitoreo de COP y mercurio (Plan de Vigilancia Mundial del Convenio de Estocolmo, Evaluación Mundial del Mercurio)."],
+                   ["Degradación de suelos", "lfert",
+                    "Proporción de tierra degradada (ODS 15.3.1), carbono orgánico del suelo, tasas de erosión."],
+                   ["Rendimiento agrícola que se estanca", "ly",
+                    "Rendimiento de cereales por hectárea (FAOSTAT) y productividad total de los factores agrícola (USDA ERS)."],
+                   ["Capital absorbido por la extracción", "fcaor",
+                    "Parte de la inversión que va a minería y energía; retorno energético de la energía (EROI); costes de extracción."],
+                   ["Alimento por persona", "fpc", "Suministro de calorías (FAOSTAT) y prevalencia de subalimentación (ODS 2.1.1)."]],
+                  [48 * mm, 26 * mm, TEXT_W - 74 * mm], zebra=True),
+            para("Cuánto confiar en la fecha", "h3")]
+    out += bullets([
+        "<b>La forma es estructural; la fecha, lo menos sólido.</b> En el modelo, la producción industrial por persona ya toca "
+        "techo hacia 2026–2027; en el mundo real sigue creciendo. Esa calibración viene de los datos de los años setenta de "
+        "<i>Limits to Growth</i>.",
+        f"<b>El ensemble sólo se ajustó a la población.</b> No a la producción, la contaminación ni la comida. La esperanza de "
+        f"vida mediana en 2026 sale en {num(b['le_2026'], 0)}–{num(a['le_2026'], 0)} años, por debajo de la real (≈ 73).",
+        "<b>Comparaciones con datos.</b> Herrington (2021) encontró que las tendencias hasta 2020 se parecen a los escenarios "
+        "de <i>Limits to Growth</i> que frenan el crecimiento hacia 2030–2040, pero el declive todavía no aparece en los datos.",
+        "<b>Lectura recomendada:</b> «si los retrasos son de unos 20 años y no anticipamos el daño, hay un valle a mitad de "
+        "siglo», no «en 2050 pasará X». Calibrar también con producción, contaminación y comida (la capa F7 de Phy-World) "
+        "acotaría la fecha.",
+    ])
+    out.append(PageBreak())
+    return out
+
+
+# ── implementación y medición de cada medida ──
+IMPL = {
+    "poll": {
+        "scales": [
+            ("1–2 %/año", "pptcm −1 a −2 %", "El ritmo histórico: normas de emisión vigentes y mejoras graduales. Es el orden de "
+             "magnitud con el que ha bajado la intensidad de carbono de la economía mundial."),
+            ("3–4 %/año (ref.)", "pptcm −4 %", "La contaminación persistente por unidad producida se reduce a la mitad cada 17–23 "
+             "años: salida acelerada de contaminantes persistentes, reducción fuerte de plásticos de un solo uso, industria "
+             "descarbonizada y química más limpia."),
+            ("6–8 %/año", "pptcm −6 a −8 %", "A la mitad cada 9–12 años: prohibición de clases enteras de sustancias, sustitución "
+             "química completa en sectores clave, captura en origen. Sin precedente histórico sostenido."),
+        ],
+        "instr": [
+            "<b>Regulación de sustancias</b> con calendarios de salida: Convenio de Estocolmo (contaminantes orgánicos persistentes), "
+            "Convenio de Minamata (mercurio) y reglamentos de registro y restricción de químicos.",
+            "<b>Precio a la contaminación:</b> impuestos o mercados de emisiones para gases de larga vida y contaminantes "
+            "persistentes; la recaudación financia la sustitución.",
+            "<b>Responsabilidad extendida del productor</b> para plásticos, electrónicos y químicos: quien pone el producto en el "
+            "mercado paga su fin de vida.",
+            "<b>Normas de emisión y mejores técnicas disponibles</b> en industria y agricultura (uso de fertilizantes y plaguicidas).",
+            "<b>Financiamiento de I+D y compras públicas</b> de alternativas limpias para crear mercado.",
+        ],
+        "measure": [
+            ("Emisiones de CO<sub>2</sub> por unidad de valor agregado (ODS 9.4.1)", "Global Carbon Budget, AIE",
+             "Generación por unidad producida (ppgf)", "Baja ≈ 4 %/año de forma sostenida"),
+            ("Emisiones de mercurio y de contaminantes orgánicos persistentes", "Evaluación Mundial del Mercurio (PNUMA); "
+             "Plan de Vigilancia del Convenio de Estocolmo", "Generación de contaminación (ppgr)", "Bajan en términos absolutos, no sólo por unidad"),
+            ("Residuos peligrosos per cápita y proporción tratada (ODS 12.4.2)", "Estadísticas nacionales, División de Estadística de la ONU",
+             "Generación de contaminación (ppgr)", "Generación baja; tratamiento sube"),
+            ("Fugas de plásticos al ambiente", "Global Plastics Outlook (OCDE)", "Generación de contaminación (ppgr)",
+             "Fugas a la mitad en ≈ 17 años"),
+            ("Concentraciones ambientales: COP en leche materna, mercurio en peces", "Programas de biomonitoreo",
+             "Stock de contaminación (ppolx)", "Se estabilizan y bajan, con ≈ 20 años de retraso"),
+        ],
+        "alert": "La intensidad baja pero el volumen total sube porque la producción crece más rápido que la mejora. El modelo "
+                 "sólo cuenta la reducción por unidad producida: lo que importa es la carga total.",
+    },
+    "res": {
+        "scales": [
+            ("1–2 %/año", "rtcm 1–2 %", "Ritmo histórico de mejora de la eficiencia energética mundial, del orden de 1–2 %/año."),
+            ("2–4 %/año (ref.)", "rtcm 4 %", "Duplicar la tasa histórica: el compromiso de la COP28 para la eficiencia energética "
+             "hasta 2030, extendido a materiales (reciclaje, durabilidad, diseño)."),
+            ("6–8 %/año", "rtcm 6–8 %", "Economía circular profunda: reutilización y reciclaje como norma, cambio de modelos de "
+             "negocio a servicios. Tiene coste de capital alto en el modelo."),
+        ],
+        "instr": [
+            "<b>Ecodiseño y derecho a reparar:</b> durabilidad, reparabilidad y reciclabilidad mínimas por ley.",
+            "<b>Contenido reciclado obligatorio</b> en envases, construcción y metales; metas de recuperación de metales críticos.",
+            "<b>Impuestos a materiales vírgenes, vertederos e incineración</b>, que abaratan relativamente lo reciclado.",
+            "<b>Normas mínimas de eficiencia energética</b> y etiquetado en equipos, edificios y vehículos.",
+            "<b>Eliminación de subsidios a combustibles fósiles</b> y compras públicas circulares.",
+        ],
+        "measure": [
+            ("Huella material per cápita y por PIB (ODS 8.4.1 / 12.2.1)", "Base de datos de flujos de materiales del IRP (PNUMA)",
+             "Recursos usados por persona (nruf)", "Baja ≈ 2–4 %/año sin caída del bienestar"),
+            ("Consumo material doméstico por PIB (ODS 12.2.2)", "IRP (PNUMA), oficinas de estadística", "Uso de recursos (nrur)",
+             "Baja de forma sostenida"),
+            ("Intensidad energética primaria (ODS 7.3.1)", "AIE, Banco Mundial (seguimiento del ODS 7)", "Recursos por unidad producida",
+             "Mejora ≥ 4 %/año, como pide la COP28"),
+            ("Tasa de uso circular de materiales", "Eurostat y equivalentes nacionales", "Recursos usados por persona (nruf)",
+             "Sube año a año"),
+            ("Reservas / producción de minerales clave", "USGS Mineral Commodity Summaries", "Recursos restantes (nrfr)",
+             "No cae más rápido que la mejora de eficiencia"),
+        ],
+        "alert": "Efecto rebote: la eficiencia abarata el uso y el consumo total sube. Medir siempre el uso absoluto, no sólo la intensidad.",
+    },
+    "agro": {
+        "scales": [
+            ("1–2 %/año", "lytcrm 1–2 %", "El crecimiento reciente del rendimiento de cereales: mejoras graduales con la inversión actual."),
+            ("2–3 %/año", "lytcrm 2–3 %", "El ritmo de la Revolución Verde. Sola, es la mejor dosis (más allá aparece la trampa de la abundancia)."),
+            ("4–6 %/año (ref.)", "lytcrm 4–6 % + suelos", "Una segunda revolución agrícola sostenida durante décadas, siempre "
+             "con control de la contaminación ≥ 3 %/año y transición demográfica."),
+            ("8 %/año", "lytcrm 8 %", "Cota del modelo, sin precedente histórico."),
+        ],
+        "instr": [
+            "<b>Inversión pública en I+D agrícola y extensión</b> (sistemas nacionales y CGIAR): mejoramiento genético, variedades "
+            "resistentes al calor y la sequía.",
+            "<b>Agua:</b> riego eficiente, cosecha de agua, manejo de cuencas.",
+            "<b>Uso eficiente de fertilizantes:</b> agricultura de precisión y dosis según el suelo, para subir rendimiento sin "
+            "subir la contaminación por nitrógeno.",
+            "<b>Menos pérdidas y desperdicio de alimentos</b> (ODS 12.3): almacenamiento, cadena de frío, mercados.",
+            "<b>Pequeños productores:</b> crédito, seguros y acceso a mercados.",
+            "<b>Suelos:</b> agricultura de conservación (labranza mínima, cultivos de cobertura, rotaciones), agroforestería, "
+            "control de erosión, restauración de tierras degradadas, pagos por servicios ecosistémicos y metas de neutralidad "
+            "en la degradación de tierras (CNULD).",
+        ],
+        "measure": [
+            ("Rendimiento de cereales (t/ha)", "FAOSTAT", "Rendimiento de la tierra (ly)", "Crece al ritmo de la escala elegida"),
+            ("Productividad total de los factores agrícola", "USDA ERS (International Agricultural Productivity)",
+             "Tecnología de rendimiento (lyt)", "Crece sin más insumos por hectárea"),
+            ("Gasto en I+D agrícola como % del PIB agrícola", "ASTI (IFPRI)", "Esfuerzo tecnológico (lytcrm)", "Se duplica o triplica"),
+            ("Prevalencia de subalimentación (ODS 2.1.1) y suministro de calorías", "FAO (SOFI), FAOSTAT",
+             "Alimento per cápita (fpc)", "Nunca baja, ni durante el valle"),
+            ("Proporción de tierra degradada (ODS 15.3.1) y carbono orgánico del suelo", "CNULD, FAO",
+             "Fertilidad del suelo (lfert)", "La degradación se detiene antes de 2040"),
+            ("Índice de pérdida de alimentos (ODS 12.3.1)", "FAO", "Pérdidas entre cosecha y consumo", "Baja"),
+        ],
+        "alert": "El rendimiento sube pero la población, la contaminación por nitrógeno y plaguicidas, o la expansión agrícola "
+                 "suben más rápido: es la «dosis peligrosa» de este capítulo. Agro-tecnología sin control de la contaminación es "
+                 "la combinación más arriesgada del estudio.",
+    },
+    "fam": {
+        "scales": [
+            ("3–2,5 hijos", "dcfszpg 3–2,5", "Tendencias actuales en países de fecundidad alta, con mejoras graduales de acceso."),
+            ("2,25–2 hijos (ref.)", "dcfszpg 2", "Fecundidad de reemplazo en una generación: acelerar lo que ya funciona en educación y salud reproductiva."),
+            ("1,75 hijos", "dcfszpg 1,75", "Niveles actuales de buena parte de Europa y América. El óptimo de sostenibilidad del estudio."),
+            ("1,5 hijos", "dcfszpg 1,5", "Niveles de Asia oriental y el sur de Europa: contracción y envejecimiento rápidos."),
+        ],
+        "instr": [
+            "Medidas voluntarias y basadas en derechos; la coerción queda fuera. En el modelo, «control natal plenamente eficaz» "
+            "significa acceso pleno, no obligación.",
+            "<b>Educación secundaria completa para las niñas</b> y fin del matrimonio infantil.",
+            "<b>Acceso universal a anticoncepción moderna</b> y salud reproductiva (en la línea de FP2030).",
+            "<b>Menos mortalidad infantil:</b> cuando los hijos sobreviven, las familias desean menos.",
+            "<b>Empleo y autonomía económica de las mujeres.</b>",
+            "<b>Pensiones y protección social</b>, para que la vejez no dependa del número de hijos.",
+        ],
+        "measure": [
+            ("Tasa global de fecundidad", "UN World Population Prospects", "Fecundidad total (tf)", "Converge a ≈ 2 en una generación"),
+            ("Tamaño ideal de familia declarado", "Encuestas DHS y MICS", "Tamaño de familia deseado (dcfs): es literalmente la variable del modelo",
+             "Baja hacia 2"),
+            ("Demanda de planificación familiar satisfecha con métodos modernos (ODS 3.7.1)", "UNFPA, DHS",
+             "Eficacia del control natal (fce)", "Cerca del 100 %"),
+            ("Tasa de natalidad adolescente (ODS 3.7.2)", "UN WPP, DHS", "Natalidad", "Baja"),
+            ("Finalización de secundaria de las niñas (ODS 4.1.2)", "UNESCO UIS", "Motor del tamaño deseado", "Sube"),
+            ("Mortalidad de menores de 5 años (ODS 3.2.1)", "UN IGME", "Esperanza de vida (le)", "Baja"),
+        ],
+        "alert": "Fecundidad sostenida por debajo de 1,5: la población se contrae más de 20 % y envejece rápido. El objetivo útil "
+                 "es 1,75–2 hijos.",
+    },
+    "suff": {
+        "scales": [
+            ("500", "iopcd 500", "Crecimiento industrial intensivo: más inversión que hoy. Empeora el destino."),
+            ("450–400", "iopcd 450–400", "Estabilización suave de la producción material per cápita."),
+            ("350 (ref.)", "iopcd 350", "Congelar la producción industrial per cápita en el nivel actual del modelo y crecer en "
+             "servicios, salud, educación y cuidados."),
+            ("300–250", "iopcd 300–250", "Reducir el consumo material un 15–30 % en las economías de alta huella. Más allá de 300 "
+             "no mejora el destino y baja el bienestar."),
+        ],
+        "instr": [
+            "<b>Reorientar gasto público e inversión</b> hacia salud, educación, cuidados y cultura.",
+            "<b>Reducción de la jornada laboral:</b> repartir las ganancias de productividad como tiempo libre y no como más producción.",
+            "<b>Impuestos progresivos al consumo de alta huella</b> (vuelos frecuentes, vehículos pesados, bienes de lujo).",
+            "<b>Vida útil mínima de productos</b>, garantías extendidas, reparación y modelos de uso compartido o alquiler.",
+            "<b>Límites a la publicidad</b> de bienes de alta huella.",
+            "<b>Presupuestos de bienestar</b> e indicadores más allá del PIB para orientar la política económica.",
+        ],
+        "measure": [
+            ("Valor agregado manufacturero per cápita (ODS 9.2.1)", "ONUDI, Banco Mundial", "Producción industrial per cápita (iopc)",
+             "Estable al nivel elegido"),
+            ("Huella material per cápita (ODS 12.2.1)", "IRP (PNUMA)", "Recursos por persona", "Baja en los países de alta huella"),
+            ("Peso de los servicios en el consumo de los hogares", "Cuentas nacionales", "Servicios per cápita (sopc)", "Sube"),
+            ("Esperanza de vida saludable, IDH, indicadores de bienestar", "OMS, PNUD", "Bienestar (hwi, le)",
+             "Siguen mejorando: si bajan, la suficiencia se está volviendo recesión"),
+            ("Horas trabajadas por persona", "OIT, OCDE", "Uso del tiempo", "Bajan sin perder ingreso real"),
+        ],
+        "alert": "Estancamiento con caída de la salud, el empleo o los servicios: la suficiencia se convierte en recesión. La "
+                 "palanca sólo funciona si el bienestar se mide y sigue subiendo.",
+    },
+}
+
+
+def impl_flowables(lv):
+    d = IMPL[lv]
+    out = [para("Implementación y medición", "eyebrow"), para("Cómo se implementa y cómo se mide", "h2b"),
+           para("Formas de implementarla según la escala", "h3"),
+           table([["Escala", "En el modelo", "Cómo se vería en la práctica"]] + [list(r) for r in d["scales"]],
+                 [26 * mm, 30 * mm, TEXT_W - 56 * mm], zebra=True),
+           para("Instrumentos", "h3")]
+    out += bullets(d["instr"])
+    out += [para("Cómo se mediría", "h3"),
+            table([["Indicador", "Fuente", "Variable del modelo", "Señal de que va a la escala de referencia"]] +
+                  [[Paragraph(r[0], S["cell"]), r[1], r[2], r[3]] for r in d["measure"]],
+                  [52 * mm, 40 * mm, 38 * mm, TEXT_W - 130 * mm], zebra=True),
+            Spacer(1, 6), callout(d["alert"], "Señal de alerta")]
+    return out
 
 
 if __name__ == "__main__":

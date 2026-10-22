@@ -62,7 +62,7 @@ def package(s: float) -> dict:
             "suff": max(200.0, 500 - 150 * s)}
 
 
-def run(U, pol: dict, *, geo: float = 1.0, year: float = YEAR):
+def run(U, pol: dict, *, geo: float = 1.0, year: float = YEAR, rec=REC):
     """Una política (dict de niveles) sobre el ensemble ``U``; ``geo`` multiplica el recurso inicial
     (> 1 incluye la mejor tecnología de extracción del escenario 2)."""
     n = len(U["nri_mult"])
@@ -76,9 +76,51 @@ def run(U, pol: dict, *, geo: float = 1.0, year: float = YEAR):
          "iet": full(year if pol["suff"] else NEVER), "iopcd": full(pol["suff"] or 400.0)}
     t = {"pptcm": (-1, 0, 1, [-pol["poll"], 0]), "rtcm": (-1, 0, 1, [pol["res"], 0]),
          "lytcrm": (0, 1, 1, [0, pol["agro"]]), **base.RICH_TABLE}
-    r = l0.run(constants=c, tables=t, n=n, t1=base.T1, dt=base.DT, record=REC)
+    r = l0.run(constants=c, tables=t, n=n, t1=base.T1, dt=base.DT, record=rec)
     yearly = np.isclose(r.time % 1.0, 0.0)
-    return r.time[yearly].astype(int), {k: r.series[k][yearly] for k in REC}
+    return r.time[yearly].astype(int), {k: r.series[k][yearly] for k in rec}
+
+
+# ── F. anatomía del valle: qué hunde la esperanza de vida y qué la recupera ──
+VALLEY_REC = REC + ("fcaor", "ly", "al", "lfert", "sopc", "lyt", "ppt", "rct")
+_TAB = l0.TABLES
+_C = l0.CONSTANTS
+
+
+def _tab(name, x):
+    lo, _, step, ys = _TAB[name]
+    return np.interp(x, lo + step * np.arange(len(ys)), ys)
+
+
+def valley(U, pol, geo, year=YEAR):
+    """Trayectorias medianas, año del valle y reparto de la caída de ln(esperanza de vida) entre sus cuatro
+    multiplicadores de World3-03: comida (lmf), servicios de salud (lmhs, por residuo), contaminación (lmp) y
+    hacinamiento (lmc)."""
+    yrs, r = run(U, pol, geo=geo, year=year, rec=VALLEY_REC)
+    i0 = int(np.searchsorted(yrs, base.START))
+    le = r["le"]
+    m = np.arange(le.shape[1])
+    imin = i0 + le[i0:].argmin(0)
+    lmf = _tab("lmf", r["fpc"] / _C["sfpc"])
+    lmp = _tab("lmp", r["ppolx"])
+    lmc = 1 - _tab("cmi", r["iopc"]) * _tab("fpu", r["pop"])
+    lmhs = le / (_C["len"] * lmf * lmp * lmc)
+    tot = np.log(le[imin, m]) - np.log(le[i0])
+    share = {k: np.log(v[imin, m]) - np.log(v[i0]) for k, v in
+             (("comida", lmf), ("salud", lmhs), ("contaminacion", lmp), ("hacinamiento", lmc))}
+    deep = tot < -0.05                       # sólo los mundos con un valle de verdad (> 5 % de caída)
+    keep = (yrs >= 1990) & ((yrs - 1990) % 2 == 0)
+    scale = {"pop": 1e-9, "al": 1e-9}
+    out = {"years": yrs[keep].tolist(),
+           "median": {k: [float(f"{v:.4g}") for v in np.median(r[k][keep] * scale.get(k, 1), 1)] for k in VALLEY_REC},
+           "le_band": [[float(f"{v:.4g}") for v in np.percentile(le[keep], p, 1)] for p in (10, 90)],
+           "valley_year": base.q(yrs[imin].astype(float)), "le_2026": float(np.median(le[i0])),
+           "le_valley": float(np.median(le[imin, m])), "le_2100": float(np.median(le[-1])),
+           "share": {k: float(np.median(v[deep] / tot[deep])) if deep.any() else 0.0 for k, v in share.items()},
+           "deep_frac": float(deep.mean()),
+           "at": {str(yy): {k: float(np.median(r[k][int(np.searchsorted(yrs, yy))]) * scale.get(k, 1)) for k in VALLEY_REC}
+                  for yy in (2026, 2035, 2045, 2055, 2070, 2100)}}
+    return out
 
 
 BAU_IO = {}
@@ -258,6 +300,21 @@ def main():
         scen.append(entry)
     res["scenarios"] = scen
     print(f"E ok ({time.time() - t0:.0f} s)")
+
+    # F. anatomía del valle
+    res["valley"] = {
+        "cases": [
+            {"key": "bau_base", "name": "Inercia · recursos base", **valley(U, OFF, 1.0)},
+            {"key": "bau_abund", "name": "Inercia · recursos abundantes", **valley(U, OFF, 2.0)},
+            {"key": "ltg_base", "name": "Paquete 1× · recursos base", **valley(U, REF, 1.0)},
+            {"key": "ltg_abund", "name": "Paquete 1× · recursos abundantes", **valley(U, REF, 2.0)},
+            {"key": "amb_abund", "name": "Paquete 1,5× · recursos abundantes", **valley(U, package(1.5), 2.0)},
+            {"key": "late_abund", "name": "Paquete 1× desde 2045 · recursos abundantes", **valley(U, REF, 2.0, 2045.0)},
+        ],
+        "delays": {k: _C[k] for k in ("pptd", "tdd", "alic1", "alsc1", "ahl70", "lpd", "hsid", "sad")},
+        "ranges": {k: list(base.UNCERTAIN[k][:2]) for k in ("pptd", "tdd", "ahl70")},
+    }
+    print(f"F ok ({time.time() - t0:.0f} s)")
 
     res["meta"] = {"generated": time.strftime("%Y-%m-%d"), "members": len(idx), "seed": base.SEED,
                    "runtime_s": round(time.time() - t0, 1), "year": YEAR}
