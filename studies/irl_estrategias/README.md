@@ -1,6 +1,7 @@
 # Política revelada (IRL) y estrategias: Atlas Mundo (L1) × World3 (L0)
 
-Informe: [`docs/Informe_IRL_estrategias_AtlasMundo_World3.pdf`](../../docs/Informe_IRL_estrategias_AtlasMundo_World3.pdf).
+Informe técnico: [`docs/Informe_IRL_estrategias_AtlasMundo_World3.pdf`](../../docs/Informe_IRL_estrategias_AtlasMundo_World3.pdf).
+Informe divulgativo (`s5_divulgativo.py`): [`docs/Informe_divulgativo_estrategias_mundo.pdf`](../../docs/Informe_divulgativo_estrategias_mundo.pdf).
 
 | Paso | Script | Salida |
 |---|---|---|
