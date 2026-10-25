@@ -453,8 +453,97 @@ def make_all():
         L = c.load("learning.json")
         out.update(learning_curve=learning_curve(L), learned_policy=learned_policy(L), pillars=pillars(L, d),
                    learned_countries=learned_countries(L))
+    RL = rl_results()
+    if RL:
+        L = c.load("learning.json") if (c.OUT / "learning.json").exists() else None
+        best = max(RL, key=lambda a: np.mean([e["score"] for e in RL[a]["eval"]]))
+        out.update(rl_curves=rl_curves(RL, L), rl_compare=rl_compare(RL, L, d), rl_policy=rl_policy(RL, best))
     return out
 
 
 if __name__ == "__main__":
     print(make_all())
+
+
+# ---------------------------------------------------------------- aprendizaje por refuerzo
+RL_ALGOS = ("PPO", "SAC", "TD3", "PETS", "MBPO")
+RL_COL = {"PPO": BLUE, "SAC": ORANGE, "TD3": AQUA, "PETS": VIOLET, "MBPO": MAGENTA}
+RL_NAME = {"PPO": "PPO (on-policy)", "SAC": "SAC (off-policy)", "TD3": "TD3 (off-policy)",
+           "PETS": "PETS-MPC (modelo)", "MBPO": "MBPO-Dyna (modelo)"}
+
+
+def rl_results():
+    return {a: c.load(f"rl_{a}.json") for a in RL_ALGOS if (c.OUT / f"rl_{a}.json").exists()}
+
+
+def rl_curves(RL, L):
+    fig, ax = plt.subplots(figsize=(7.0, 3.3))
+    for a, d in RL.items():
+        cv = d["curve"]
+        x = np.array([p["episodes"] for p in cv])
+        y = np.array([p["train_score"] for p in cv])
+        k = min(5, len(y))
+        ys = np.convolve(y, np.ones(k) / k, mode="valid")
+        ax.plot(x[k - 1:], ys, color=RL_COL[a], lw=1.6, label=RL_NAME[a])
+        g = [(p["episodes"], p["greedy_score"]) for p in cv if "greedy_score" in p]
+        if g:
+            ax.scatter(*zip(*g), color=RL_COL[a], s=14, marker="D", edgecolor="white", lw=0.8, zorder=3)
+    ax.axvline(20 * 48, color=MUTED, lw=0.6, ls=":")
+    ax.text(20 * 48, ax.get_ylim()[0], " datos aleatorios\n compartidos", fontsize=6.5, color=INK2, va="bottom")
+    if L:
+        top = max(v["score"] for k, v in L["fixed_scores"].items())
+        ax.axhline(top, color=INK2, lw=0.8, ls="--")
+        ax.text(ax.get_xlim()[1], top, "mejor estrategia fija ", fontsize=6.5, color=INK2, ha="right", va="bottom")
+    ax.axhline(0, color=MUTED, lw=0.6)
+    ax.set_xlabel("episodios reales del L1 consumidos (cada corrida = 48 episodios en paralelo)")
+    ax.set_ylabel("puntuación compuesta por episodio\n(media móvil; ◆ política determinista)")
+    ax.legend(fontsize=7, loc="lower right", ncol=2)
+    return save(fig, "rl_curves")
+
+
+def rl_compare(RL, L, d):
+    S = d["strategies"]
+    rows = []
+    for a, r in RL.items():
+        ev = r["eval"]
+        rows.append((RL_NAME[a], np.mean([e["score"] for e in ev]), {p: np.mean([e["pilares"][p] for e in ev]) for p in ev[0]["pilares"]},
+                     RL_COL[a]))
+    if L:
+        reps = L["world"]["aprendida_mejor"]["validacion"]
+        rows.append(("CEM (caja negra, paso 3)", np.mean([e["score"] for e in reps]),
+                     {p: np.mean([e["pilares"][p] for e in reps]) for p in reps[0]["pilares"]}, INK2))
+        for k in sorted(L["fixed_scores"], key=lambda k: -L["fixed_scores"][k]["score"])[:3]:
+            v = L["fixed_scores"][k]
+            rows.append((f"Fija: {S[k]['label']}", v["score"], v["pilares"], MUTED))
+    rows.sort(key=lambda r: r[1])
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(7.4, 3.6), sharey=True, gridspec_kw={"width_ratios": [1.1, 2]})
+    y = np.arange(len(rows))
+    ax.barh(y, [r[1] for r in rows], color=[r[3] for r in rows], height=0.62)
+    for yi, r in zip(y, rows):
+        ax.text(r[1] + 0.01, yi, f"{r[1]:+.2f}".replace(".", ","), va="center", fontsize=6.8)
+    ax.set_yticks(y)
+    ax.set_yticklabels([r[0] for r in rows], fontsize=7)
+    ax.set_title("Puntuación total\n(fuera de muestra)", fontsize=8.5)
+    ax.set_xlim(0, max(r[1] for r in rows) * 1.25)
+    w = 0.26
+    for j, (p, col) in enumerate((("desarrollo", BLUE), ("ambiente", AQUA), ("colapso", ORANGE))):
+        ax2.barh(y + (j - 1) * w, [r[2][p] for r in rows], height=w, color=col, label=p)
+    ax2.axvline(0, color=INK2, lw=0.8)
+    ax2.set_title("Pilares (desv. típicas frente a la base)", fontsize=8.5)
+    ax2.legend(fontsize=6.8, loc="lower right")
+    for a_ in (ax, ax2):
+        a_.grid(axis="y", visible=False)
+    return save(fig, "rl_compare")
+
+
+def rl_policy(RL, algo):
+    ev = RL[algo]["eval"]
+    A = np.mean([np.array(e["actions_mean"]) for e in ev], 0)          # (5, 18)
+    fig, axes = plt.subplots(1, 3, figsize=(7.4, 2.4), sharey=True)
+    for z, (ax, zn) in enumerate(zip(axes, ("Periferia", "Semiperiferia", "Centro"))):
+        heat(ax, A[:, z * 6:(z + 1) * 6], ["2020", "2022", "2024", "2026", "2028"],
+             ["Capital", "I+D", "Impor-\ntar", "Extraer", "Inv.\next.", "Redis-\ntribuir"], vmax=0.5, fs=6.3)
+        ax.set_title(zn, fontsize=8.5)
+        ax.xaxis.tick_top()
+        plt.setp(ax.get_xticklabels(), fontsize=6.2)
+    return save(fig, "rl_policy")

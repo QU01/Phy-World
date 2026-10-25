@@ -246,6 +246,18 @@ def build():
                      f"fija ({S[top_fixed[1]]['label']}): más redistribución en todas partes, menos acumulación de capital en el centro y "
                      f"más en la periferia. Cambia P(colapso ≤ 2070) en {num(learned['p2070'] * 100, 1, True)} puntos y el pico de "
                      f"contaminación en {pct(learned['metrics']['ppolx'], 0)}.")
+    RLx = F.rl_results()
+    if RLx:
+        scx = {a: np.mean([e["score"] for e in RLx[a]["eval"]]) for a in RLx}
+        bx = max(scx, key=scx.get)
+        evx = RLx[bx]["eval"]
+        mx = lambda k: np.mean([e["metrics"][k] for e in evx])  # noqa: E731
+        items.append(f"<b>Aprendizaje por refuerzo:</b> cinco agentes (on-policy PPO; off-policy SAC y TD3; basados en modelo "
+                     f"PETS-MPC y MBPO-Dyna) aprendieron una política que reacciona al estado del mundo cada dos años. El mejor, "
+                     f"<b>{F.RL_NAME[bx]}</b>, obtiene {num(scx[bx], 2, True)} fuera de muestra (CEM {num(learned['score'], 2, True) if learned else '—'}): "
+                     f"{num(mx('p2070') * 100, 1, True)} pp de colapso antes de 2070, {num(mx('psevere') * 100, 1, True)} pp de colapso "
+                     f"severo y {pct(mx('ppolx'), 0)} de pico de contaminación, sin perder desarrollo. Su receta: el centro redistribuye "
+                     f"más y acumula cada vez menos capital; la periferia invierte fuerte al principio y extrae menos.")
     items.append("<b>Ninguna estrategia dentro de la región de confianza del IRL (±0,5 logit) evita el colapso de World3 en la mayoría de "
                  "los mundos.</b> Mueven su fecha y su severidad; el resultado clásico de <i>Los límites del crecimiento</i> sobrevive a la "
                  "conducta realista de 180 países.")
@@ -254,7 +266,7 @@ def build():
     story.append(callout("<b>Cómo leer este informe.</b> Todo resultado es un <b>modo de comportamiento exploratorio</b>, no un pronóstico. "
                          "El L1 está validado fuera de muestra hasta 10 años; el L0 (World3-03) es un modelo agregado de 1972/2004 sin "
                          "calibración a datos recientes. El acoplamiento L1→L0 de este estudio es un supuesto declarado [M] (sección 4.3). "
-                         "Las limitaciones están en la sección 7.", ORANGE))
+                         "Las limitaciones están en la sección 8.", ORANGE))
 
     # ------------------------------------------------ 1. qué se hizo
     story += section("01", "Qué se hizo", "método")
@@ -498,8 +510,116 @@ def build():
                                        for j, ch in enumerate(c.CHANNELS) if max(np.mean(agg[:, j] > 0), np.mean(agg[:, j] < 0)) >= 0.7)
                              + "."))
 
+    # ------------------------------------------------ 5b. aprendizaje por refuerzo
+    RL = F.rl_results()
+    if RL:
+        story += section("06", "Aprendizaje por refuerzo: la estrategia óptima en lazo cerrado", "RL on-policy, off-policy y basado en modelo")
+        story.append(P("El CEM del paso 3 elige un vector fijo para toda la década. Aquí el planificador es un <b>agente que observa y "
+                       "reacciona</b>: en 2020, 2022, 2024, 2026 y 2028 observa el estado del L1 por zona (PIB per cápita, crecimiento "
+                       "del consumo, riesgo de conflicto, deuda, intensidad fósil; tiempo, renta de recursos, deuda mundial y la media "
+                       "de sus acciones pasadas: 36 rasgos) y fija los desvíos de los 6 canales en cada zona (18 acciones continuas en "
+                       "±0,5 logit). La recompensa es la misma puntuación compuesta de tres pilares del paso 3 (más una recompensa "
+                       "intermedia de potencial que no cambia el total), frente al mismo miembro de la línea base con números "
+                       "aleatorios comunes. Cada corrida del L1 da 48 episodios en paralelo. Los términos de World3 se calculan durante "
+                       "el entrenamiento con un <b>emulador</b> (red neuronal entrenada con 600 corridas de World3 sobre 400 mundos; R² "
+                       "fuera de muestra 0,99-1,00); la evaluación final usa World3 de verdad."))
+        fam = [["Algoritmo", "Familia", "Cómo aprende", "Episodios reales"]]
+        how = {"PPO": "política gaussiana y crítico; gradiente de política con recorte y GAE, sólo con datos de la política actual",
+               "SAC": "actor-crítico con entropía máxima y doble Q; reutiliza toda la experiencia (memoria de repetición)",
+               "TD3": "actor determinista, doble Q con retardo y suavizado del objetivo; memoria de repetición",
+               "PETS": "ensemble de 5 redes aprende la dinámica y la recompensa; en cada decisión planifica con CEM sobre el modelo (MPC)",
+               "MBPO": "el mismo modelo genera ramas cortas desde estados reales; SAC aprende sobre 90 % de datos imaginados"}
+        for a, r in RL.items():
+            fam.append([F.RL_NAME[a].split(" (")[0], r["family"], how[a], f"{r['curve'][-1]['episodes']:,}".replace(",", ".")])
+        story.append(table(fam, [24 * mm, 30 * mm, W - 2 * M - 80 * mm, 26 * mm]))
+        story.append(P("Tabla 7. Los cinco agentes. Off-policy y basados en modelo arrancan con 20 corridas aleatorias compartidas "
+                       "(960 episodios); PPO, on-policy, no puede usarlas.", "cap"))
+        story.append(fig(figs["rl_curves"], caption="Figura 17. Curvas de aprendizaje frente a la experiencia real consumida."))
+        story.append(fig(figs["rl_compare"], caption="Figura 18. Comparación final con la misma evaluación que el CEM: semillas 101 y 202 "
+                                                      "(nunca vistas), R = 32, World3 de verdad sobre 400 mundos."))
+        best = max(RL, key=lambda a: np.mean([e["score"] for e in RL[a]["eval"]]))
+        ev = RL[best]["eval"]
+        mvb = lambda k: np.mean([e["metrics"][k] for e in ev])  # noqa: E731
+        rows = [["Agente", "Puntuación", "Δ ID mundial", "Δ ID quintil pobre", "Δ fósil", "Δ pico contam.", "Δ P(col. ≤2070)",
+                 "Δ P(severo)", "Δ HWI 2100"]]
+        allrows = [(F.RL_NAME[a], RL[a]["eval"]) for a in RL]
+        if L:
+            allrows.append(("CEM (paso 3)", L["world"]["aprendida_mejor"]["validacion"]))
+        for name, evs in sorted(allrows, key=lambda r: -np.mean([e["score"] for e in r[1]])):
+            mmet = lambda k: np.mean([e["metrics"][k] for e in evs])  # noqa: E731
+            rows.append([name, num(np.mean([e["score"] for e in evs]), 3, True), num(mmet("dev") * 100, 3, True),
+                         num(mmet("dev_q1") * 100, 3, True), pct(mmet("fossil")), pct(mmet("ppolx")),
+                         f"{num(mmet('p2070') * 100, 1, True)} pp", f"{num(mmet('psevere') * 100, 1, True)} pp", num(mmet("hwi"), 3, True)])
+        story.append(table(rows, [34 * mm] + [(W - 2 * M - 34 * mm) / 8] * 8))
+        story.append(P("Tabla 8. Resultados fuera de muestra frente a la línea base (media de las dos semillas).", "cap"))
+        story.append(fig(figs["rl_policy"], caption=f"Figura 19. La política aprendida por el mejor agente ({F.RL_NAME[best]}): "
+                                                     "acción media por zona, canal y año de decisión (logit; azul = más, naranja = menos)."))
+        A = np.mean([np.array(e["actions_mean"]) for e in ev], 0)
+        Sd = np.mean([np.array(e["actions_sd"]) for e in ev], 0)
+        zn = ("periferia", "semiperiferia", "centro")
+        desc = []
+        for z in range(3):
+            m = A[:, z * 6:(z + 1) * 6].mean(0)
+            o = np.argsort(-np.abs(m))[:3]
+            desc.append(f"<b>{zn[z]}</b>: " + ", ".join(f"{c.CH_ES[c.CHANNELS[j]].lower()} {m[j]:+.2f}" for j in o))
+        trend = A[-1] - A[0]
+        j = int(np.argmax(np.abs(trend)))
+        story.append(callout(f"<b>La estrategia óptima encontrada por RL ({F.RL_NAME[best]}).</b> Puntuación fuera de muestra "
+                             f"{num(np.mean([e['score'] for e in ev]), 2, True)}. Rasgos dominantes (media 2020-2028): " + "; ".join(desc) +
+                             f". La política <b>cambia en el tiempo</b>: el mayor ajuste entre 2020 y 2028 es en "
+                             f"{c.CH_ES[c.CHANNELS[j % 6]].lower()} ({zn[j // 6]}, {trend[j]:+.2f}). Reacciona al estado: la "
+                             f"desviación típica de sus acciones entre los 32 mundos es {num(Sd.mean(), 3)} logit en promedio. Resultado: "
+                             f"{pct(mvb('ppolx'))} de pico de contaminación, {num(mvb('p2070') * 100, 1, True)} pp de colapso antes de 2070, "
+                             f"{num(mvb('dev_q1') * 100, 2, True)} puntos de desarrollo en el quintil más pobre.", AQUA))
+        sc = {a: np.mean([e["score"] for e in RL[a]["eval"]]) for a in RL}
+        tr_end = {a: np.mean([p["train_score"] for p in RL[a]["curve"][-5:]]) for a in RL}
+        eps = {a: RL[a]["curve"][-1]["episodes"] for a in RL}
+        fixed_top = max(v["score"] for k, v in fx.items()) if fx else 0.0
+
+        def first_cross(a):
+            for p in RL[a]["curve"]:
+                if p.get("greedy_score", -9) > fixed_top:
+                    return p["episodes"]
+            return None
+        lines = []
+        if "PPO" in RL:
+            lines.append(f"<b>On-policy (PPO)</b> sólo aprende de su propia experiencia: necesitó {eps['PPO']:,} episodios ".replace(",", ".") +
+                         f"y fue el más lento al principio, pero el más estable y el mejor al final ({num(sc['PPO'], 2, True)} fuera de muestra).")
+        offp = [a for a in ("SAC", "TD3") if a in RL]
+        if offp:
+            lines.append("<b>Off-policy</b> (" + ", ".join(f"{a} {num(sc[a], 2, True)}" for a in offp) + ") reutiliza cada episodio muchas "
+                         "veces y aprovecha los datos aleatorios compartidos: llega antes a buenas políticas, pero se estanca algo por "
+                         "debajo de PPO (posiblemente porque la recompensa terminal es ruidosa y eso dificulta aprender el crítico).")
+        if "MBPO" in RL:
+            fc = first_cross("MBPO")
+            lines.append(f"<b>Basado en modelo, Dyna (MBPO)</b> es el más eficiente en datos: " +
+                         (f"supera a la mejor estrategia fija con sólo {fc:,} episodios reales. ".replace(",", ".") if fc else "") +
+                         f"Pero explota los errores de su modelo: puntuación de entrenamiento {num(tr_end['MBPO'], 2, True)} frente a "
+                         f"{num(sc['MBPO'], 2, True)} fuera de muestra.")
+        if "PETS" in RL:
+            lines.append(f"<b>Basado en modelo, MPC (PETS)</b> planifica en el modelo en cada decisión. La dinámica por zona se aprende "
+                         f"bien, pero la recompensa terminal (que agrega 180 países y World3) se predice mal (R² ≈ 0,5): sin política "
+                         f"que corrija los errores, queda en {num(sc['PETS'], 2, True)}.")
+        dirs = []
+        for a in RL:
+            Aa = np.mean([np.array(e["actions_mean"]) for e in RL[a]["eval"]], 0).mean(0)
+            dirs.append(Aa)
+        dirs = np.array(dirs)
+        agree = [(z, j) for z in range(3) for j in range(6)
+                 if abs(dirs[:, z * 6 + j].mean()) > 0.1 and np.all(np.sign(dirs[:, z * 6 + j]) == np.sign(dirs[:, z * 6 + j].mean()))]
+        if agree:
+            lines.append("<b>En qué coinciden todos los agentes</b> (mismo signo en los cinco y media > 0,1 logit): " +
+                         "; ".join(f"{c.CH_ES[c.CHANNELS[j]].lower()} en {zn[z]} {dirs[:, z * 6 + j].mean():+.2f}" for z, j in agree) +
+                         ". Es la misma dirección que el CEM (redistribuir más, acumular menos capital en el centro); el RL añade el "
+                         "calendario y la reacción al estado.")
+        story += [P("<b>Qué enseña la comparación de familias.</b>", "h2")] + bullets(lines)
+        story.append(callout("<b>Advertencia.</b> Los agentes optimizan el modelo, incluido el acoplamiento L1 → World3 declarado en la "
+                             "sección 4.3: buena parte de su ventaja viene de los canales que ese acoplamiento hace más influyentes "
+                             "(gasto social → servicios de World3; acumulación de capital → contaminación). La evaluación con semillas "
+                             "nuevas y World3 de verdad descarta el sobreajuste al azar y al emulador, no al supuesto de acoplamiento.", ORANGE))
+
     # ------------------------------------------------ 6. conclusiones
-    story += section("06", "Conclusiones y recomendaciones", "síntesis")
+    story += section("07", "Conclusiones y recomendaciones", "síntesis")
     rk = sorted(((v["score"], k) for k, v in fx.items() if k != "base"), reverse=True) if fx else []
     story += bullets([
         "<b>La política real es inercial y de poder relativo.</b> Cualquier estrategia que dependa de que los gobiernos maximicen el "
@@ -515,7 +635,7 @@ def build():
         "validar."])
 
     # ------------------------------------------------ 7. limitaciones
-    story += section("07", "Limitaciones y honestidad", "lo que este estudio no dice")
+    story += section("08", "Limitaciones y honestidad", "lo que este estudio no dice")
     story += bullets([
         "<b>Datos no disponibles en este entorno:</b> el calibrado de FaIR (Zenodo) y FAOSTAT estaban bloqueados por la red. El clima del "
         "L1 es la TCRE del Atlas (no FaIR, F4 apagado), no hay sector de alimentos (F5) y el L0 regional de 10 regiones (F6), que necesita "
@@ -528,13 +648,18 @@ def build():
         "lejos de ser óptima para cualquier recompensa de esa familia. Las recompensas por país tienen intervalos amplios (Figura 5).",
         "<b>Bandas del L1 demasiado estrechas</b> (defecto D7 del Atlas: cubren 60-70 % en vez de 80 %). Las diferencias pareadas con "
         "números aleatorios comunes son más fiables que los niveles.",
+        "<b>Aprendizaje por refuerzo:</b> la recompensa de World3 durante el entrenamiento sale de un emulador (R² 0,99-1,00) y las "
+        "puntuaciones de entrenamiento se calculan por miembro, mientras que la evaluación final (la que se compara) usa la mediana de "
+        "32 miembros y World3 de verdad; por eso las dos escalas no coinciden exactamente. Un entrenamiento por algoritmo y semilla: "
+        "las diferencias pequeñas entre agentes no son concluyentes. TD3 y SAC se relanzaron tras un fallo de memoria.",
         "<b>El aprendizaje multiagente</b> es una mejor respuesta aprendida con todos los países foco moviéndose a la vez, no un equilibrio "
         "demostrado; 12 miembros por evaluación.",
         "Las fuentes de los datos del Atlas se descargaron del commit fijado y se verificaron por SHA-256 (con fin de línea normalizado)."])
     story += [P("<b>Reproducir</b>", "h2"),
               P("<font name='DV' size='7.6'>python world4_cli.py --install-atlas --install-wpp --install-energy<br/>"
                 "cd studies/irl_estrategias &amp;&amp; python s1_irl.py &amp;&amp; python s2_strategies.py &amp;&amp; "
-                "python s2b_sensitivity.py &amp;&amp; python s3_learning.py &amp;&amp; python s4_report.py</font>", "small"),
+                "python s2b_sensitivity.py &amp;&amp; python s3_learning.py &amp;&amp; python w3_surrogate.py &amp;&amp; python rl_train.py init "
+                "&amp;&amp; python rl_train.py PPO (SAC, TD3, PETS, MBPO) &amp;&amp; python s4_report.py</font>", "small"),
               P(f"Tiempo de cómputo: IRL {irl['setup']['segundos'] // 60} min; estrategias {d['setup']['segundos'] // 60} min" +
                 (f"; aprendizaje {L['setup']['segundos'] // 60} min." if L else "."), "small")]
     return story
