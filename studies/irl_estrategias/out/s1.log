@@ -1,0 +1,44 @@
+  origen 1960: 7450 desvíos (86s)
+  origen 1970: 14900 desvíos (168s)
+  origen 1980: 23300 desvíos (243s)
+  origen 1990: 31700 desvíos (317s)
+  origen 2000: 40100 desvíos (390s)
+  origen 2005: 48500 desvíos (456s)
+desvíos 48500 456 s
+  USA: racionalidad 0.55 (bienestar 0.52), n=1091
+  CHN: racionalidad 0.68 (bienestar 0.49), n=1072
+  IND: racionalidad 0.64 (bienestar 0.61), n=1072
+  BRA: racionalidad 0.57 (bienestar 0.54), n=1067
+  MEX: racionalidad 0.58 (bienestar 0.52), n=1077
+  DEU: racionalidad 0.55 (bienestar 0.47), n=1095
+  RUS: racionalidad 0.63 (bienestar 0.49), n=722
+  JPN: racionalidad 0.59 (bienestar 0.46), n=1089
+  NGA: racionalidad 0.61 (bienestar 0.56), n=1071
+  ZAF: racionalidad 0.62 (bienestar 0.55), n=1077
+  IDN: racionalidad 0.64 (bienestar 0.50), n=1055
+  SAU: racionalidad 0.60 (bienestar 0.52), n=1076
+  ARG: racionalidad 0.54 (bienestar 0.48), n=1070
+  COL: racionalidad 0.62 (bienestar 0.58), n=1057
+  EGY: racionalidad 0.62 (bienestar 0.50), n=1080
+  KOR: racionalidad 0.63 (bienestar 0.48), n=1099
+  TUR: racionalidad 0.59 (bienestar 0.55), n=1079
+  FRA: racionalidad 0.63 (bienestar 0.45), n=1068
+  GBR: racionalidad 0.57 (bienestar 0.48), n=1079
+  VEN: racionalidad 0.63 (bienestar 0.50), n=1086
+{
+ "theta_unidades": {
+  "bienestar": -0.3382,
+  "poder": 1.0,
+  "elite": -0.1664,
+  "paz": -0.0202,
+  "autonomia": 0.0106,
+  "inercia": 0.0771
+ },
+ "racionalidad": 0.5847402597402598,
+ "alternativas": {
+  "bienestar": 0.5172727272727272,
+  "poder": 0.5014285714285714,
+  "elite": 0.5164935064935064,
+  "aleatoria_media": 0.49902142857142856
+ }
+}
