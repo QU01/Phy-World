@@ -150,6 +150,12 @@ def measure(log=print, with_query: bool = True, with_report: bool = True) -> dic
         check("api.query", asdict(api.query("gdp_pc", "MEX", 2005, 2010, members=8)), False)
         check("mcp.w4_query", tools.call("w4_query", {"variable": "gdp_pc", "region": "MEX", "as_of": 2005,
                                                       "target": 2010, "members": 8}), False)
+    from world4.conflict import service as cg_service
+    from world4.data import conflict_grid as cg_data
+    if cg_data.available() and any(cg_service.models_dir().glob("model_*.json")):
+        log("W11: conflict-grid forecast (F11), with its saved model")
+        last = sorted(cg_service.models_dir().glob("model_*.json"))[-1].stem.split("_")[1]
+        check("api.conflict_grid_forecast", api.conflict_grid_forecast(last, min_p=0.2, samples=40), False)
     html_bad = []
     if with_report:
         log("W11: HTML report")
