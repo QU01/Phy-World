@@ -300,3 +300,22 @@ def loop_dominance(start: int = 2019, years: int = 81, top: int = 3, step: int =
     m = model.L0R(model.calibrate(W, min(start, 2019)), model.initial(W, start))
     out = m.run(years, keep_states=True)
     return loops.dominance_table(loops.analyse(*loops.l0_world_view(m, out)), top=top, step=step)
+
+
+def conflict_grid_forecast(origin=None, *, min_p: float = 0.0, monthly: bool = True, bbox=None, countries=None,
+                           samples: int = 200, seed: int = 0, refit: bool = False) -> dict:
+    """Pronóstico de violencia organizada por celda PRIO-GRID (0,5°) para los 12 meses siguientes a ``origin``
+    ('AAAA-MM'; por omisión el último mes con datos): P(evento) por tipo y mes, eventos y muertes esperados,
+    la parte del riesgo que es fondo estructural o contagio, y agregados por país (``world4.conflict``).
+    Devuelve la carga útil JSON por columnas ``world4.conflict_grid/1`` (``service.payload``). La primera
+    llamada para un origen entrena el modelo (minutos) y lo guarda; las siguientes lo leen."""
+    from world4.conflict import service
+    from world4.data import conflict_grid as cdata
+    if not cdata.available():
+        raise QueryError("conflict-grid data not installed: python world4_cli.py --install-conflict-grid")
+    try:
+        P = service.forecast(origin, samples=samples, seed=seed, refit=refit)
+    except ValueError as exc:
+        raise QueryError(str(exc)) from exc
+    return service.payload(P, min_p=min_p, monthly=monthly, bbox=bbox, countries=countries,
+                           validation=service.validation_headline())

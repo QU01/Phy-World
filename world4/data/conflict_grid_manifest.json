@@ -1,0 +1,91 @@
+{
+ "source": "UCDP GED 26.1 + UCDP Candidate 26.01.26.09 (ucdp.uu.se/downloads, CC BY 4.0); PRIO-GRID 2.0 through grid.prio.org/api",
+ "files": {
+  "ged261-csv.zip": {
+   "sha256": "8c941d84954e555ee2e54f40fa04d9203bf1e2f962203d0a9930966c4947c667",
+   "url": "https://ucdp.uu.se/downloads/ged/ged261-csv.zip"
+  },
+  "GEDEvent_v26_01_26_09.csv": {
+   "sha256": "134da9b3df08b65266802c4b662e572f396c70c92ab62297319be657540bcede",
+   "url": "https://ucdp.uu.se/downloads/candidateged/GEDEvent_v26_01_26_09.csv"
+  }
+ },
+ "priogrid": {
+  "basegrid": {
+   "canonical_sha256": "47a73805e4171d88aa5558e734247872b8656f29ecf50b92d4f3862e192708d0",
+   "api": "https://grid.prio.org/api/data/basegrid",
+   "year": 0
+  },
+  "gwno": {
+   "canonical_sha256": "7328ba9c340e1d072ccfae03107371154e27f5f96f4495186029362639903414",
+   "api": "https://grid.prio.org/api/data/50",
+   "year": 2014
+  },
+  "capdist": {
+   "canonical_sha256": "e0966df1739fd177b0b626c0e84f851ce41dc857b60d3c74e4d5bd9db129c32c",
+   "api": "https://grid.prio.org/api/data/9",
+   "year": 2014
+  },
+  "bdist1": {
+   "canonical_sha256": "60016f82efe26678344dc1fb2da9a5b7bdd62249d22792da56b0f4f6e0b633cf",
+   "api": "https://grid.prio.org/api/data/6",
+   "year": 2014
+  },
+  "pop_gpw_sum": {
+   "canonical_sha256": "edee2d1a371446c4a5b8dbf646ff60a98ca163cb0cb9a9c3d57cf98beafed685",
+   "api": "https://grid.prio.org/api/data/75",
+   "year": 2010
+  },
+  "ttime_mean": {
+   "canonical_sha256": "22b591bf0b106fb9c3788ff4e1be52f09e23c2e001095101a3ee8d67d0176193",
+   "api": "https://grid.prio.org/api/data/88",
+   "year": 0
+  },
+  "mountains_mean": {
+   "canonical_sha256": "a87932f6626024a9c09aeffee661f955c6a3f1b1cd0e98a45ea47f23e275625a",
+   "api": "https://grid.prio.org/api/data/63",
+   "year": 0
+  },
+  "landarea": {
+   "canonical_sha256": "84d046991f108b9618a2ad87c859698dd8177ec9e2fb4946fe938b12d8f5bc96",
+   "api": "https://grid.prio.org/api/data/61",
+   "year": 0
+  },
+  "urban_gc": {
+   "canonical_sha256": "b3c72a9d2b08f3fc6011f8978696a9a38bae6eff2661f3b65a9e88fa23856b0e",
+   "api": "https://grid.prio.org/api/data/91",
+   "year": 0
+  },
+  "imr_mean": {
+   "canonical_sha256": "0837a0698aa555b1387eded909b95d5617fab3b139e6412045dacc471b1aeb32",
+   "api": "https://grid.prio.org/api/data/54",
+   "year": 0
+  },
+  "excluded": {
+   "canonical_sha256": "143c52cf81a279d556e644c67f94dc0125b7c79a655345c56c41a7d7f52f2744",
+   "api": "https://grid.prio.org/api/data/31",
+   "year": 2013
+  },
+  "petroleum_s": {
+   "canonical_sha256": "a047224e08e9f05a7ffadc8b8c80da07e038724d4bb071e561478830b54c28dc",
+   "api": "https://grid.prio.org/api/data/70",
+   "year": 0
+  },
+  "diamsec_s": {
+   "canonical_sha256": "88fad479137037ef70914ae5046c851fe096148f6610f4722c947de2379237f2",
+   "api": "https://grid.prio.org/api/data/14",
+   "year": 0
+  },
+  "goldplacer_s": {
+   "canonical_sha256": "d8e9bd312ab928214e631b4a57829b832aab393a290b2f61b9998bdece0e42de",
+   "api": "https://grid.prio.org/api/data/40",
+   "year": 0
+  },
+  "gem_s": {
+   "canonical_sha256": "a57d8bea97feb1faf093f1a9f4cf385a670fbe33a9c07054cf5f106ff00f4ed7",
+   "api": "https://grid.prio.org/api/data/37",
+   "year": 0
+  }
+ },
+ "downloaded": "2026-10-29"
+}

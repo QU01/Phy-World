@@ -395,6 +395,42 @@
     "food (F5) water"
    ],
    "note": "Agricultural freshwater withdrawals; sparse (AQUASTAT reports every ~5 years). Not vendored."
+  },
+  "ucdp_ged": {
+   "name": "UCDP Georeferenced Event Dataset (GED) 26.1",
+   "license": "CC BY 4.0",
+   "mark": "[V]",
+   "redistributable": true,
+   "vintage": "26.1 (2026-03-30), events 1989-2025",
+   "lag_years": 1,
+   "used_in": [
+    "conflict grid (F11)"
+   ],
+   "note": "Licence read on ucdp.uu.se/downloads in the F11 session. Installed with --install-conflict-grid and checked against conflict_grid_manifest.json (SHA-256 of ged261-csv.zip). Not vendored."
+  },
+  "ucdp_candidate": {
+   "name": "UCDP Candidate Events Dataset 26.01.26.09",
+   "license": "CC BY 4.0",
+   "mark": "[V]",
+   "redistributable": true,
+   "vintage": "January-September 2026, monthly releases",
+   "lag_years": 0,
+   "used_in": [
+    "conflict grid (F11)"
+   ],
+   "note": "Monthly release with at most one month of lag (UCDP). Preliminary: about a third of the 2026 events carry a 'Check ...' code_status. Used for the months after GED 26.1 and as the 2026 truth of the F11 validation."
+  },
+  "priogrid": {
+   "name": "PRIO-GRID 2.0 (Tollefsen, Strand & Buhaug 2012)",
+   "license": null,
+   "mark": "[?]",
+   "redistributable": null,
+   "vintage": "2.0 (codebook 2016-06-02) through grid.prio.org/api; variables at their last year (2010-2014)",
+   "lag_years": 2,
+   "used_in": [
+    "conflict grid (F11)"
+   ],
+   "note": "Freely available with citation (codebook); no licence text found, so World4 treats it as not redistributable. The API JSON has no guaranteed order: conflict_grid_manifest.json pins the SHA-256 of each sorted (gid, value) table."
   }
  },
  "reference_models": {

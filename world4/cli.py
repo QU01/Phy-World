@@ -3,7 +3,7 @@
 Family pattern (Phy-HX / Phy-CT): flat flags, no sub-commands; cli_style transplanted; every
 degradation announced and recorded; exit codes 0 ok, 2 spec error, 3 infeasible, 4 --strict with
 degradations. F0 offers: --info, --campaign, --install-atlas, --l0 and --query; F0.5 adds
---build-store and --structural; F1 adds --install-wpp and --validate (W3/W4/W5 runs); F3 adds --install-energy; F4 adds --install-climate; F5 adds --install-food. The wizard (no arguments)
+--build-store and --structural; F1 adds --install-wpp and --validate (W3/W4/W5 runs); F3 adds --install-energy; F4 adds --install-climate; F5 adds --install-food; F11 adds --install-conflict-grid, --conflict-grid and --validate-conflict-grid. The wizard (no arguments)
 arrives in F9: with no mode, a terminal gets the wizard and a pipe gets --info. F9 adds --help-numbers,
 --fidelity, --report, --dashboard and --mcp, and WALLS / TIGHT / THE LAST BLOCKER when a policy is infeasible.
 """
@@ -32,7 +32,8 @@ def _data_errors() -> tuple:
     from world4.structural.store import StoreMissing
     out = [AtlasDataError, PosteriorMissing, StoreMissing, FileNotFoundError]
     for mod, name in (("world4.data.wpp", "WPPDataError"), ("world4.data.energy", "EnergyDataError"),
-                      ("world4.data.climate", "ClimateDataError"), ("world4.data.food", "FoodDataError")):
+                      ("world4.data.climate", "ClimateDataError"), ("world4.data.food", "FoodDataError"),
+                      ("world4.data.conflict_grid", "ConflictGridDataError")):
         try:
             out.append(getattr(__import__(mod, fromlist=[name]), name))
         except (ImportError, AttributeError):
@@ -64,6 +65,13 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--install-food", action="store_true",
                    help="F5: download FAOSTAT (crops, land use, fertilisers, N budget, emissions, food balances) and "
                         "WDI water withdrawals (SHA-256 checked)")
+    m.add_argument("--install-conflict-grid", action="store_true",
+                   help="F11: UCDP GED 26.1 + UCDP Candidate events and PRIO-GRID 2.0 cells (SHA-256 checked)")
+    m.add_argument("--conflict-grid", metavar="JSON", nargs="?", const="",
+                   help="F11: forecast of organized violence per PRIO-GRID cell, next 12 months (JSON payload to "
+                        "runs/conflict_grid/forecast_<origin>.json or JSON)")
+    m.add_argument("--validate-conflict-grid", metavar="JSON", nargs="?", const="",
+                   help="F11: rolling-origin validation 2019-2025 against the ViEWS benchmarks (~1 h)")
     m.add_argument("--validate", "--validate-f1", dest="validate", action="store_true",
                    help="F1-F5: rolling-origin W3/W5 (Atlas, F1 ... F1-F5) + free hindcasts of population, psi, "
                         "the energy mix, CO2, GMST, cereals and cropland + AR6 carbon-budget check")
@@ -97,6 +105,9 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("--as-of", type=int, default=None, help="origin year for --query (1970-2018)")
     n.add_argument("--target", type=int, default=None, help="target year for --query (1-10 years ahead)")
     n.add_argument("--members", type=int, default=32, help="ensemble members for --query")
+    n.add_argument("--origin", default=None, help="F11: forecast origin AAAA-MM for --conflict-grid (last data month)")
+    n.add_argument("--min-p", type=float, default=0.01,
+                   help="F11: --conflict-grid keeps cells with P(any event in 12 months) >= this (0 = all cells)")
     n.add_argument("--atlas-src", default=None, help="local Atlas clone for --install-atlas (else git clone)")
     o = p.add_argument_group("output")
     o.add_argument("--json", action="store_true", help="print the result as JSON and nothing else")
@@ -319,6 +330,78 @@ def run_install_food(a) -> int:
     else:
         ui.kv("result", ui.status(v["ok"], "OK", "MISMATCH"), "", v["npz"])
     return EXIT_OK if v["ok"] else EXIT_SPEC
+
+
+def run_install_conflict_grid(a) -> int:
+    from world4.data import conflict_grid
+    log = (lambda *x: None) if a.json else (lambda m: ui.step(m))
+    if not a.json:
+        print(ui.banner())
+        ui.step("UCDP GED 26.1 + UCDP Candidate 2026 (CC BY 4.0) and PRIO-GRID 2.0 cells and covariates")
+    v = conflict_grid.install(log=log)
+    if a.json:
+        print(json.dumps(v, indent=1))
+    else:
+        ui.kv("result", ui.status(v["ok"], "OK", "MISMATCH"), "", v["npz"])
+    return EXIT_OK if v["ok"] else EXIT_SPEC
+
+
+def run_conflict_grid(a) -> int:
+    from world4 import api
+    from world4.data import conflict_grid as cdata
+    if not cdata.available():
+        raise cdata.ConflictGridDataError("conflict-grid data not installed: python world4_cli.py --install-conflict-grid")
+    if not a.json:
+        print(ui.banner())
+        ui.step("forecast of organized violence per PRIO-GRID cell (logistic hurdle + spatio-temporal Hawkes)")
+    try:
+        out = api.conflict_grid_forecast(a.origin, min_p=a.min_p)
+    except api.QueryError as exc:
+        raise SpecError(str(exc)) from exc
+    path = Path(a.conflict_grid) if a.conflict_grid else home.runs() / "conflict_grid" / f"forecast_{out['origin']}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+    if a.json:
+        print(json.dumps({k: out[k] for k in ("schema", "origin", "months", "summary")} | {"file": str(path)}, indent=1))
+        return EXIT_OK
+    c = out["cells"]
+    ui.kv("origin", out["origin"], "", f"{out['months'][0]} .. {out['months'][-1]}")
+    ui.kv("cells", str(out["summary"]["cells_returned"]), "", f"with P(any event) >= {a.min_p}")
+    e = out["summary"]["expected_events_window"]
+    ui.kv("events expected", f"sb {e['sb']:.0f}  ns {e['ns']:.0f}  os {e['os']:.0f}", "events", "whole world")
+    print()
+    print("  " + ui.dim("highest-risk cells: P(any event in 12 months), driver shares of next month's intensity"))
+    for i in range(min(10, len(c["gid"]))):
+        print(f"    gid {c['gid'][i]:>6}  ({c['lat'][i]:6.2f}, {c['lon'][i]:7.2f})  GW {c['country_gw'][i]:>3}  "
+              f"P {c['p_window_any'][i]:.2f}  sb-deaths {c['deaths_sb_expected'][i]:7.1f}  "
+              f"background {c['driver_background'][i]:.2f} own {c['driver_own'][i]:.2f} "
+              f"neighbours {c['driver_neighbours'][i]:.2f} country {c['driver_country'][i]:.2f}")
+    print()
+    ui.kv("written", str(path))
+    return EXIT_OK
+
+
+def run_validate_conflict_grid(a) -> int:
+    import warnings
+    warnings.simplefilter("ignore")
+    from world4.conflict import validate
+    log = (lambda *x: None) if a.json else (lambda m: print("  " + m, flush=True))
+    if not a.json:
+        print(ui.banner())
+        ui.step("F11 rolling-origin validation: origins " + ", ".join(validate.ORIGINS))
+    r = validate.run(log=log)
+    path = Path(a.validate_conflict_grid) if a.validate_conflict_grid else \
+        home.runs() / "conflict_grid" / "validacion.json"
+    validate.save(r, path)
+    if a.json:
+        print(json.dumps(r["summary"], indent=1))
+    else:
+        for o in ("sb", "any"):
+            for m, v in r["summary"][o]["all"].items():
+                x = v["all_h"]
+                ui.kv(f"{o} {m}", f"Brier {x['brier']:.5f}  AUPR {x['aupr']:.3f}  AUROC {x['auroc']:.3f}")
+        ui.kv("written", str(path))
+    return EXIT_OK
 
 
 def run_validate(a) -> int:
@@ -747,6 +830,12 @@ def main(argv=None) -> int:
             code = run_install_climate(a)
         elif a.install_food:
             code = run_install_food(a)
+        elif a.install_conflict_grid:
+            code = run_install_conflict_grid(a)
+        elif a.conflict_grid is not None:
+            code = run_conflict_grid(a)
+        elif a.validate_conflict_grid is not None:
+            code = run_validate_conflict_grid(a)
         elif a.validate:
             code = run_validate(a)
         elif a.build_store:
@@ -787,7 +876,7 @@ def main(argv=None) -> int:
     except DATA_ERRORS as exc:
         ui.err(f"missing data or model file: {exc}")
         print("  " + ui.dim("install it first: --install-atlas, --install-wpp, --install-energy, --install-climate, "
-                            "--install-food (the message above names which); W4_HOME says where it goes"))
+                            "--install-food, --install-conflict-grid (the message above names which); W4_HOME says where it goes"))
         return EXIT_SPEC
     if a.strict and ui.strict_verdict():
         if not a.json:

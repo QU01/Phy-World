@@ -34,7 +34,15 @@ as an alternative conduct ("what countries would do" vs "what would suit them").
 Phase **F9** makes it a standalone product: `pip install` gives a `world4` command; a wizard when the command
 line says nothing, `--help-numbers`, `--fidelity`, WALLS / TIGHT / THE LAST BLOCKER when the limits cannot be met;
 a self-contained HTML report (`--report`), the Atlas globe with World4 layers (`--dashboard`), an MCP server
-(`--mcp`), and honesty measured as a criterion (W11). The science is in
+(`--mcp`), and honesty measured as a criterion (W11).
+Phase **F11** adds conflict and event prediction on discrete map cells: every PRIO-GRID cell (0.5°, ~55 km,
+64 818 land cells) gets, for each of the next 12 months, the probability of state-based, non-state and one-sided
+violence (UCDP GED 26.1 + UCDP Candidate 2026), the expected events and state-based deaths, and the share of its
+risk that is structural background or contagion from its own past, its neighbours and its country. Two models are
+averaged: a direct logistic hurdle per horizon (as in ViEWS) and a discrete-time spatio-temporal Hawkes process
+fitted by EM and simulated forward; both are backtested against the ViEWS 2023/24 benchmarks
+([docs/F11-informe.md](docs/F11-informe.md)). `api.conflict_grid_forecast()` returns a column-oriented JSON
+payload meant for the coming React interface. The science is in
 [docs/Quasar_World4_Science.md](docs/Quasar_World4_Science.md).
 
 | Layer | What it is in F0 | Pinned against | Result |
@@ -53,6 +61,7 @@ behaviour modes of the 2004 model.
 pip install .                                                # from a checkout (the repo is not published yet)
 world4 --info                                                # the CLI; data go to $W4_HOME (default ~/.world4)
 world4 --install-atlas --install-wpp --install-energy --install-climate --install-food
+world4 --install-conflict-grid                               # F11: UCDP GED + Candidate, PRIO-GRID (no Atlas needed)
 ```
 
 From a checkout everything lives next to the code (`data_cache/`, `runs/`), as below.
@@ -95,6 +104,9 @@ python world4_cli.py --levers               # F8: policy levers and narratives
 python world4_cli.py --theta "carbon_price=150,efficiency=0.01" --narrative ssp2   # one policy, robust objectives, PRIM
 python world4_cli.py --design               # F8: robust search, PRIM, regret, conduct (~10 min)
 python world4_cli.py --calibrate            # F7: posterior (models/posterior.npz), calibrated W4 hindcast, W8 (~1 h)
+python world4_cli.py --conflict-grid        # F11: violence forecast per PRIO-GRID cell, next 12 months (JSON payload)
+python world4_cli.py --conflict-grid out.json --origin 2025-12 --min-p 0   # any origin, all cells
+python world4_cli.py --validate-conflict-grid   # F11: rolling origins 2019-2025 vs the ViEWS benchmarks
 python world4_cli.py --validate             # W3/W5 rolling origin + hindcasts (population, psi, energy, CO2, GMST, cereals, cropland) + AR6 check (~50 min)
 ```
 
@@ -104,6 +116,7 @@ Exit codes: 0 ok, 2 spec error, 3 infeasible (for `--theta`: a declared limit is
 from world4 import api
 api.query("conflict_hazard", "COL", 2000, 2005)   # Distribution with p10/p50/p90, unit, caveats
 api.run_l0(scenario=1)
+api.conflict_grid_forecast(min_p=0.05)            # F11: cells, months, P(event), deaths, drivers, countries
 ```
 
 ## Tests
