@@ -91,6 +91,8 @@ def build_parser() -> argparse.ArgumentParser:
                         "includes the policy and its vulnerabilities")
     m.add_argument("--dashboard", metavar="DIR", nargs="?", const="",
                    help="F9: the Atlas globe with World4 layers (one HTML file, globe.gl from its CDN)")
+    m.add_argument("--serve", metavar="PORT", nargs="?", const=8765, type=int,
+                   help="F12: the React interface and its JSON API on http://127.0.0.1:PORT (default 8765)")
     m.add_argument("--mcp", action="store_true", help="F9: run the MCP server on stdio (JSON-RPC 2.0)")
     m.add_argument("--structural", metavar="REQUEST_JSON",
                    help="F0.5: answer one Prime Radiant request (a JSON file, or - for stdin) as JSON")
@@ -820,6 +822,10 @@ def main(argv=None) -> int:
         if a.mcp:
             from world4.mcp import server
             return server.serve()
+        if a.serve is not None:
+            from world4 import server as ui_server
+            ui_server.serve(a.serve)
+            return EXIT_OK
         if a.install_atlas:
             code = run_install(a)
         elif a.install_wpp:

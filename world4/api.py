@@ -152,6 +152,35 @@ def query(variable: str, region: str, as_of, target, *, members: int = 32, seed:
     if not (1 <= h <= VALIDATED_HORIZON_YEARS) or t_tgt > L1_LAST_YEAR:
         raise QueryError(f"target {t_tgt}: the F0 L1 forecasts 1-{VALIDATED_HORIZON_YEARS} years ahead, not past "
                          f"{L1_LAST_YEAR}")
+    ens_all, meta = _l1_ensemble(variable, region, t_asof, members, seed)
+    ens = ens_all[:, h]
+    ens = ens[np.isfinite(ens)]
+    if ens.size == 0:
+        raise QueryError(f"the L1 produced no finite values for {variable} in {region} {t_tgt}")
+    unit, src, with_f4, with_f5, cut = meta["unit"], meta["src"], meta["with_f4"], meta["with_f5"], meta["cut"]
+    from world4.data import atlas
+    t0 = t_asof - 1950
+    p10, p50, p90 = (float(np.percentile(ens, q)) for q in (10, 50, 90))
+    caveats = list(L1_CAVEATS)
+    if with_f4 and not with_f5:
+        caveats.append("F5 food data not installed: footprint and biocapacity frozen at the origin (Atlas D4) "
+                       "(python world4_cli.py --install-food)")
+    if not with_f4:
+        caveats.append("F4 climate data not installed: GMST follows the Atlas TCRE (python world4_cli.py "
+                       "--install-climate)")
+    return Distribution(variable, unit, region, t_asof, t_tgt, p10, p50, p90, float(ens.mean()), int(ens.size),
+                        "L1", calibrated=False, exploratory=False, caveats=caveats,
+                        provenance={"model_revision": MODEL_REVISION, "atlas_commit": atlas.ATLAS_COMMIT,
+                                    "params_cutoff": cut, "seed": t0 if seed is None else seed,
+                                    "resolution_source": src, "population": "endogenous (F1)", "psi": "world markets (F2)", "energy": "endogenous mix with EROI (F3)",
+                                    "climate": ("FaIR v2.2.4, calibration 1.6.0 (F4)" if with_f4 else "Atlas TCRE"),
+                                    "food": ("endogenous food, land, N and water (F5)" if with_f5 else "none"),
+                                    "wpp_edition": "2024-07-11"})
+
+
+def _l1_ensemble(variable: str, region: str, t_asof: int, members: int, seed) -> tuple[np.ndarray, dict]:
+    """El ensemble del L1 desde ``t_asof`` (miembros x horizontes 0..), ya transformado, y lo que lo describe.
+    Es el camino de ``query``; ``query_path`` lo reutiliza para todos los horizontes de una vez."""
     import warnings
 
     from world4.data import atlas
@@ -183,33 +212,43 @@ def query(variable: str, region: str, as_of, target, *, members: int = 32, seed:
     if out_key in WORLD_KEYS:
         if region not in ("WLD", "world"):
             raise QueryError(f"{variable} is a world variable: region='WLD'")
-        ens = f[out_key][:, h]
+        ens = np.asarray(f[out_key], float)
     else:
         iso = list(W.iso3)
         if region not in iso:
             raise QueryError(f"region {region!r} is not in the L1 (180 ISO3)")
-        ens = f[out_key][:, iso.index(region), h]
+        ens = np.asarray(f[out_key], float)[:, iso.index(region)]
     if transform is not None:
         ens = transform(ens)
-    ens = ens[np.isfinite(ens)]
-    if ens.size == 0:
-        raise QueryError(f"the L1 produced no finite values for {variable} in {region} {t_tgt}")
-    p10, p50, p90 = (float(np.percentile(ens, q)) for q in (10, 50, 90))
-    caveats = list(L1_CAVEATS)
-    if with_f4 and not with_f5:
-        caveats.append("F5 food data not installed: footprint and biocapacity frozen at the origin (Atlas D4) "
-                       "(python world4_cli.py --install-food)")
-    if not with_f4:
-        caveats.append("F4 climate data not installed: GMST follows the Atlas TCRE (python world4_cli.py "
-                       "--install-climate)")
-    return Distribution(variable, unit, region, t_asof, t_tgt, p10, p50, p90, float(ens.mean()), int(ens.size),
-                        "L1", calibrated=False, exploratory=False, caveats=caveats,
-                        provenance={"model_revision": MODEL_REVISION, "atlas_commit": atlas.ATLAS_COMMIT,
-                                    "params_cutoff": cut, "seed": t0 if seed is None else seed,
-                                    "resolution_source": src, "population": "endogenous (F1)", "psi": "world markets (F2)", "energy": "endogenous mix with EROI (F3)",
-                                    "climate": ("FaIR v2.2.4, calibration 1.6.0 (F4)" if with_f4 else "Atlas TCRE"),
-                                    "food": ("endogenous food, land, N and water (F5)" if with_f5 else "none"),
-                                    "wpp_edition": "2024-07-11"})
+    return ens, {"unit": unit, "src": src, "with_f4": with_f4, "with_f5": with_f5, "cut": cut}
+
+
+def query_path(variable: str, region: str, as_of, horizon: int = VALIDATED_HORIZON_YEARS, *, members: int = 32,
+               seed: int | None = None) -> dict:
+    """La trayectoria de ``query``: p10/p50/p90 para cada año de ``as_of`` + 1 a ``as_of`` + ``horizon`` con UNA
+    corrida del ensemble (los mismos miembros que ``query`` con la misma semilla)."""
+    if variable not in _L1_VARS:
+        raise QueryError(f"unknown variable: {variable}. See catalog().")
+    t_asof = _year(as_of)
+    if not (L1_FIRST_ORIGIN <= t_asof < L1_LAST_YEAR):
+        raise QueryError(f"as_of {t_asof} outside [{L1_FIRST_ORIGIN}, {L1_LAST_YEAR - 1}]")
+    horizon = int(min(horizon, VALIDATED_HORIZON_YEARS, L1_LAST_YEAR - t_asof))
+    ens, meta = _l1_ensemble(variable, region, t_asof, members, seed)
+    years, p10, p50, p90 = [], [], [], []
+    for h in range(0, horizon + 1):
+        e = ens[:, h]
+        e = e[np.isfinite(e)]
+        if e.size == 0:
+            continue
+        years.append(t_asof + h)
+        q = np.percentile(e, [10, 50, 90])
+        p10.append(float(q[0])), p50.append(float(q[1])), p90.append(float(q[2]))
+    return {"variable": variable, "region": region, "as_of": t_asof, "unit": meta["unit"], "years": years,
+            "p10": p10, "p50": p50, "p90": p90, "members": int(members), "fidelity": "L1", "calibrated": False,
+            "exploratory": False, "resolution_source": meta["src"], "params_cutoff": meta["cut"],
+            "band": "p10-p90 of the raw L1 ensemble (too narrow: D7)",
+            "caveats": list(L1_CAVEATS) + ([] if meta["with_f4"] else
+                                           ["F4 climate data not installed: GMST follows the Atlas TCRE"])}
 
 
 def run_l0r(start: int = 2019, years: int = 81, *, posterior: bool = False, explore: bool = False,

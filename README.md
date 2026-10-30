@@ -42,7 +42,10 @@ risk that is structural background or contagion from its own past, its neighbour
 averaged: a direct logistic hurdle per horizon (as in ViEWS) and a discrete-time spatio-temporal Hawkes process
 fitted by EM and simulated forward; both are backtested against the ViEWS 2023/24 benchmarks
 ([docs/F11-informe.md](docs/F11-informe.md)). `api.conflict_grid_forecast()` returns a column-oriented JSON
-payload meant for the coming React interface. The science is in
+payload meant for the coming React interface.
+Phase **F12** adds that interface: `world4_cli.py --serve` serves a React app (`ui/`, built with `npm run build`) and
+a JSON API over the whole system: the conflict map per cell, World3 <-> society, the ten World3 scenarios, the L1
+fan per country, policies and regions, and the data and licences ([ui/README.md](ui/README.md)). The science is in
 [docs/Quasar_World4_Science.md](docs/Quasar_World4_Science.md).
 
 | Layer | What it is in F0 | Pinned against | Result |
@@ -107,6 +110,7 @@ python world4_cli.py --calibrate            # F7: posterior (models/posterior.np
 python world4_cli.py --conflict-grid        # F11: violence forecast per PRIO-GRID cell, next 12 months (JSON payload)
 python world4_cli.py --conflict-grid out.json --origin 2025-12 --min-p 0   # any origin, all cells
 python world4_cli.py --validate-conflict-grid   # F11: rolling origins 2019-2025 vs the ViEWS benchmarks
+python world4_cli.py --serve                # F12: the React interface on http://127.0.0.1:8765/ (cd ui && npm install && npm run build first)
 python world4_cli.py --validate             # W3/W5 rolling origin + hindcasts (population, psi, energy, CO2, GMST, cereals, cropland) + AR6 check (~50 min)
 ```
 
