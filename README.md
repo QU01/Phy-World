@@ -44,7 +44,7 @@ fitted by EM and simulated forward; both are backtested against the ViEWS 2023/2
 ([docs/F11-informe.md](docs/F11-informe.md)). `api.conflict_grid_forecast()` returns a column-oriented JSON
 payload meant for the coming React interface.
 Phase **F12** adds that interface: `world4_cli.py --serve` serves a React app (`ui/`, built with `npm run build`) and
-a JSON API over the whole system: the conflict map per cell, World3 <-> society, the ten World3 scenarios, the L1
+a JSON API over the whole system: the conflict map per cell, World3 <-> society, the World3 scenarios, the L1
 fan per country, policies and regions, and the data and licences ([ui/README.md](ui/README.md)). The science is in
 [docs/Quasar_World4_Science.md](docs/Quasar_World4_Science.md).
 

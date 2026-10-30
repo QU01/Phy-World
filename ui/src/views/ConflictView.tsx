@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { getJSON, type ConflictCell, type ConflictMeta, type ConflictPayload, type ConflictValidation, type Outcome } from "../lib/api";
+import { getJSON, SNAPSHOT, type ConflictCell, type ConflictMeta, type ConflictPayload, type ConflictValidation, type Outcome } from "../lib/api";
 import { useApi } from "../lib/useApi";
 import { Card, ErrorNotice, Field, Legend, Loading, Seg, Stat } from "../components/common";
 import { CellMap, type CellLayer } from "../components/CellMap";
@@ -112,6 +112,7 @@ export function ConflictView({ theme }: { theme: string }) {
 }
 
 function originOptions(m: ConflictMeta): string[] {
+  if (SNAPSHOT) return [m.last_month];
   // los orígenes guardados y diciembre de cada año desde 2015, más el último mes
   const out = new Set<string>(m.saved_origins);
   const last = +m.last_month.slice(0, 4);

@@ -10,7 +10,7 @@ Rutas (todas GET salvo ``/api/policy``):
 
     /api/status                         datos instalados y qué vistas pueden correr
     /api/sources                        registro de fuentes (W12)
-    /api/l0?scenario=1                  World3-03, escenarios 1-10 del libro de 2004
+    /api/l0?scenario=1                  World3-03, escenarios 1-5 del libro de 2004
     /api/social?scenario=1&n=40&feedback=1&seed=1     World3 <-> sociedad de 180 países (bandas + mapa)
     /api/catalog                        variables del L1
     /api/l1?variable=&region=&as_of=&horizon=&members=   trayectoria p10/p50/p90 del L1
@@ -120,9 +120,7 @@ L0_SERIES = {
 L0_SCENARIOS = {
     1: "Negocios como de costumbre (Limits to Growth, 30-Year Update)", 2: "Más recursos no renovables",
     3: "+ control de la contaminación", 4: "+ rendimiento de la tierra", 5: "+ protección contra la erosión",
-    6: "+ eficiencia en el uso de recursos", 7: "Familias de 2 hijos desde 2002", 8: "+ producción industrial estable",
-    9: "Desarrollo sostenible desde 2002", 10: "Desarrollo sostenible desde 1982",
-}
+}   # los que define world4.core.l0.SCENARIOS (1-5 del libro de 2004)
 
 
 def l0(scenario: int = 1) -> dict:

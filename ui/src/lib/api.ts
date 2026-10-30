@@ -1,4 +1,29 @@
 // Cliente de la API de `python world4_cli.py --serve` (world4/server.py).
+//
+// Modo instantánea (``VITE_SNAPSHOT=1`` al compilar): en vez de la API lee ``data/<clave>.json`` publicados junto
+// a la página (``ui/scripts/snapshot.py`` los escribe con la misma clave); lo que no está precalculado responde
+// que necesita el servidor en vivo.
+
+export const SNAPSHOT = import.meta.env.VITE_SNAPSHOT === "1";
+const LIVE_REMEDY = "python world4_cli.py --serve";
+
+/** Clave de archivo de una petición: ruta sin /api/, parámetros ordenados (igual que snapshot.py). */
+export function snapshotKey(path: string, params: Record<string, string>): string {
+  const base = path.replace(/^\/api\//, "").replace(/\//g, "_");
+  const qs = Object.keys(params).sort().map((k) => `${k}-${params[k]}`).join("_");
+  return (qs ? `${base}__${qs}` : base).replace(/[^A-Za-z0-9_.-]/g, "-");
+}
+
+async function fromSnapshot<T>(path: string, params: Record<string, string>, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(`data/${snapshotKey(path, params)}.json`, { signal });
+  if (!res.ok) {
+    throw new ApiError(503, "Esta consulta no está en la instantánea: esta página muestra resultados ya calculados y " +
+                       "para calcular otros hace falta el servidor de World4 en vivo.", LIVE_REMEDY);
+  }
+  const body = (await res.json()) as { __status?: number; error?: string; remedy?: string };
+  if (body && typeof body === "object" && body.__status) throw new ApiError(body.__status, body.error ?? "", body.remedy);
+  return body as T;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -28,9 +53,14 @@ async function handle<T>(res: Response): Promise<T> {
 export async function getJSON<T>(path: string, params?: Record<string, string | number | boolean | undefined>,
                                  signal?: AbortSignal): Promise<T> {
   const q = new URLSearchParams();
+  const flat: Record<string, string> = {};
   for (const [k, v] of Object.entries(params ?? {})) {
-    if (v !== undefined && v !== "") q.set(k, typeof v === "boolean" ? (v ? "1" : "0") : String(v));
+    if (v !== undefined && v !== "") {
+      flat[k] = typeof v === "boolean" ? (v ? "1" : "0") : String(v);
+      q.set(k, flat[k]);
+    }
   }
+  if (SNAPSHOT) return fromSnapshot<T>(path, flat, signal);
   const url = q.toString() ? `${path}?${q}` : path;
   let res: Response;
   try {
@@ -44,6 +74,9 @@ export async function getJSON<T>(path: string, params?: Record<string, string | 
 }
 
 export async function postJSON<T>(path: string, body: unknown): Promise<T> {
+  if (SNAPSHOT) {
+    throw new ApiError(503, "Evaluar una política se calcula en vivo: esta página es una instantánea.", LIVE_REMEDY);
+  }
   const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify(body) });
   return handle<T>(res);

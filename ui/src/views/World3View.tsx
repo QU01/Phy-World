@@ -19,8 +19,8 @@ export function World3View() {
       <div className="viewhead">
         <h2>World3-03 (L0)</h2>
         <p>
-          El núcleo biofísico: World3-03 reimplementado en NumPy y anclado a Vensim (error máximo 6,9e-6). Los diez
-          escenarios de <i>Limits to Growth: The 30-Year Update</i>. Son modos de comportamiento del modelo de 2004, no
+          El núcleo biofísico: World3-03 reimplementado en NumPy y anclado a Vensim (error máximo 6,9e-6). Los
+          escenarios 1-5 de <i>Limits to Growth: The 30-Year Update</i>. Son modos de comportamiento del modelo de 2004, no
           pronósticos.
         </p>
       </div>
