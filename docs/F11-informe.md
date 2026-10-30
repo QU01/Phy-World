@@ -6,7 +6,7 @@
   - los eventos y las muertes estatales esperados (con p50 y p90 mensuales);
   - la parte de su riesgo que es fondo estructural o contagio (de su propio pasado, de sus vecinas, de su país).
 - **Datos:** UCDP GED 26.1 (1989-2025) + UCDP Candidate 26.01.26.09 (enero-septiembre de 2026) + PRIO-GRID 2.0. `--install-conflict-grid`, SHA-256 en `world4/data/conflict_grid_manifest.json`. No necesita el Atlas.
-- **Validación:** `world4_cli.py --validate-conflict-grid` (7 orígenes, 2019-12 … 2025-12; ~1 h). Resultados en `reports/conflicto_celdas/validacion.json`; tablas con `reports/conflicto_celdas/tablas.py`.
+- **Validación:** `world4_cli.py --validate-conflict-grid` (7 orígenes, 2019-12 … 2025-12; ~1 h). **En la media de los 7 orígenes, la combinación bate a todos los benchmarks del reto ViEWS 2023/24 en cada tipo y métrica** (origen por origen hay 4 excepciones, §4): AUPR 0,466 frente a 0,418 (cell12) y 0,358 (neighbors12); CRPS de muertes estatales en África y Oriente Medio 0,237 frente a 0,250 (neighbors12) y 0,261 (cero). En 2026, contra eventos candidatos que no existían al descargar los datos de entrenamiento: AUPR 0,480 frente a 0,407. Resultados en `reports/conflicto_celdas/validacion.json`; tablas con `reports/conflicto_celdas/tablas.py`.
 - **Pruebas:** `tests/test_f11_conflict_grid.py`, 8 nuevas (mundo sintético + datos instalados).
 - **Interfaz:** `api.conflict_grid_forecast()` y `world4_cli.py --conflict-grid` devuelven la carga útil `world4.conflict_grid/1` (JSON por columnas), pensada para la interfaz en React que viene después.
 
@@ -66,7 +66,120 @@ donde Sᵤₖ = Σ_{s≤t} bₖ (1 − bₖ)^{t−s} yᵤ(s) es el estado de un 
 
 Origen T = diciembre de 2019 … 2025; se entrena con datos ≤ T y se pronostican los 12 meses siguientes (9 para T = 2025-12: la verdad de 2026 son los eventos candidatos hasta septiembre). Las métricas son medias sobre los meses de origen (7 × 12 − 3 = 81), con 64 818 celdas por mes.
 
-RESULTADOS
+**En una línea:** en la media de los orígenes, la combinación supera a todos los modelos de referencia del reto ViEWS en los tres tipos de violencia y en todas las métricas: Brier, log-loss, AUROC y AUPR para la probabilidad de evento; CRPS para las muertes. También en 2026, contra eventos que no existían cuando se descargaron los datos de entrenamiento. Origen por origen (mundo) pierde en 4 comparaciones, siempre por poco:
+
+- el Brier frente a *cell12* en 2019-12 (`ns` y `any`) y en 2020-12 (`ns`);
+- el CRPS de muertes frente al cero en 2021-12 (0,1113 frente a 0,1102).
+
+La AUPR gana en todos los orígenes. Donde menos aporta es en los estallidos en celdas sin historia.
+
+### 4.1 Probabilidad de al menos un evento (cualquier tipo), mundo, h = 1…12
+
+| Modelo | Brier | Log-loss | AUROC | AUPR | Eventos esperados / observados |
+|---|---|---|---|---|---|
+| **Combinación** | **0,00548** | **0,02145** | **0,979** | **0,466** | 38 491 / 41 396 |
+| Logística | 0,00549 | 0,02157 | 0,979 | 0,466 | 38 265 / 41 396 |
+| Hawkes | 0,00560 | 0,02205 | 0,977 | 0,446 | 41 475 / 41 396 |
+| ViEWS neighbors12 | 0,00604 | 0,02763 | 0,947 | 0,358 | 38 003 / 41 396 |
+| cell12 | 0,00563 | 0,03830 | 0,881 | 0,418 | 38 758 / 41 396 |
+| Frecuencia histórica | 0,00688 | 0,03225 | 0,942 | 0,230 | 20 655 / 41 396 |
+| Persistencia | 0,00896 | 0,12382 | 0,685 | 0,165 | 36 405 / 41 396 |
+
+Con la tasa base de ~0,6 % de celda-mes con eventos, el AUROC sale alto para casi todos. La AUPR es la que separa: **0,466 frente a 0,418** del mejor benchmark (+11 %) y **0,358** de *neighbors12* (+30 %).
+
+### 4.2 Por tipo de violencia (AUPR, mundo, h = 1…12)
+
+| Tipo | Combinación | Logística | Hawkes | ViEWS neighbors12 | cell12 |
+|---|---|---|---|---|---|
+| Estatal (`sb`) | **0,451** | 0,448 | 0,433 | 0,361 | 0,401 |
+| No estatal (`ns`) | **0,410** | 0,402 | 0,388 | 0,239 | 0,345 |
+| Unilateral (`os`) | **0,259** | 0,257 | 0,235 | 0,185 | 0,201 |
+
+La violencia contra civiles es la más difícil: es más esporádica y la autoexcitación es menor (0,9 frente a 0,97-1,0).
+
+### 4.3 Por origen (AUPR, cualquier evento, mundo)
+
+| Origen | Combinación | ViEWS neighbors12 | cell12 |
+|---|---|---|---|
+| 2019-12 | **0,525** | 0,424 | 0,504 |
+| 2020-12 | **0,477** | 0,358 | 0,433 |
+| 2021-12 | **0,360** | 0,240 | 0,315 |
+| 2022-12 | **0,458** | 0,368 | 0,411 |
+| 2023-12 | **0,487** | 0,359 | 0,420 |
+| 2024-12 | **0,481** | 0,386 | 0,432 |
+| 2025-12 (verdad: candidatos 2026) | **0,480** | 0,377 | 0,407 |
+
+2022 es el peor año para todos: la invasión rusa de Ucrania abrió un frente donde no había historia reciente.
+
+### 4.4 Al menos un evento en los próximos 12 meses (lo que pinta el mapa por defecto)
+
+| Modelo | Brier | AUROC | AUPR |
+|---|---|---|---|
+| **Combinación** | 0,01514 | **0,977** | 0,684 |
+| Logística | **0,01501** | 0,977 | **0,689** |
+| Hawkes | 0,01614 | 0,972 | 0,649 |
+| ViEWS neighbors12 (1 − (1 − p)¹²) | 0,02015 | 0,922 | 0,572 |
+| cell12 | 0,01829 | 0,797 | 0,507 |
+| Persistencia | 0,02484 | 0,597 | 0,187 |
+
+### 4.5 Muertes estatales (CRPS; menor es mejor)
+
+| Modelo | África y Oriente Medio, h = 1…12 | Ídem, 2026 (candidatos) | Mundo, h = 1…12 |
+|---|---|---|---|
+| **Combinación** | **0,2365** | **0,1810** | **0,0897** |
+| ViEWS neighbors12 | 0,2498 | 0,1970 | 0,0954 |
+| cell12 | 0,2575 | 0,2497 | 0,0994 |
+| ViEWS exactly zero | 0,2606 | 0,2000 | 0,1032 |
+| ViEWS last historical | 0,3828 | 0,2796 | 0,1358 |
+
+El orden coincide con el que el reto de ViEWS encontró en `pgm`: *neighbors12* bate al cero y *last historical* es el peor. La combinación bate a los cuatro, aunque por poco (−5 % frente a *neighbors12*, −9 % frente al cero). El cero inflado deja poco margen a cualquier modelo de muertes por celda. Los niveles no son comparables con las tablas de ViEWS (0,45 para el cero en 2018-2023): aquí se cuentan los eventos con `where_prec ≤ 4` sin imputar, los orígenes son diciembre y no octubre, y los años son otros.
+
+### 4.6 Celdas sin historia (el "problema difícil"), cualquier evento
+
+| Modelo | AUROC | AUPR | Eventos esperados / observados |
+|---|---|---|---|
+| **Combinación** | 0,921 | 0,010 | 1 427 / 2 148 |
+| Logística | **0,928** | **0,012** | 1 231 / 2 148 |
+| Hawkes | 0,893 | 0,008 | 2 492 / 2 148 |
+| Frecuencia histórica | 0,708 | 0,006 | 3 429 / 2 148 |
+| ViEWS neighbors12, cell12, persistencia | 0,500 | 0,000 | 0 / 2 148 |
+
+Los benchmarks de historia dicen 0 por construcción. El modelo **ordena** bien las celdas tranquilas (AUROC 0,92): la distancia al conflicto, el país y la geografía informan. Pero la AUPR de 0,01 dice que acertar dónde estallará es casi imposible con estos datos (la tasa base es 0,05 %). Es lo que dicen Mueller y Rauh, y es el lugar donde más aportarían predictores nuevos.
+
+### 4.7 Calibración (combinación, cualquier evento, h = 1…3, todos los orígenes)
+
+| p pronosticada | p media | Frecuencia observada | Celda-mes |
+|---|---|---|---|
+| [0, 0,001) | 0,0001 | 0,0003 | 1 149 280 |
+| [0,001, 0,003) | 0,0017 | 0,0031 | 78 677 |
+| [0,003, 0,01) | 0,0058 | 0,0093 | 51 704 |
+| [0,01, 0,03) | 0,0173 | 0,0237 | 35 286 |
+| [0,03, 0,1) | 0,0559 | 0,0636 | 22 075 |
+| [0,1, 0,2) | 0,1430 | 0,1514 | 10 297 |
+| [0,2, 0,4) | 0,2832 | 0,2886 | 7 626 |
+| [0,4, 0,6) | 0,4878 | 0,4723 | 3 191 |
+| [0,6, 0,8) | 0,6941 | 0,6819 | 1 811 |
+| [0,8, 1,0) | 0,8942 | 0,8871 | 1 231 |
+
+Por encima de 0,1 está bien calibrada. Por debajo de 0,03 subestima entre 1,4 y 3 veces en términos relativos; en total pronostica un 7 % menos eventos que los observados. Es el mismo defecto que en las celdas sin historia. No se recalibró, para no ajustar nada a la validación: queda como defecto declarado y como candidato a una recalibración Platt con orígenes anteriores a 2019.
+
+### 4.8 El proceso de Hawkes: cuánto contagia un evento
+
+| Origen | sb → sb | ns → ns | os → os | os → sb | sb → os |
+|---|---|---|---|---|---|
+| 2019-12 | 0,977 | 0,981 | 0,891 | 0,142 | 0,017 |
+| 2022-12 | 0,972 | 0,996 | 0,899 | 0,140 | 0,016 |
+| 2025-12 | 0,975 | 0,999 | 0,912 | 0,144 | 0,011 |
+
+(Hijos esperados de cada tipo por evento, sumando la celda, los 24 vecinos de los anillos 1-2 y el país.) Las estimaciones son estables entre orígenes. La violencia organizada es casi crítica: cada evento estatal engendra 0,97 eventos estatales más. La excitación cruzada es asimétrica: la violencia contra civiles precede a combates (0,14 eventos estatales por evento unilateral), y no al revés (0,01-0,02).
+
+### 4.9 Tiempos (4 CPU)
+
+Barrido de predictores 1989-2026 en 45 s. Ajuste de un origen en ~5 min: 52 logísticas con ~1,2 millones de filas y 3 Hawkes por EM. Simulación de 200 trayectorias × 12 meses × 64 818 celdas y carga útil en ~1-2 min.
+
+### 4.10 Pronóstico vivo (origen 2026-09, para 2026-10 … 2027-09)
+
+Se esperan 13 128 eventos estatales (en los 12 meses observados hasta 2026-09 hubo 12 492), 5 856 no estatales (5 235) y 2 736 unilaterales (2 710), y unas 53 000 muertes estatales (47 950). Por eventos esperados, los países de mayor riesgo (Gleditsch-Ward) son Ucrania (369), México (70), Colombia (100), Nigeria (475), Pakistán (770), Israel/Palestina (666), Yemen (678), RD del Congo (490), Etiopía (530) y Malí (432). En las celdas de mayor riesgo, el 95-100 % de la intensidad del mes siguiente es autoexcitación de la propia celda: el conflicto en curso.
 
 ## 5. Lo que no hace (defectos declarados)
 
@@ -74,7 +187,8 @@ RESULTADOS
 - **Fuga de revisión.** Los orígenes anteriores usan como predictores el GED final (revisado), no lo que existía en T (los candidatos).
 - **Covariables congeladas.** Las de PRIO-GRID están en su último año publicado (2010-2014) y las celdas conservan el país de 2014.
 - **Ubicaciones imprecisas.** `where_prec` 5-7 no se imputan a celdas (≈ 6 % de los eventos).
-- **Hawkes casi crítico.** La razón de ramificación sale ≈ 1 (conflicto muy persistente). A 12 meses la simulación es estable, pero el proceso no sirve para horizontes largos sin un tope.
+- **Hawkes casi crítico.** La razón de ramificación sale ≈ 1 (conflicto muy persistente; en `ns` llega a 1,008 en 2021). A 12 meses la simulación es estable, pero el proceso no sirve para horizontes largos sin un tope.
+- **Subestima los riesgos bajos** (§4.7) y los estallidos (§4.6), y el total en un 7 %; no se recalibró para no ajustar nada a la validación.
 - **Distancia aproximada.** Es euclídea en la malla: no corrige por la latitud.
 - **Tamaño de las muertes.** La parte de tamaño es la más débil (σ ≈ 1,3 en log1p) y no tiene colas de ley de potencias.
 - **Interacciones.** Un solo modelo logístico lineal en sus predictores transformados; ViEWS usa árboles. Una prueba con árboles (dependencia nueva) queda para después de ver la interfaz.
