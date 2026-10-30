@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getJSON, SNAPSHOT, type Status } from "./lib/api";
 import { useApi } from "./lib/useApi";
 import { ConflictView } from "./views/ConflictView";
+import { DensityView } from "./views/DensityView";
 import { SocialView } from "./views/SocialView";
 import { World3View } from "./views/World3View";
 import { CountryView } from "./views/CountryView";
@@ -11,6 +12,7 @@ import { ErrorNotice } from "./components/common";
 
 const VIEWS = [
   { id: "conflicto", label: "Conflicto por celdas", hint: "F11 · 64 818 celdas, 12 meses", cap: "conflict" },
+  { id: "densidad", label: "Densidad de eventos", hint: "F13 · regresiones del Atlas", cap: "l1" },
   { id: "sociedad", label: "Sociedad ↔ World3", hint: "180 países a 2100", cap: "social" },
   { id: "world3", label: "World3", hint: "L0 · 5 escenarios", cap: "l0" },
   { id: "paises", label: "Países", hint: "L1 · 1-10 años", cap: "l1" },
@@ -102,6 +104,7 @@ export function App() {
         )}
         {status.error && <ErrorNotice error={status.error} what="conectar con World4" />}
         {view === "conflicto" && <ConflictView theme={themeKey} />}
+        {view === "densidad" && <DensityView theme={themeKey} />}
         {view === "sociedad" && <SocialView />}
         {view === "world3" && <World3View />}
         {view === "paises" && <CountryView />}

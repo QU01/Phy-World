@@ -220,3 +220,32 @@ export type SourceEntry = {
   lag_years?: number; used_in?: string[]; note?: string;
 };
 export type Sources = { sources: Record<string, SourceEntry> };
+
+// ------------------------------------------------------------------ F13: densidad de eventos
+export type DensityCountry = {
+  iso3: string; in_atlas: number; events_expected: number; density: number; p_any: number;
+  p10: number; p50: number; p90: number; area_km2: number; atlas_frozen_years: number; observed: number | null;
+  drivers: { factor: string; log_effect: number }[];
+};
+export type DensityPayload = {
+  origin: number; target: number; horizon: number; train_until: number; world_events_expected: number;
+  countries: DensityCountry[]; factors: string[]; caveats: string[];
+  cells?: { gid: number[]; lon: number[]; lat: number[]; iso3: string[]; events_expected: number[]; density: number[] };
+  validation: null | Record<string, { rps_system: number; rps_history_only: number; skill_vs_history: number;
+                                      aupr_any: number; expected_over_observed: number }>;
+};
+export type DensityScenario = {
+  origin: number; years: number[]; members: number; live_l1: boolean; iso3: string[];
+  events_mean: number[][]; events_p10: number[][]; events_p90: number[][]; observed: (number | null)[][];
+  world_events: { mean: number[]; p10: number[]; p90: number[] }; l1_driven: string[]; frozen: string[];
+};
+export type DensityStudy = {
+  labels: Record<string, { label: string; group: string }>;
+  horizons: Record<string, {
+    null_skill: number; todo_atlas: number; todo_atlas_mas_world3: number;
+    groups: Record<string, number>; unique: Record<string, number>;
+    single: Record<string, { skill: number; improved: number; group: string }>;
+    forward: { add: string | null; skill: number; aupr: number }[];
+  }>;
+  backtest: null | Record<string, Record<string, Record<string, unknown>>>;
+};

@@ -3,7 +3,7 @@
 Family pattern (Phy-HX / Phy-CT): flat flags, no sub-commands; cli_style transplanted; every
 degradation announced and recorded; exit codes 0 ok, 2 spec error, 3 infeasible, 4 --strict with
 degradations. F0 offers: --info, --campaign, --install-atlas, --l0 and --query; F0.5 adds
---build-store and --structural; F1 adds --install-wpp and --validate (W3/W4/W5 runs); F3 adds --install-energy; F4 adds --install-climate; F5 adds --install-food; F11 adds --install-conflict-grid, --conflict-grid and --validate-conflict-grid. The wizard (no arguments)
+--build-store and --structural; F1 adds --install-wpp and --validate (W3/W4/W5 runs); F3 adds --install-energy; F4 adds --install-climate; F5 adds --install-food; F11 adds --install-conflict-grid, --conflict-grid and --validate-conflict-grid; F13 adds --event-density and --study-factors. The wizard (no arguments)
 arrives in F9: with no mode, a terminal gets the wizard and a pipe gets --info. F9 adds --help-numbers,
 --fidelity, --report, --dashboard and --mcp, and WALLS / TIGHT / THE LAST BLOCKER when a policy is infeasible.
 """
@@ -72,6 +72,10 @@ def build_parser() -> argparse.ArgumentParser:
                         "runs/conflict_grid/forecast_<origin>.json or JSON)")
     m.add_argument("--validate-conflict-grid", metavar="JSON", nargs="?", const="",
                    help="F11: rolling-origin validation 2019-2025 against the ViEWS benchmarks (~1 h)")
+    m.add_argument("--event-density", metavar="JSON", nargs="?", const="",
+                   help="F13: events per 10 000 km² per country in --origin + --horizon from the Atlas regressions")
+    m.add_argument("--study-factors", action="store_true",
+                   help="F13: which Atlas and World3 factors predict events (out of sample) and the backtest (~15 min)")
     m.add_argument("--validate", "--validate-f1", dest="validate", action="store_true",
                    help="F1-F5: rolling-origin W3/W5 (Atlas, F1 ... F1-F5) + free hindcasts of population, psi, "
                         "the energy mix, CO2, GMST, cereals and cropland + AR6 carbon-budget check")
@@ -107,7 +111,9 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("--as-of", type=int, default=None, help="origin year for --query (1970-2018)")
     n.add_argument("--target", type=int, default=None, help="target year for --query (1-10 years ahead)")
     n.add_argument("--members", type=int, default=32, help="ensemble members for --query")
-    n.add_argument("--origin", default=None, help="F11: forecast origin AAAA-MM for --conflict-grid (last data month)")
+    n.add_argument("--origin", default=None,
+                   help="forecast origin: AAAA-MM for --conflict-grid (last data month), AAAA for --event-density (2025)")
+    n.add_argument("--horizon", type=int, default=1, help="F13: years ahead for --event-density (1-5)")
     n.add_argument("--min-p", type=float, default=0.01,
                    help="F11: --conflict-grid keeps cells with P(any event in 12 months) >= this (0 = all cells)")
     n.add_argument("--atlas-src", default=None, help="local Atlas clone for --install-atlas (else git clone)")
@@ -403,6 +409,53 @@ def run_validate_conflict_grid(a) -> int:
                 x = v["all_h"]
                 ui.kv(f"{o} {m}", f"Brier {x['brier']:.5f}  AUPR {x['aupr']:.3f}  AUROC {x['auroc']:.3f}")
         ui.kv("written", str(path))
+    return EXIT_OK
+
+
+def run_event_density(a) -> int:
+    from world4 import api
+    if not a.json:
+        print(ui.banner())
+        ui.step("F13: event density per country from the Atlas regressions")
+    try:
+        out = api.event_density(int(a.origin) if a.origin else None, a.horizon, cells=bool(a.event_density))
+    except (api.QueryError, ValueError) as exc:
+        raise SpecError(str(exc)) from exc
+    if a.event_density:
+        Path(a.event_density).parent.mkdir(parents=True, exist_ok=True)
+        Path(a.event_density).write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+    if a.json:
+        print(json.dumps({k: v for k, v in out.items() if k not in ("cells",)}, ensure_ascii=False, default=str))
+        return EXIT_OK
+    ui.kv("origin -> target", f"{out['origin']} -> {out['target']}", "", f"model trained with targets <= {out['train_until']}")
+    ui.kv("world", f"{out['world_events_expected']:,.0f}", "events expected")
+    print()
+    print("  " + ui.dim("country   expected  density/10k km2  P(any)    p10      p50      p90   observed"))
+    for r in out["countries"][:15]:
+        obs = "" if r["observed"] is None else f"{r['observed']:.0f}"
+        print(f"  {r['iso3']:<7} {r['events_expected']:>9.0f} {r['density']:>16.2f} {r['p_any']:>7.2f} {r['p10']:>8.0f} "
+              f"{r['p50']:>8.0f} {r['p90']:>8.0f} {obs:>9}")
+    if a.event_density:
+        ui.kv("written", a.event_density)
+    return EXIT_OK
+
+
+def run_study_factors(a) -> int:
+    import warnings
+    warnings.simplefilter("ignore")
+    from world4.conflict import density, factors
+    log = (lambda *x: None) if a.json else (lambda m: print("  " + m, flush=True))
+    if not a.json:
+        print(ui.banner())
+        ui.step("F13: factors of organized-violence events (Atlas + World3), out of sample")
+    res = factors.run(horizons=(1, 3, 5), log=log)
+    factors.save(res, density.STUDY)
+    bt = density.backtest(log=log)
+    density.STUDY.with_name("backtest.json").write_text(json.dumps(bt, ensure_ascii=False, default=float), encoding="utf-8")
+    if a.json:
+        print(json.dumps(bt["summary"], default=float))
+    else:
+        ui.kv("written", str(density.STUDY.parent))
     return EXIT_OK
 
 
@@ -842,6 +895,10 @@ def main(argv=None) -> int:
             code = run_conflict_grid(a)
         elif a.validate_conflict_grid is not None:
             code = run_validate_conflict_grid(a)
+        elif a.event_density is not None:
+            code = run_event_density(a)
+        elif a.study_factors:
+            code = run_study_factors(a)
         elif a.validate:
             code = run_validate(a)
         elif a.build_store:

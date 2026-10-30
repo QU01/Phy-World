@@ -21,6 +21,9 @@ Rutas (todas GET salvo ``/api/policy``):
     /api/conflict/forecast?origin=&min_p=0.01         carga útil world4.conflict_grid/1
     /api/conflict/cell?gid=&origin=     historia mensual observada de una celda + su pronóstico
     /api/conflict/validation            resumen de reports/conflicto_celdas/validacion.json
+    /api/density?origin=2025&h=1&cells=1    densidad de eventos por país (y por celda) con las regresiones del Atlas
+    /api/density/scenario?origin=2019&members=32  densidad año a año sobre las trayectorias del L1
+    /api/density/study                  resumen del estudio de factores (reports/factores_eventos)
 """
 from __future__ import annotations
 
@@ -355,6 +358,60 @@ def conflict_validation() -> dict:
     return cached(("conflict_validation", p.stat().st_mtime), build)
 
 
+# ---------------------------------------------------------------- densidad de eventos (F13)
+def _density_guard():
+    from world4.data import atlas, conflict_grid
+    if not atlas.verify()["ok"]:
+        raise DataMissing("the density regressions need the Atlas", "python world4_cli.py --install-atlas")
+    if not conflict_grid.available():
+        raise DataMissing("the density regressions need UCDP GED", "python world4_cli.py --install-conflict-grid")
+
+
+def density(origin, h, cells):
+    from world4 import api
+    _density_guard()
+    try:
+        return api.event_density(origin, h, cells=cells)
+    except api.QueryError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def density_scenario(origin, members):
+    from world4 import api
+    _density_guard()
+    return api.event_density_scenario(origin, members=members)
+
+
+def density_study() -> dict:
+    from world4.conflict import density as D
+    if not D.STUDY.is_file():
+        raise DataMissing("no factor study saved", "python world4_cli.py --study-factors")
+
+    def build():
+        r = json.loads(D.STUDY.read_text(encoding="utf-8"))
+        out = {"meta": {k: v for k, v in r["meta"].items() if k != "factors"}, "labels": {}, "horizons": {}}
+        for g, fs in r["meta"]["factors"].items():
+            for f, lab in fs.items():
+                out["labels"][f] = {"label": lab, "group": g}
+        for k, v in r.items():
+            if not k.startswith("h"):
+                continue
+            out["horizons"][k] = {
+                "historia": v["historia"], "null_skill": v["null"]["skill"], "todo_atlas": v["todo_atlas"]["skill"],
+                "todo_atlas_mas_world3": v["todo_atlas_mas_world3"]["skill"],
+                "groups": {g: x["skill"] for g, x in v["groups"].items()},
+                "unique": v["unique_group_contribution"],
+                "single": {f: {"skill": x["skill"], "improved": x["ls_improved_share"], "group": x["group"]}
+                           for f, x in v["single"].items()},
+                "forward": [{"add": p["add"], "skill": p["skill"], "aupr": p["aupr_any"]} for p in v["forward"]["path"]],
+                "coefficients": v["coefficients"]}
+        bt = D.STUDY.with_name("backtest.json")
+        out["backtest"] = json.loads(bt.read_text(encoding="utf-8"))["summary"] if bt.is_file() else None
+        return out
+
+    return cached(("density_study", D.STUDY.stat().st_mtime), build)
+
+
 # ---------------------------------------------------------------- HTTP
 def _q(qs, name, cast=str, default=None):
     v = qs.get(name)
@@ -407,6 +464,14 @@ def route(method: str, path: str, qs: dict, body: bytes | None):
         return 200, conflict_cell(gid, _q(qs, "origin"))
     if path == "/api/conflict/validation":
         return 200, conflict_validation()
+    if path == "/api/density":
+        args = (_q(qs, "origin", int, None), _q(qs, "h", int, 1), _q(qs, "cells", bool, False))
+        return 200, cached(("density",) + args, lambda: density(*args))
+    if path == "/api/density/scenario":
+        args = (_q(qs, "origin", int, 2019), min(_q(qs, "members", int, 32), 128))
+        return 200, cached(("density_scenario",) + args, lambda: density_scenario(*args))
+    if path == "/api/density/study":
+        return 200, density_study()
     return 404, {"error": f"no route {path}"}
 
 

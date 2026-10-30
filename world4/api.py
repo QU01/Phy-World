@@ -358,3 +358,32 @@ def conflict_grid_forecast(origin=None, *, min_p: float = 0.0, monthly: bool = T
         raise QueryError(str(exc)) from exc
     return service.payload(P, min_p=min_p, monthly=monthly, bbox=bbox, countries=countries,
                            validation=service.validation_headline())
+
+
+def event_density(origin=None, horizon: int = 1, *, cells: bool = False) -> dict:
+    """F13: densidad de eventos de violencia organizada por país (eventos por 10 000 km²) en ``origin + horizon``
+    desde la información del año ``origin`` (1990-2025; por omisión el último año completo de UCDP GED), con las
+    regresiones del Atlas elegidas fuera de muestra (``world4.conflict.density``). ``cells=True`` reparte cada país
+    entre sus celdas PRIO-GRID."""
+    from world4.conflict import density
+    from world4.data import atlas, conflict_grid
+    if not atlas.verify()["ok"]:
+        raise QueryError("Atlas data not installed: python world4_cli.py --install-atlas")
+    if not conflict_grid.available():
+        raise QueryError("conflict-grid data not installed: python world4_cli.py --install-conflict-grid")
+    try:
+        return density.payload(origin, horizon, cells=cells)
+    except ValueError as exc:
+        raise QueryError(str(exc)) from exc
+
+
+def event_density_scenario(origin: int = 2019, *, members: int = 32, seed: int = 0) -> dict:
+    """F13: densidad de eventos año a año sobre las trayectorias simuladas del Atlas (L1) desde ``origin``
+    (1990-2019; 2019 usa el modo vivo del L1 hasta 2030). Exploratorio."""
+    from world4.conflict import density
+    out = density.scenario(origin, members=members, seed=seed)
+    out.update({"units": {"events_mean": "events per year", "events_p10": "events per year",
+                          "events_p50": "events per year", "events_p90": "events per year",
+                          "observed": "events per year (UCDP GED)", "area_km2": "km²", "world_events": "events per year"},
+                "band": "p10-p90 over L1 ensemble members and negative binomial draws", "exploratory": True})
+    return out
