@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { getJSON, type DensityCountry, type DensityPayload, type DensityScenario, type DensityStudy } from "../lib/api";
+import { getJSON, SNAPSHOT, type DensityCountry, type DensityPayload, type DensityScenario, type DensityStudy } from "../lib/api";
 import { useApi } from "../lib/useApi";
 import { Card, ErrorNotice, Field, Legend, Loading, Seg, Stat } from "../components/common";
 import { HBars, LineChart } from "../components/charts";
@@ -36,7 +36,7 @@ export function DensityView({ theme }: { theme: string }) {
       <div className="controls card" style={{ padding: "10px 14px" }}>
         <Field label="Información hasta el año">
           <select value={origin} onChange={(e) => setOrigin(+e.target.value)}>
-            {Array.from({ length: 31 }, (_, k) => 2025 - k).map((y) => <option key={y} value={y}>{y}</option>)}
+            {(SNAPSHOT ? [2025] : Array.from({ length: 31 }, (_, k) => 2025 - k)).map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         </Field>
         <Field label="Años hacia delante">
