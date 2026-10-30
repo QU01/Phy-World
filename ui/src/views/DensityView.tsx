@@ -18,7 +18,8 @@ export function DensityView({ theme }: { theme: string }) {
   const [layer, setLayer] = useState<"pais" | "celdas">("pais");
   const [iso, setIso] = useState<string | null>(null);
   const r = useApi((s) => getJSON<DensityPayload>("/api/density", { origin, h, cells: true }, s), [origin, h]);
-  const study = useApi((s) => getJSON<DensityStudy>("/api/density/study", undefined, s), []);
+  const [lens, setLens] = useState<"nb" | "ppml">("nb");
+  const study = useApi((s) => getJSON<DensityStudy>("/api/density/study", { lens }, s), [lens]);
   const d = r.data;
   const values = useMemo(() => Object.fromEntries((d?.countries ?? []).map((c) => [c.iso3, c.density])), [d]);
   const sel = d?.countries.find((c) => c.iso3 === iso) ?? null;
@@ -73,7 +74,7 @@ export function DensityView({ theme }: { theme: string }) {
           </div>
         </div>
       )}
-      <StudyCard study={study.data} error={study.error} h={h} />
+      <StudyCard study={study.data} error={study.error} h={h} lens={lens} onLens={setLens} />
       <ScenarioCard />
     </>
   );
@@ -159,9 +160,11 @@ function CountryCard({ c, d, labels }: { c: DensityCountry; d: DensityPayload; l
       </dl>
       <h3 style={{ margin: "12px 0 6px" }}>Lo que más pesa en su pronóstico</h3>
       <p className="sub">Multiplica los eventos esperados frente a un país promedio</p>
-      <HBars max={Math.max(...c.drivers.map((x) => Math.abs(x.log_effect)), 0.1)} format={(v) => `×${num(Math.exp(v), 2)}`}
-             rows={c.drivers.map((x) => ({ label: name(x.factor), value: x.log_effect,
+      <HBars max={Math.max(...c.drivers.map((x) => Math.abs(x.log_effect)), 0.1)} format={() => ""}
+             rows={c.drivers.map((x) => ({ label: `${name(x.factor)} · ×${num(Math.exp(x.log_effect), 2)}`,
+                                           value: Math.abs(x.log_effect),
                                            color: x.log_effect >= 0 ? "var(--series-2)" : "var(--series-1)" }))} />
+      <Legend items={[{ label: "sube el pronóstico", color: "var(--series-2)" }, { label: "lo baja", color: "var(--series-1)" }]} />
     </Card>
   );
 }
@@ -184,7 +187,8 @@ function ValidationCard({ v, h }: { v: NonNullable<DensityPayload["validation"]>
   );
 }
 
-function StudyCard({ study, error, h }: { study?: DensityStudy; error?: import("../lib/api").ApiError; h: number }) {
+function StudyCard({ study, error, h, lens, onLens }: { study?: DensityStudy; error?: import("../lib/api").ApiError; h: number;
+  lens: "nb" | "ppml"; onLens: (l: "nb" | "ppml") => void }) {
   const key = h <= 2 ? "h1" : h <= 4 ? "h3" : "h5";
   if (error) return <ErrorNotice error={error} what="el estudio de factores" />;
   if (!study) return null;
@@ -195,7 +199,10 @@ function StudyCard({ study, error, h }: { study?: DensityStudy; error?: import("
   const groups = Object.entries(s.groups).sort((a, b) => b[1] - a[1]);
   return (
     <Card title={`¿Qué predice mejor los eventos? (a ${key.slice(1)} ${key === "h1" ? "año" : "años"})`}
-          sub="Cada factor añadido a la historia del conflicto, fuera de muestra (2005-2019): reducción del RPS">
+          sub={lens === "nb"
+            ? "Lente del orden de magnitud (binomial negativa): dónde habrá violencia y de qué escala. Cada factor añadido a la historia del conflicto, fuera de muestra (2005-2019): reducción del RPS"
+            : "Lente del volumen (PPML, la del sistema): cuántos eventos habrá en total. Cada factor añadido a la historia del conflicto, fuera de muestra (2005-2019): reducción del RPS"}
+          actions={<Seg value={lens} onChange={onLens} options={[{ value: "nb", label: "Orden de magnitud" }, { value: "ppml", label: "Volumen" }]} />}>
       <div className="grid3" style={{ alignItems: "start" }}>
         <div>
           <h3 style={{ marginBottom: 8 }}>Los 12 factores que más mejoran</h3>

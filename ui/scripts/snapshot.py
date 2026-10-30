@@ -51,6 +51,9 @@ def main(out: Path) -> None:
     reqs += [("/api/l0", {"scenario": s}) for s in range(1, 6)]
     reqs += [("/api/social", {"scenario": s, "feedback": f, "n": 40}) for s, f in SOCIAL]
     reqs += [("/api/l1", {"variable": v, "region": r, "as_of": 2009, "members": 32}) for v, r in L1]
+    reqs += [("/api/density", {"origin": 2025, "h": h, "cells": "1"}) for h in range(1, 6)]
+    reqs += [("/api/density/study", {"lens": lens}) for lens in ("nb", "ppml")]
+    reqs.append(("/api/density/scenario", {"origin": 2019, "members": 32}))
     meta = S.conflict_meta()
     origin = meta["last_month"]
     reqs.append(("/api/conflict/forecast", {"origin": origin}))

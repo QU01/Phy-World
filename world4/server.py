@@ -382,13 +382,15 @@ def density_scenario(origin, members):
     return api.event_density_scenario(origin, members=members)
 
 
-def density_study() -> dict:
+def density_study(lens: str = "ppml") -> dict:
+    """``lens``: "ppml" (volumen; la que usa el sistema) o "nb" (orden de magnitud)."""
     from world4.conflict import density as D
-    if not D.STUDY.is_file():
+    path = D.STUDY if lens == "ppml" else D.STUDY.with_name("resultados_nb.json")
+    if not path.is_file():
         raise DataMissing("no factor study saved", "python world4_cli.py --study-factors")
 
     def build():
-        r = json.loads(D.STUDY.read_text(encoding="utf-8"))
+        r = json.loads(path.read_text(encoding="utf-8"))
         out = {"meta": {k: v for k, v in r["meta"].items() if k != "factors"}, "labels": {}, "horizons": {}}
         for g, fs in r["meta"]["factors"].items():
             for f, lab in fs.items():
@@ -409,7 +411,7 @@ def density_study() -> dict:
         out["backtest"] = json.loads(bt.read_text(encoding="utf-8"))["summary"] if bt.is_file() else None
         return out
 
-    return cached(("density_study", D.STUDY.stat().st_mtime), build)
+    return cached(("density_study", lens, path.stat().st_mtime), build)
 
 
 # ---------------------------------------------------------------- HTTP
@@ -471,7 +473,7 @@ def route(method: str, path: str, qs: dict, body: bytes | None):
         args = (_q(qs, "origin", int, 2019), min(_q(qs, "members", int, 32), 128))
         return 200, cached(("density_scenario",) + args, lambda: density_scenario(*args))
     if path == "/api/density/study":
-        return 200, density_study()
+        return 200, density_study(_q(qs, "lens", str, "ppml"))
     return 404, {"error": f"no route {path}"}
 
 

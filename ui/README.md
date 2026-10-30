@@ -5,6 +5,7 @@ Aplicación React (Vite + TypeScript) sobre la API JSON de `world4/server.py`.
 | Vista | Qué muestra | Necesita |
 |---|---|---|
 | Conflicto por celdas | Mapa de las 64 818 celdas PRIO-GRID con P(evento) a 12 meses o por mes, eventos y muertes esperados; ficha de celda (pronóstico mes a mes, origen del riesgo, historia); países; validación | `--install-conflict-grid` |
+| Densidad de eventos | Eventos por 10 000 km² por país (o por celda) a 1-5 años desde cualquier año 1990-2025 con las regresiones del Atlas (F13); qué factores predicen mejor; escenario sobre el L1 | Atlas y `--install-conflict-grid` |
 | Sociedad ↔ World3 | World3 acoplado a 180 países: conflicto, golpes, crisis, democracia a 2100 con bandas; mapa por país | nada |
 | World3 | Los escenarios 1-5 de *Limits to Growth: The 30-Year Update* | nada |
 | Países (L1) | Abanico p10/p50/p90 a 1-10 años del Atlas | `--install-atlas --install-wpp --install-energy` |

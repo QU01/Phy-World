@@ -45,7 +45,13 @@ fitted by EM and simulated forward; both are backtested against the ViEWS 2023/2
 payload meant for the coming React interface.
 Phase **F12** adds that interface: `world4_cli.py --serve` serves a React app (`ui/`, built with `npm run build`) and
 a JSON API over the whole system: the conflict map per cell, World3 <-> society, the World3 scenarios, the L1
-fan per country, policies and regions, and the data and licences ([ui/README.md](ui/README.md)). The science is in
+fan per country, policies and regions, and the data and licences ([ui/README.md](ui/README.md)).
+Phase **F13** asks which Atlas and World3 factors predict the number of organized-violence events of a country, out of
+sample, and builds a regression system that predicts the event density (events per 10 000 km²) of every country 1-5
+years ahead from any year 1990-2025, with the Atlas: +19-26 % over the conflict history alone at 1-3 years, also in
+2020-2025, never used to choose the factors. State capacity and exclusion predict the order of magnitude, country
+scale the volume; World3 helps through its country analogues only, and its world trajectory always hurts
+([docs/F13-informe.md](docs/F13-informe.md)). The science is in
 [docs/Quasar_World4_Science.md](docs/Quasar_World4_Science.md).
 
 | Layer | What it is in F0 | Pinned against | Result |
@@ -110,6 +116,8 @@ python world4_cli.py --calibrate            # F7: posterior (models/posterior.np
 python world4_cli.py --conflict-grid        # F11: violence forecast per PRIO-GRID cell, next 12 months (JSON payload)
 python world4_cli.py --conflict-grid out.json --origin 2025-12 --min-p 0   # any origin, all cells
 python world4_cli.py --validate-conflict-grid   # F11: rolling origins 2019-2025 vs the ViEWS benchmarks
+python world4_cli.py --event-density --origin 2025 --horizon 1   # F13: events per 10 000 km² per country in 2026
+python world4_cli.py --study-factors        # F13: which factors predict events (Atlas + World3) and the backtest (~15 min)
 python world4_cli.py --serve                # F12: the React interface on http://127.0.0.1:8765/ (cd ui && npm install && npm run build first)
 python world4_cli.py --validate             # W3/W5 rolling origin + hindcasts (population, psi, energy, CO2, GMST, cereals, cropland) + AR6 check (~50 min)
 ```
@@ -121,6 +129,7 @@ from world4 import api
 api.query("conflict_hazard", "COL", 2000, 2005)   # Distribution with p10/p50/p90, unit, caveats
 api.run_l0(scenario=1)
 api.conflict_grid_forecast(min_p=0.05)            # F11: cells, months, P(event), deaths, drivers, countries
+api.event_density(2025, 1, cells=True)            # F13: event density per country (and cell) from the Atlas
 ```
 
 ## Tests
