@@ -92,7 +92,8 @@ WORLD3_ANALOGS = {"lny": "iopc", "yield_shock": "fpc", "res_rents": "nrfr", "ln_
                   "dle3": "le", "eco_deficit": "hef", "pop_growth": "pop", "youth": "pop"}
 ALL = [f for g in FACTORS.values() for f in g]
 # columnas que no entran en el cribado pero usa el modo escenario (variables que simula el L1)
-EXTRA = {"democ": "democracia (V-Dem Regimes of the World >= 2), la variable de régimen del L1"}
+EXTRA = {"democ": "democracia (V-Dem Regimes of the World >= 2), la variable de régimen del L1",
+         "not_in_atlas": "1 si el Atlas no tiene el país (sus variables van imputadas)"}
 # países con eventos en GED que el Atlas no tiene (ISO 3166-1): entran con su historia y sin variables del Atlas
 NOT_IN_ATLAS = {4: "AFG", 90: "SLB", 232: "ERI", 328: "GUY", 434: "LBY", 598: "PNG", 626: "TLS", 706: "SOM",
                 728: "SSD", 732: "ESH"}
@@ -317,6 +318,7 @@ def _features(a: pd.DataFrame) -> pd.DataFrame:
     f["oil_shock_x_exporter"] = a.oil_shock * exporter
     f["cereal_shock_x_poor"] = a.cereal_shock * poor
     f["year_trend"] = a.year - 2000.0
+    f["not_in_atlas"] = 1.0 - a.in_atlas
     f["democ"] = np.where(a.regime_row.notna(), (a.regime_row >= 2).astype(float), np.nan)
     f = f.replace([np.inf, -np.inf], np.nan)
     keep = ["iso3", "isonum", "year", "area_km2", "n_cells", "in_atlas", "atlas_frozen", "ev_all", "ev_sb", "ev_ns", "ev_os",

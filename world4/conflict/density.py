@@ -37,7 +37,10 @@ L1_DRIVEN = ("lny", "growth", "debt", "democ", "coups10", "crisis", "h_acd")
 class Prep:
     """Imputación (mediana del entrenamiento, con indicador de faltante) y estandarización, reutilizable."""
 
-    def fit(self, X: pd.DataFrame, flag_min: float = 0.03):
+    def fit(self, X: pd.DataFrame, flag_min: float = 2.0):
+        """``flag_min`` > 1: sin indicadores de dato faltante (por omisión en el sistema: aprenden países
+        concretos, p. ej. Palestina, sin régimen en V-Dem y con miles de eventos, y contagian a los países que V-Dem
+        no cubre); el estudio de factores sí los usa (``factors.prepare``)."""
         self.cols = list(X.columns)
         self.med = X.median().fillna(0.0)
         self.flags = [c for c in self.cols if X[c].isna().mean() >= flag_min]
@@ -91,7 +94,11 @@ def _offset(df):
 
 class DensitySystem:
     def __init__(self, features: dict[int, list[str]] | None = None, horizons=HORIZONS, mean: str = "ppml"):
-        self.features = features or study_features()
+        # "no está en el Atlas" siempre entra: sin ella, los indicadores de dato faltante aprenden a señalar a
+        # Afganistán, Somalia... (todo faltante y mucho conflicto) y contagian a los países pequeños que V-Dem
+        # no cubre (Brunéi, Belice...)
+        feats = features or study_features()
+        self.features = {h: (v if "not_in_atlas" in v else v + ["not_in_atlas"]) for h, v in feats.items()}
         self.mean = mean
         self.horizons = tuple(horizons)
         self.models: dict[int, NB] = {}
@@ -243,10 +250,15 @@ def cell_density(pred: pd.DataFrame, *, halflife_years: float = 2.0, background:
 
 
 # ---------------------------------------------------------------- escenario con el L1
-def scenario(origin: int = 2019, members: int = 32, years: int = 11, seed: int = 0, system=None) -> dict:
+def scenario(origin: int = 2019, members: int = 32, years: int = 11, seed: int = 0, system=None,
+             feedback: str = "draw") -> dict:
     """Densidad por país año a año sobre las trayectorias del L1 (``L1_DRIVEN`` salen del ensemble; los demás
     factores quedan en su valor del origen; la historia de eventos se simula con la propia binomial negativa).
-    Devuelve, por país, p10/p50/p90 de eventos y de densidad para origin+1 .. origin+years."""
+    Devuelve, por país, p10/p50/p90 de eventos y de densidad para origin+1 .. origin+years.
+
+    ``feedback="draw"``: la historia del año siguiente es el número sorteado (desde 2019: 12 600-16 100 eventos
+    por año en el mundo, error medio |ln(1+eventos)| por país-año 1,50 en 2020-2025). Con ``"mean"`` la media
+    fraccionaria de los países en paz cuenta como "hubo eventos" y los empuja hacia arriba (error 2,06)."""
     from world4.core.l1_atlas import calibrate
     from world4.structural import engine as E
     if system is None:
@@ -278,7 +290,7 @@ def scenario(origin: int = 2019, members: int = 32, years: int = 11, seed: int =
     last_ev = np.where(hist5[:, ::-1] > 0, np.arange(5)[None], 99).min(1)
     since = np.repeat(last_ev[None].astype(float), R, 0)                                 # años desde el último
     area10 = base.area_km2.to_numpy() / cp.AREA_UNIT
-    coup_hist = np.repeat(base.coups10.fillna(0).to_numpy()[None], R, 0)
+    coup_hist = np.repeat(base.coups10.to_numpy(float)[None], R, 0)          # NaN donde el Atlas no lo tiene
     out_ev = np.zeros((years, R, N))
     X0 = base[feats].copy()
     idx = np.array([l1_idx.get(c, -1) for c in base.iso3])
@@ -306,14 +318,16 @@ def scenario(origin: int = 2019, members: int = 32, years: int = 11, seed: int =
             for c, v in {**upd, **l1v}.items():
                 if c in X.columns:
                     val = np.asarray(v, float)
-                    X[c] = np.where(np.isfinite(val), val, X[c].to_numpy())
+                    had = X0[c].notna().to_numpy()          # sólo donde el país tenía el dato: el patrón de
+                    X[c] = np.where(np.isfinite(val) & had, val, X[c].to_numpy())   # faltantes no cambia
             Xr.append(prep.transform(X).to_numpy())
         mu = np.stack([m.mu(Z, np.log(area10)) for Z in Xr])                             # (R, N)
         rr = 1.0 / m.alpha_of(mu)
         draw = rng.negative_binomial(rr, rr / (rr + mu)).astype(float)
         out_ev[k - 1] = draw
-        ev_hist = np.concatenate([ev_hist[:, :, 1:], draw[:, :, None]], 2)
-        since = np.where(draw > 0, 0, since + 1)
+        feed = draw if feedback == "draw" else mu
+        ev_hist = np.concatenate([ev_hist[:, :, 1:], feed[:, :, None]], 2)
+        since = np.where(feed >= 0.5, 0, since + 1)
     q = np.percentile(out_ev, [10, 50, 90], axis=1)                                      # (3, years, N)
     mean = out_ev.mean(1)
     ys = list(range(origin + 1, origin + years + 1))
@@ -351,8 +365,9 @@ def _model_path(train_until: int) -> Path:
 
 def get_system(train_until: int = cp.LAST_GED_YEAR, refit: bool = False) -> DensitySystem:
     p = _model_path(train_until)
-    study_mtime = STUDY.stat().st_mtime if STUDY.is_file() else 0
-    if p.is_file() and not refit and p.stat().st_mtime >= study_mtime:
+    # un modelo guardado vale mientras no cambien ni el estudio ni este código
+    newest = max(STUDY.stat().st_mtime if STUDY.is_file() else 0, Path(__file__).stat().st_mtime)
+    if p.is_file() and not refit and p.stat().st_mtime >= newest:
         return DensitySystem.from_dict(json.loads(p.read_text(encoding="utf-8")))
     s = DensitySystem().fit(train_until)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -385,7 +400,14 @@ def payload(origin: int | None = None, horizon: int = 1, *, cells: bool = False)
            "units": {"events_expected": "events in the target year", "density": "events per 10 000 km² of land",
                      "p_any": "probability of at least one event", "p10": "events", "p50": "events", "p90": "events",
                      "area_km2": "km²", "observed": "events (UCDP GED) when the target year has data",
-                     "world_events_expected": "events", "log_effect": "contribution to ln(expected events)"},
+                     "world_events_expected": "events", "log_effect": "contribution to ln(expected events)",
+                     "train_until": "year (last target year used to fit)", "gid": "PRIO-GRID cell id",
+                     "lon": "degrees east (cell centre)", "lat": "degrees north (cell centre)", "in_atlas": "1 if the Atlas has the country",
+                     "atlas_frozen_years": "years since the last Atlas data (2019)",
+                     "rps_system": "ranked probability score over orders of magnitude (0-4, lower is better)",
+                     "rps_history_only": "ranked probability score (0-4)", "skill_vs_history": "1 - RPS / RPS of history only",
+                     "aupr_any": "area under the precision-recall curve for at least one event",
+                     "expected_over_observed": "ratio of summed expected to observed events"},
            "band": "p10-p90 of the negative binomial predictive distribution per country",
            "validation": bt, "exploratory": False, "caveats": list(CAVEATS)}
     if cells:

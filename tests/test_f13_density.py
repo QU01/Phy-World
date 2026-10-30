@@ -29,7 +29,8 @@ def test_ppml_matches_total_and_recovers_dispersion():
 
 def test_prep_round_trip_and_missing_flags():
     df = pd.DataFrame({"a": [1.0, np.nan, 3.0, 4.0, np.nan], "b": [2.0, 2.0, 2.0, 2.0, 2.0]})
-    p = Prep().fit(df)
+    assert "a__na" not in Prep().fit(df).transform(df).columns            # el sistema: sin indicadores
+    p = Prep().fit(df, flag_min=0.03)
     Z = p.transform(df)
     assert "a__na" in Z.columns and "b" not in Z.columns                   # constante: fuera
     q = Prep.from_dict(json.loads(json.dumps(p.to_dict())))
