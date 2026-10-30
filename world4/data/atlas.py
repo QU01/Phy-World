@@ -120,10 +120,29 @@ def install(src: str | Path | None = None, dest: Path | None = None) -> dict:
             out.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(p, out)
         _generate_panel_full()
+        _match_line_endings(dest)
     finally:
         if tmp is not None:
             shutil.rmtree(tmp, ignore_errors=True)
     return verify(dest)
+
+
+def _match_line_endings(base: Path) -> list[str]:
+    """El manifiesto se fijó en Windows: git convierte los CSV a CRLF al hacer checkout y pandas escribe CRLF
+    (``os.linesep``). En Linux o macOS los mismos datos salen con LF y otro SHA-256. Un fichero cuya única
+    diferencia es esa se reescribe con CRLF: queda idéntico byte a byte al fijado. Cualquier otra diferencia
+    sigue siendo un error de ``verify``."""
+    fixed = []
+    for rel, meta in manifest()["files"].items():
+        p = base / rel
+        if not p.is_file() or sha256(p) == meta["sha256"]:
+            continue
+        b = p.read_bytes()
+        crlf = b.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+        if crlf != b and hashlib.sha256(crlf).hexdigest() == meta["sha256"]:
+            p.write_bytes(crlf)
+            fixed.append(rel)
+    return fixed
 
 
 def _generate_panel_full():
