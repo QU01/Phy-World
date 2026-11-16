@@ -395,6 +395,42 @@
     "food (F5) water"
    ],
    "note": "Agricultural freshwater withdrawals; sparse (AQUASTAT reports every ~5 years). Not vendored."
+  },
+  "ucdp_ged": {
+   "name": "UCDP Georeferenced Event Dataset (GED) Global 26.1 and UCDP Candidate Events 26.0.X",
+   "license": "CC BY 4.0",
+   "mark": "[V]",
+   "redistributable": true,
+   "vintage": "GED 26.1 (1989-2025); Candidate January-September 2026",
+   "lag_years": 1,
+   "used_in": [
+    "L2 events (F12)"
+   ],
+   "note": "Licence read on ucdp.uu.se/downloads on 2026-11-16 ('All datasets are free of charge and licensed under CC BY 4.0'). The final GED of year y is published in mid y+1; candidate events are monthly with about one month of lag and only those coded 'Clear' are used. W13 scores against the final GED and its features at the origin use the final GED too (leak D-L2-1). Not vendored: l2_manifest.json."
+  },
+  "prio_grid": {
+   "name": "PRIO-GRID 2.0 (API of grid.prio.org): gwno, pop_gpw_sum (GPW v3), capdist, bdist1, excluded (GeoEPR), nlights, mountains, ttime, land cover",
+   "license": "none stated ('freely available to all interested users', cite Tollefsen, Strand & Buhaug 2012); third-party variables keep their own terms",
+   "mark": "[V]",
+   "redistributable": null,
+   "vintage": "v2.0 (codebook of 2016-06-02); yearly variables end in 2010-2014",
+   "lag_years": 0,
+   "used_in": [
+    "L2 cells (F12)"
+   ],
+   "note": "Codebook read through the site on 2026-11-16: no licence text, so it is treated as not redistributable and never vendored. Static in the L2: the cell population is the GPW v3 2010 distribution rescaled to WPP country totals [S]; the country of a cell is the 2014 one."
+  },
+  "unhcr_refugees": {
+   "name": "UNHCR Refugee Population Statistics Database (R package 'refugees' 2025.12.3: population, flows, idmc)",
+   "license": "CC BY 4.0",
+   "mark": "[V]",
+   "redistributable": true,
+   "vintage": "package commit c7bd34a (2025.12.3); years 1951-2025",
+   "lag_years": 1,
+   "used_in": [
+    "L2 displacement (F12)"
+   ],
+   "note": "LICENSE.md of github.com/PopulationStatistics/refugees read on 2026-11-16. The idmc table is the Internal Displacement Monitoring Centre's series as redistributed by UNHCR; IDMC's own terms were not opened [S]. Stocks of year y are treated as known from January of y+1 (optimistic by about six months, declared). UNRWA-mandate Palestine refugees are not included."
   }
  },
  "reference_models": {

@@ -57,6 +57,11 @@ CRITERIA = [
               "data file with SHA-256; nothing non-redistributable inside the repo",
               "sources.json + atlas/wpp/energy/climate/food manifests",
               mark="[V]"),
+    Criterion("W13", "L2 events against its references (F12)",
+              "rolling origins 2015-2024 (test period; 2005-2014 chose the model): monthly deaths by country and by "
+              "cell; the simulator of agents must beat zero, last-12-months and the hurdle model in CRPS of "
+              "ln(1 + deaths), 95 % CI by country below zero, at 1, 3, 6 and 12 months for both levels; ViEWS reported",
+              "UCDP GED 26.1 (final) for the Middle East; runs/l2_w13.json", mark="[V]"),
 ]
 
 BLOCKS = {
@@ -220,6 +225,10 @@ def _w12(crit) -> Score:
     fman = fdata.manifest()
     if not all(len(m["sha256"]) == 64 for m in fman["files"].values()):
         problems.append("food manifest with an invalid hash")
+    from world4.data import conflict as l2data
+    lman = l2data.manifest()
+    if not all(len(m["sha256"]) == 64 for m in lman["files"].values()):
+        problems.append("L2 manifest with an invalid hash")
     vendored = [p for p in (ROOT / "world4").rglob("*.csv")] + [p for p in (ROOT / "world4").rglob("*.csv.gz")]
     if vendored:
         problems.append(f"data inside the package: {[p.name for p in vendored]}")
@@ -231,7 +240,7 @@ def _w12(crit) -> Score:
                  measured=(f"{len(vintages.sources())} sources registered, {unknown} with licence [?]; "
                            f"not redistributable: {', '.join(restricted) or 'none'}; "
                            f"{len(man['files'])} Atlas + {len(wman['files'])} WPP + {len(eman['files'])} energy + "
-                           f"{len(cman['files'])} climate + {len(fman['files'])} food files with SHA-256; "
+                           f"{len(cman['files'])} climate + {len(fman['files'])} food + {len(lman['files'])} L2 files with SHA-256; "
                            "0 third-party data in the package"),
                  cause=(f"{unknown} unverified licences: not blocking because World4 redistributes nothing, "
                         "but those data may not be used outside the local install") if unknown else "")
@@ -630,6 +639,34 @@ def _w11(crit) -> Score:
                                                              "misses its mutant")
 
 
+W13_STEPS = ("1", "3", "6", "12")
+
+
+def _w13(crit) -> Score:
+    from world4.data import conflict as l2data
+    f = RUNS / "l2_w13.json"
+    if not l2data.available():
+        return Score(crit, BLOCKED, cause="no L2 data", waits_on=("python world4_cli.py --install-l2",))
+    if not f.is_file():
+        return Score(crit, BLOCKED, cause="no W13 run", waits_on=("python world4_cli.py --l2-validate",))
+    d = json.loads(f.read_text(encoding="utf-8"))
+    ver = d["verdict"]
+    need = [f"{lv}/{s}" for lv in ("country", "cell") for s in W13_STEPS]
+    grade = [k for k in need if ver.get(k, {}).get("forecast_grade")]
+    worse = [k for k in need if ver.get(k, {}).get("loses_to")]
+    per = ", ".join(f"{k} {ver[k]['skill_vs_best']:+.3f} vs {ver[k]['best_reference']}" for k in need if k in ver)
+    measured = (f"{d['n_origins']} origins {d['origins'][0]}..{d['origins'][-1]}, {d['region']}; skill = 1 - "
+                f"CRPS(agents) / CRPS(best reference) on ln(1 + deaths): {per}; beats every reference at "
+                f"{len(grade)}/{len(need)} level-steps")
+    cause = "ViEWS is not reported (its forecast archive could not be reached from here)"
+    if len(grade) == len(need):
+        return Score(crit, AMBER, measured=measured, detail=d, cause=cause)
+    return Score(crit, RED, measured=measured, detail=d,
+                 cause=(f"the simulator does not beat every reference at {sorted(set(need) - set(grade))}"
+                        + (f" and is significantly worse than a reference at {worse}" if worse else "")
+                        + "; " + cause))
+
+
 def build() -> Campaign:
     camp = Campaign("Phy-World", CRITERIA)
     camp.measure("W1")(_w1)
@@ -644,6 +681,7 @@ def build() -> Campaign:
     camp.measure("W7")(_w7)
     camp.measure("W10")(_w10)
     camp.measure("W11")(_w11)
+    camp.measure("W13")(_w13)
     for cid, waits in BLOCKS.items():
         camp.block(cid, waits)
     return camp

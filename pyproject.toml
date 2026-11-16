@@ -23,6 +23,8 @@ test = ["pytest"]
 wpp = ["rdata==1.1.0"]
 # F4: el modelo de clima FaIR (Apache-2.0); con su conjunto calibrado 1.6.0 (--install-climate)
 climate = ["fair==2.2.4"]
+# F12: convertir las tablas .rda de ACNUR y de WPP para el L2 (--install-l2); leer el .npz no lo necesita
+l2 = ["rdata==1.1.0"]
 # F8 (opcional): EMA Workbench (BSD-3, verificada en su LICENSE) como referencia de PRIM; World4 trae el suyo
 dmdu = ["ema_workbench==2.5.3"]
 # F8 (opcional): el PPO anclado del Atlas (recommend.py, rl.py); World4 sólo usa su problema inverso

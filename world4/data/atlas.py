@@ -46,6 +46,24 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+TEXT_SUFFIXES = (".csv", ".json")
+
+
+def sha256_crlf(path: Path) -> str:
+    """SHA-256 que tendría el fichero de texto con finales de línea CRLF. El manifiesto se generó en un
+    checkout de Windows (``core.autocrlf``): los mismos datos clonados en Linux o macOS tienen LF y otro
+    hash, sin que cambie ningún valor."""
+    data = Path(path).read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+    return hashlib.sha256(data).hexdigest()
+
+
+def matches(path: Path, expected: str) -> bool:
+    """El fichero es el del manifiesto, byte a byte o salvo los finales de línea (sólo texto)."""
+    if sha256(path) == expected:
+        return True
+    return Path(path).suffix in TEXT_SUFFIXES and sha256_crlf(path) == expected
+
+
 def _files(base: Path, rels) -> dict[str, Path]:
     out = {}
     for rel in rels:
@@ -83,7 +101,7 @@ def verify(base: Path | None = None) -> dict:
         p = base / rel
         if not p.is_file():
             missing.append(rel)
-        elif sha256(p) != meta["sha256"]:
+        elif not matches(p, meta["sha256"]):
             bad.append(rel)
     return {"ok": not missing and not bad, "missing": missing, "mismatched": bad, "root": str(base),
             "commit": man["commit"]}
