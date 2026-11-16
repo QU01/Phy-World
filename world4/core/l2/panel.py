@@ -94,7 +94,7 @@ class Panel:
     def _spread(self, index: np.ndarray, n_index: int, value: np.ndarray, mask=None) -> np.ndarray:
         """(n_index, T): cada evento reparte ``value`` a partes iguales entre los meses que abarca."""
         e = self.ev
-        out = np.zeros((n_index, self.T))
+        out = np.zeros((n_index, self.T), np.float32)          # float32: a escala mundial son muchas series
         ok = (index >= 0) if mask is None else (index >= 0) & mask
         t0, t1 = e["t0"][ok], e["t1"][ok]
         idx, v = index[ok], value[ok].astype(float)
@@ -272,24 +272,25 @@ def load(region: str = "mideast") -> Panel:
 
 
 # ---------------------------------------------------------------------- rasgos con retardo
-def lagged_mean(x: np.ndarray, k: int) -> np.ndarray:
+def lagged_mean(x: np.ndarray, k: int, cols=None) -> np.ndarray:
     """(U, T+1): la columna ``t`` es la media de ``x[:, t-k:t]`` (con menos meses al principio, la de los que hay).
-    La columna ``T`` describe el mes siguiente al último dato: es la que usa un pronóstico vivo."""
-    cs = np.concatenate([np.zeros(x.shape[:-1] + (1,)), np.cumsum(x, -1)], -1)
-    t = np.arange(x.shape[-1] + 1)
+    La columna ``T`` describe el mes siguiente al último dato: es la que usa un pronóstico vivo. Con ``cols``
+    sólo se devuelven esas columnas (U, len(cols)): a escala mundial no caben todas."""
+    cs = np.concatenate([np.zeros(x.shape[:-1] + (1,)), np.cumsum(x, -1, dtype=np.float64)], -1)
+    t = np.arange(x.shape[-1] + 1) if cols is None else np.asarray(cols)
     lo = np.maximum(t - k, 0)
     return (cs[..., t] - cs[..., lo]) / np.maximum(t - lo, 1)
 
 
-def months_since(x: np.ndarray, cap: float = TSL_CAP) -> np.ndarray:
+def months_since(x: np.ndarray, cap: float = TSL_CAP, cols=None) -> np.ndarray:
     """(U, T+1): meses desde el último mes con ``x > 0`` ANTES de ``t`` (``cap`` si nunca o hace más)."""
     U, T = x.shape
-    out = np.full((U, T + 1), cap)
+    out = np.full((U, T + 1), cap, np.float32)
     last = np.full(U, -np.inf)
     for t in range(1, T + 1):
         last = np.where(x[:, t - 1] > 0, t - 1, last)
         out[:, t] = np.minimum(t - last, cap)
-    return out
+    return out if cols is None else out[:, np.asarray(cols)]
 
 
 def neighbour_sum(x: np.ndarray, nbr: np.ndarray) -> np.ndarray:

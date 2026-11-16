@@ -35,8 +35,9 @@ Phase **F9** makes it a standalone product: `pip install` gives a `world4` comma
 line says nothing, `--help-numbers`, `--fidelity`, WALLS / TIGHT / THE LAST BLOCKER when the limits cannot be met;
 a self-contained HTML report (`--report`), the Atlas globe with World4 layers (`--dashboard`), an MCP server
 (`--mcp`), and honesty measured as a criterion (W11).
-Phase **F12** adds the events layer (**L2**), first for the Middle East: monthly, on the 0.5° PRIO-GRID, estimated on
-the UCDP georeferenced events of 1989-2026. Armed actors and their dyads decide each month whether and how much to
+Phase **F12** adds the events layer (**L2**) for the whole world, in the five UCDP regions (Africa, Americas, Asia,
+Europe, Middle East; 191 countries, about 65 000 cells): monthly, on the 0.5° PRIO-GRID, estimated on the UCDP georeferenced
+events of 1989-2026. The Middle East came first and chose the form of the model; the other four regions took it as it was. Armed actors and their dyads decide each month whether and how much to
 fight, events land on a footprint that moves with the simulation, new dyads are born, and population blocks flee and
 return (UNHCR/IDMC stocks). It is scored against a persistence reference and a statistical hurdle model on rolling
 origins (W13) and **does not beat them** (see [docs/F12-informe.md](docs/F12-informe.md)): everything it gives is
@@ -75,7 +76,7 @@ python -m venv .venv
 .venv/Scripts/python world4_cli.py --install-climate          # FaIR calibration 1.6.0 + HadCRUT5, SHA-256 checked (F4)
 .venv/Scripts/python world4_cli.py --install-food             # FAOSTAT + WDI water, SHA-256 checked (F5)
 .venv/Scripts/python -m pip install -e .[l2]
-.venv/Scripts/python world4_cli.py --install-l2               # UCDP GED + candidate, PRIO-GRID, UNHCR, WPP (F12, ~110 MB)
+.venv/Scripts/python world4_cli.py --install-l2 --l2-region world   # UCDP GED + candidate, PRIO-GRID, UNHCR, WPP (F12, ~110 MB)
 ```
 
 On Linux and macOS the interpreter is `.venv/bin/python`. The Atlas manifest was written on Windows; its SHA-256
@@ -106,9 +107,9 @@ python world4_cli.py --levers               # F8: policy levers and narratives
 python world4_cli.py --theta "carbon_price=150,efficiency=0.01" --narrative ssp2   # one policy, robust objectives, PRIM
 python world4_cli.py --design               # F8: robust search, PRIM, regret, conduct (~10 min)
 python world4_cli.py --calibrate            # F7: posterior (models/posterior.npz), calibrated W4 hindcast, W8 (~1 h)
-python world4_cli.py --l2-forecast --horizon 12                 # F12: Middle East, deaths by country and cell, displacement
-python world4_cli.py --l2-forecast --as-of-month 2023-10 --json # F12: the same as it would have been made then
-python world4_cli.py --l2-validate          # F12: W13, rolling origins 2015-2024 against the references (~5 min)
+python world4_cli.py --l2-forecast --l2-region world --horizon 12   # F12: deaths by country and cell, displacement (191 countries)
+python world4_cli.py --l2-forecast --l2-region africa --as-of-month 2023-04 --json   # one region, as it would have been made then
+OMP_NUM_THREADS=1 python world4_cli.py --l2-validate --l2-region world   # F12: W13, origins 2015-2024, five regions (~1 h on 4 cores)
 python world4_cli.py --validate             # W3/W5 rolling origin + hindcasts (population, psi, energy, CO2, GMST, cereals, cropland) + AR6 check (~50 min)
 ```
 
@@ -118,7 +119,8 @@ Exit codes: 0 ok, 2 spec error, 3 infeasible (for `--theta`: a declared limit is
 from world4 import api
 api.query("conflict_hazard", "COL", 2000, 2005)   # Distribution with p10/p50/p90, unit, caveats
 api.run_l0(scenario=1)
-api.l2_forecast("mideast", horizon=12)            # F12: p10/p50/p90 by country, hotspots, displacement; exploratory
+api.l2_forecast("world", horizon=12)              # F12: p10/p50/p90 by country, hotspots, displacement; exploratory
+api.l2_forecast("mideast", horizon=12)            # or one region: africa, americas, asia, europe, mideast
 ```
 
 ## Tests

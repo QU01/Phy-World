@@ -67,7 +67,7 @@ def one_origin(args) -> dict:
     Q = P.truncated(t0)                              # nada de t0 en adelante puede entrar en el ajuste
     H = {lv: max(s for s in STEPS[lv]) for lv in STEPS}
     truth_hi = P.last_final_month + 1
-    res = {"t0": int(t0), "models": {}}
+    res = {"t0": int(t0), "region": region, "models": {}}
     y = {lv: P.deaths(lv)[:, t0:min(t0 + H[lv], truth_hi)] for lv in STEPS}
     ens = {}
     run = forecast.run(Q, t0, H["country"], members=members, seed=seed, l1=opt.get("l1", False),
@@ -102,25 +102,45 @@ def _cluster_ci(diff: np.ndarray, cluster: np.ndarray, n_boot: int = 1000, seed:
     return [float(np.quantile(means, 0.025)), float(np.quantile(means, 0.975))]
 
 
-def summarise(P, parts: list, model: str = "agents") -> dict:
-    """Media por nivel, paso y métrica de cada variante, y ``model`` menos cada referencia con su IC."""
-    out = {"origins": [P.label(p["t0"]) for p in parts], "n_origins": len(parts), "levels": {}}
-    cluster = {"country": np.arange(P.K), "cell": P.cell_country}
+def summarise(panels, parts: list, model: str = "agents") -> dict:
+    """Media por nivel, paso y métrica de cada variante, y ``model`` menos cada referencia con su IC.
+    ``panels`` es un panel o un dict región -> panel; con varias regiones se juntan todas las unidades y el
+    remuestreo sigue siendo por países enteros."""
+    if not isinstance(panels, dict):
+        panels = {panels.region: panels}
+        parts = [{**q, "region": q.get("region", next(iter(panels)))} for q in parts]
+    by_region = {r: sorted([q for q in parts if q["region"] == r], key=lambda q: q["t0"]) for r in panels}
+    by_region = {r: v for r, v in by_region.items() if v}
+    first = next(iter(by_region.values()))
+    P0 = panels[first[0]["region"]]
+    out = {"origins": [P0.label(q["t0"]) for q in first], "n_origins": len(first), "levels": {},
+           "regions_pooled": list(by_region)}
+    cluster, off = {"country": [], "cell": []}, 0
+    for r in by_region:                               # un identificador de país único entre regiones
+        P = panels[r]
+        cluster["country"].append(off + np.arange(P.K))
+        cluster["cell"].append(off + np.where(P.cell_country >= 0, P.cell_country, P.K))
+        off += P.K + 1
+    names = list(first[0]["models"])
     for lv in STEPS:
         L = {}
         for j, s in enumerate(STEPS[lv]):
             row = {}
             for metric in METRICS[lv]:
-                stack = {name: np.stack([p["models"][name][lv][metric][:, j] for p in parts])
-                         for name in parts[0]["models"]}                       # (origins, U)
+                stack, cl = {n: [] for n in names}, []
+                for i, (r, qs) in enumerate(by_region.items()):
+                    for n in names:
+                        stack[n].append(np.stack([q["models"][n][lv][metric][:, j] for q in qs]).reshape(-1))
+                    cl.append(np.tile(cluster[lv][i], len(qs)))
+                stack = {n: np.concatenate(v) for n, v in stack.items()}
+                cl = np.concatenate(cl)
                 n = int(np.isfinite(stack[model]).sum())
                 cell = {"n": n, "mean": {k: (float(np.nanmean(v)) if n else None) for k, v in stack.items()}}
                 if n:
-                    cl = np.broadcast_to(cluster[lv][None], stack[model].shape).reshape(-1)
                     for ref in stack:
                         if ref == model:
                             continue
-                        d = (stack[model] - stack[ref]).reshape(-1)
+                        d = stack[model] - stack[ref]
                         cell[f"minus_{ref}"] = {"mean": float(np.nanmean(d)), "ci95": _cluster_ci(d, cl)}
                 row[metric] = cell
             L[str(s)] = row
@@ -146,25 +166,37 @@ def verdict(summary: dict, metric: str = "crps_log") -> dict:
     return out
 
 
+LEAKS = ["D-L2-1: features at the origin use the final GED, which at that date existed only as candidate events "
+         "or not at all"]
+UNIT = "deaths per month (UCDP best estimate, all three types of violence)"
+
+
+def _finish(s: dict, **extra) -> dict:
+    s.update({"unit": UNIT, "verdict": verdict(s), "exploratory": True, "leaks_declared": LEAKS, **extra})
+    return s
+
+
 def run(region: str = "mideast", period: str = "test", members: int = MEMBERS, workers: int = 4, opt=None,
         log=print) -> dict:
-    from world4.core.l2 import panel
-    P = panel.load(region)
+    """W13 de una región o, con ``world``, de las cinco: el resumen junta todas las unidades y ``regions``
+    guarda el de cada una. La forma del modelo se eligió con ``mideast`` 2005-2014: para las otras cuatro
+    regiones los dos periodos son prueba."""
+    from world4.core.l2 import panel, regions
+    names = regions.names(region)
+    panels = {r: panel.load(r) for r in names}
     opt = dict(opt or {})
-    ts = origins(P, DEV_YEARS if period == "dev" else TEST_YEARS)
     t = time.time()
-    jobs = [(region, t0, members, 1000 + t0, opt) for t0 in ts]
+    jobs = [(r, t0, members, 1000 + t0, opt) for r in sorted(names, key=lambda r: -panels[r].S)
+            for t0 in origins(panels[r], DEV_YEARS if period == "dev" else TEST_YEARS)]
     if workers > 1:
         with get_context("spawn").Pool(workers) as pool:
             parts = pool.map(one_origin, jobs, chunksize=1)
     else:
         parts = [one_origin(j) for j in jobs]
-    s = summarise(P, parts)
-    s.update({"region": region, "period": period, "members": members, "options": opt, "seconds": time.time() - t,
-              "unit": "deaths per month (UCDP best estimate, all three types of violence)",
-              "verdict": verdict(s), "exploratory": True,
-              "leaks_declared": ["D-L2-1: features at the origin use the final GED, which at that date existed "
-                                 "only as candidate events or not at all"]})
+    common = {"period": period, "members": members, "options": opt}
+    s = _finish(summarise(panels, parts), region=region, seconds=time.time() - t, **common)
+    if len(names) > 1:
+        s["regions"] = {r: _finish(summarise({r: panels[r]}, parts), region=r, **common) for r in names}
     for lv in STEPS:
         for st in STEPS[lv]:
             c = s["levels"][lv][str(st)]["crps_log"]
@@ -195,7 +227,7 @@ def _disp_origin(args) -> dict:
     P = panel.load(region)
     t0 = P.month(year, 1)
     Q = P.truncated(t0)
-    th = dm.fit(Q, t0, maxiter=200)
+    th = dm.fit_cached(Q, t0, maxiter=200)
     H = 12 * max(DISP_YEARS_AHEAD)
     site = P.site_deaths()                                  # la verdad, con los sitios del panel completo
     Hd = min(H, P.T - t0)
@@ -204,8 +236,8 @@ def _disp_origin(args) -> dict:
     full = forecast.run(Q, t0, H, members=members, seed=seed, disp_params=th).displaced
     j0 = year - 1 - int(P.years[0])
     last = {"ref": np.nan_to_num(P.ref_stock[:, :, j0].sum(1)), "idp": np.nan_to_num(P.idp_stock[:, j0])}
-    out = {"year": int(year), "params": {k: (v.tolist() if hasattr(v, "tolist") else v) for k, v in th.items()
-                                         if k != "x"}, "rows": []}
+    out = {"year": int(year), "region": region,
+           "params": {k: (v.tolist() if hasattr(v, "tolist") else v) for k, v in th.items() if k != "x"}, "rows": []}
     for a in DISP_YEARS_AHEAD:
         j, h = j0 + a, 12 * a - 1
         if j >= len(P.years):
@@ -217,7 +249,8 @@ def _disp_origin(args) -> dict:
                 if not np.isfinite(o) or (what == "idp" and o <= 0 and last[what][k] <= 0):
                     continue                                   # sin registro de desplazados internos
                 ens = full[what][:, k, h]
-                out["rows"].append({"years_ahead": a, "what": what, "country": P.iso3[k], "observed": o,
+                out["rows"].append({"years_ahead": a, "what": what, "country": P.iso3[k], "region": region,
+                                    "observed": o,
                                     "persistence": float(last[what][k]),
                                     "driven": float(driven[what][0, k, h]) if h < Hd else None,
                                     "p10": float(np.percentile(ens, 10)), "p50": float(np.median(ens)),
@@ -225,19 +258,9 @@ def _disp_origin(args) -> dict:
     return out
 
 
-def displacement_run(region: str = "mideast", members: int = 48, workers: int = 4, log=print) -> dict:
-    """Error de los stocks de desplazados fuera de muestra, en asinh(personas / 10 000) (≈ error logarítmico
-    para stocks grandes), contra la persistencia del último stock publicado."""
+def _disp_table(rows: list, log=None) -> dict:
     from world4.core.l2 import displacement as dm
-    t = time.time()
-    jobs = [(region, y, members, 500 + y) for y in DISP_ORIGIN_YEARS]
-    if workers > 1:
-        with get_context("spawn").Pool(min(workers, len(jobs))) as pool:
-            parts = pool.map(_disp_origin, jobs, chunksize=1)
-    else:
-        parts = [_disp_origin(j) for j in jobs]
     f = lambda v: np.arcsinh(np.asarray(v, float) / dm.SCALE)  # noqa: E731
-    rows = [r for p in parts for r in p["rows"]]
     table = {}
     for a in DISP_YEARS_AHEAD:
         for what in ("ref", "idp"):
@@ -251,12 +274,32 @@ def displacement_run(region: str = "mideast", members: int = 48, workers: int = 
                 cell[m] = float(np.mean(np.abs(f([r[key] for r in sel]) - o)))
             cell["coverage_p10_p90"] = float(np.mean([r["p10"] <= r["observed"] <= r["p90"] for r in sel]))
             table[f"{what}/{a}"] = cell
-            log(f"  {what} +{a}y n={cell['n']:3d} |error| persistence {cell['persistence']:.3f} driven "
-                f"{cell['driven_by_observed_deaths']:.3f} forecast {cell['full_forecast_p50']:.3f}; p10-p90 covers "
-                f"{cell['coverage_p10_p90']:.2f}")
-    return {"region": region, "origins": list(DISP_ORIGIN_YEARS), "members": members, "exploratory": True,
-            "unit": "mean absolute error of asinh(persons / 10 000) of the end-of-year stock; coverage is a share",
-            "table": table, "rows": rows, "params": {str(p["year"]): p["params"] for p in parts},
-            "seconds": time.time() - t,
-            "note": "ref = refugees and asylum seekers by origin (UNHCR); idp = internally displaced, the larger of "
-                    "UNHCR and IDMC; stocks of year y - 1 are taken as known in January of y"}
+            if log:
+                log(f"  {what} +{a}y n={cell['n']:3d} |error| persistence {cell['persistence']:.3f} driven "
+                    f"{cell['driven_by_observed_deaths']:.3f} forecast {cell['full_forecast_p50']:.3f}; p10-p90 "
+                    f"covers {cell['coverage_p10_p90']:.2f}")
+    return table
+
+
+def displacement_run(region: str = "mideast", members: int = 48, workers: int = 4, log=print) -> dict:
+    """Error de los stocks de desplazados fuera de muestra, en asinh(personas / 10 000) (≈ error logarítmico
+    para stocks grandes), contra la persistencia del último stock publicado."""
+    from world4.core.l2 import regions
+    t = time.time()
+    names = regions.names(region)
+    jobs = [(r, y, members, 500 + y) for r in names for y in DISP_ORIGIN_YEARS]
+    if workers > 1:
+        with get_context("spawn").Pool(min(workers, len(jobs))) as pool:
+            parts = pool.map(_disp_origin, jobs, chunksize=1)
+    else:
+        parts = [_disp_origin(j) for j in jobs]
+    rows = [r for p in parts for r in p["rows"]]
+    out = {"region": region, "origins": list(DISP_ORIGIN_YEARS), "members": members, "exploratory": True,
+           "unit": "mean absolute error of asinh(persons / 10 000) of the end-of-year stock; coverage is a share",
+           "table": _disp_table(rows, log), "rows": rows,
+           "params": {f"{p['region']}/{p['year']}": p["params"] for p in parts}, "seconds": time.time() - t,
+           "note": "ref = refugees and asylum seekers by origin (UNHCR); idp = internally displaced, the larger of "
+                   "UNHCR and IDMC; stocks of year y - 1 are taken as known in January of y"}
+    if len(names) > 1:
+        out["regions"] = {r: _disp_table([q for q in rows if q["region"] == r]) for r in names}
+    return out

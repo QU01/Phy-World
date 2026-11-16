@@ -27,39 +27,41 @@ TRAIN_STRIDE = {"country": 1, "cell": 3}     # las celdas entrenan con un origen
 MIN_POSITIVE = 30                # con menos filas positivas, la parte positiva usa la media sin regresión
 
 
-def features(P: pn.Panel, level: str, kind: str = "all") -> tuple[np.ndarray, list]:
-    """(U, T+1, F): la columna ``t`` describe la unidad con datos anteriores a ``t``."""
+def features(P: pn.Panel, level: str, kind: str = "all", cols=None) -> tuple[np.ndarray, list]:
+    """(U, T+1, F): la columna ``t`` describe la unidad con datos anteriores a ``t``. Con ``cols`` (meses) sólo
+    se construyen esas columnas, (U, len(cols), F): es lo que usan el ajuste y el pronóstico."""
     y = P.deaths(level, kind)
+    T1 = y.shape[1] + 1
+    cols = np.arange(T1) if cols is None else np.asarray(cols)
     f, names = [], []
     for k in pn.WINDOWS:
-        f.append(np.log1p(pn.lagged_mean(y, k)))
+        f.append(np.log1p(pn.lagged_mean(y, k, cols)))
         names.append(f"own{k}")
-    f.append(np.log1p(pn.months_since(y)))
+    f.append(np.log1p(pn.months_since(y, cols=cols)))
     names.append("since")
-    T1 = y.shape[1] + 1
-    yr = np.clip(P.year0 + np.arange(T1) // 12 - int(P.pop_years[0]), 0, len(P.pop_years) - 1)
+    yr = np.clip(P.year0 + cols // 12 - int(P.pop_years[0]), 0, len(P.pop_years) - 1)
     if level == "country":
         tot = y.sum(0, keepdims=True)
         for k in (3, 12):
-            f.append(np.log1p(pn.lagged_mean(tot - y, k)))
+            f.append(np.log1p(pn.lagged_mean(tot - y, k, cols)))
             names.append(f"rest{k}")
         f.append(np.log(np.maximum(P.pop[:, yr], 1.0)))
         names.append("lpop")
     else:
         nb = pn.neighbour_sum(y, P.nbr)
         for k in (3, 12):
-            f.append(np.log1p(pn.lagged_mean(nb, k)))
+            f.append(np.log1p(pn.lagged_mean(nb, k, cols)))
             names.append(f"nbr{k}")
         yk = P.deaths("country", kind)
         cc = P.cell_country
         for k in (3, 12):
-            lk = np.log1p(pn.lagged_mean(yk, k))
+            lk = np.log1p(pn.lagged_mean(yk, k, cols))
             f.append(np.where((cc >= 0)[:, None], lk[np.maximum(cc, 0)], 0.0))
             names.append(f"country{k}")
         f.append(np.log1p(P.pop_cell[:, yr]))
         names.append("lpop")
         for j, n in enumerate(pn.COV_USED):
-            f.append(np.repeat(P.cov[:, j][:, None], T1, 1))
+            f.append(np.repeat(P.cov[:, j][:, None], len(cols), 1))
             names.append(n)
     return np.stack(f, -1), names
 
@@ -96,16 +98,18 @@ class Hurdle:
 def fit(P: pn.Panel, level: str, t0: int, kind: str = "all", steps=None) -> dict:
     """Un ``Hurdle`` por horizonte, con desenlaces anteriores a ``t0``."""
     steps = STEPS[level] if steps is None else steps
-    F, names = features(P, level, kind)
     y = P.deaths(level, kind)
     stride = TRAIN_STRIDE[level]
+    cols = np.arange(MIN_HISTORY, t0, stride)                  # los orígenes de entrenamiento, una sola vez
+    F, names = features(P, level, kind, cols)
     out = {"names": names, "level": level, "kind": kind, "t0": int(t0), "models": {}}
     for s in steps:
-        taus = np.arange(MIN_HISTORY, t0 - s + 1, stride)      # el desenlace tau + s - 1 es anterior a t0
-        if len(taus) < 12:
+        use = cols <= t0 - s                                   # el desenlace tau + s - 1 es anterior a t0
+        if use.sum() < 12:
             continue
-        X = F[:, taus].reshape(-1, F.shape[-1])
-        out["models"][int(s)] = Hurdle().fit(X, y[:, taus + s - 1].reshape(-1))
+        taus = cols[use]
+        X = F[:, use].reshape(-1, F.shape[-1])
+        out["models"][int(s)] = Hurdle().fit(X, y[:, taus + s - 1].reshape(-1).astype(float))
     return out
 
 
@@ -116,19 +120,23 @@ def _model_for(model: dict, s: int) -> Hurdle:
     return model["models"][min(ks, key=lambda k: (abs(k - s), k))]
 
 
+def _origin_features(P: pn.Panel, model: dict, t0: int) -> np.ndarray:
+    """(U, F) rasgos del origen: no usan nada de ``t0`` en adelante."""
+    F, _ = features(P, model["level"], model["kind"], [min(int(t0), P.T)])
+    return F[:, 0]
+
+
 def forecast(P: pn.Panel, model: dict, t0: int, horizon: int, members: int = 100, seed: int = 0) -> np.ndarray:
     """(members, U, horizon): el paso ``h`` (0 = el mes ``t0``) usa el modelo del horizonte ajustado más próximo.
     Los rasgos son los del origen: no usan nada de ``t0`` en adelante."""
-    F, _ = features(P, model["level"], model["kind"])
-    X = F[:, min(t0, F.shape[1] - 1)]
+    X = _origin_features(P, model, t0)
     rng = np.random.default_rng(seed)
     return np.stack([_model_for(model, h + 1).draw(X, members, rng) for h in range(horizon)], -1)
 
 
 def p_any(P: pn.Panel, model: dict, t0: int, horizon: int) -> np.ndarray:
     """(U, horizon) probabilidad de al menos una muerte en cada mes."""
-    F, _ = features(P, model["level"], model["kind"])
-    X = F[:, min(t0, F.shape[1] - 1)]
+    X = _origin_features(P, model, t0)
     return np.stack([_model_for(model, h + 1).p_any(X) for h in range(horizon)], -1)
 
 

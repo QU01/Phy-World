@@ -89,7 +89,7 @@ def run(P: pn.Panel, t0: int | None = None, horizon: int = 12, members: int = 64
     disp, th = None, None
     if displacement:
         from world4.core.l2 import displacement as dm
-        th = disp_params or dm.fit(P, t0)
+        th = disp_params or dm.fit_cached(P, t0)
         disp = dm.simulate(P, th, t0, r.site_deaths)
         disp["asylum_share"], disp["asylum_top"] = dm.asylum_shares(P, t0)
     return Forecast(region=P.region, t0=t0, horizon=horizon, members=members, model=M, run=r, panel=P,

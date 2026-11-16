@@ -4,7 +4,7 @@ población; produce eventos con el mismo esquema que los datos (UCDP GED) para p
 El nombre «L2» lo dejó libre la hoja de ruta: FaIR y los cultivos, que iban a ser un L2 aparte, viven dentro
 del L1 desde F4/F5. Esta fase es F12 (F11 sigue reservada al estimador estructural sobre el L1 completo).
 
-    regions       qué países forman cada región (hoy: ``mideast``)
+    regions       qué países forman cada una de las cinco regiones de UCDP; ``world`` son las cinco
     panel         el panel celda-mes y país-mes, las díadas y los actores, cortado «a fecha de»
     baseline      la vara: referencias sin modelo y un modelo estadístico de valla (país-mes y celda-mes)
     agents        el simulador de actores, díadas, huella espacial y nacimiento de díadas

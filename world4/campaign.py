@@ -58,10 +58,12 @@ CRITERIA = [
               "sources.json + atlas/wpp/energy/climate/food manifests",
               mark="[V]"),
     Criterion("W13", "L2 events against its references (F12)",
-              "rolling origins 2015-2024 (test period; 2005-2014 chose the model): monthly deaths by country and by "
-              "cell; the simulator of agents must beat zero, last-12-months and the hurdle model in CRPS of "
-              "ln(1 + deaths), 95 % CI by country below zero, at 1, 3, 6 and 12 months for both levels; ViEWS reported",
-              "UCDP GED 26.1 (final) for the Middle East; runs/l2_w13.json", mark="[V]"),
+              "rolling origins 2015-2024 (test period; the Middle East 2005-2014 chose the model): monthly deaths by "
+              "country and by cell; the simulator of agents must beat zero, last-12-months and the hurdle model in "
+              "CRPS of ln(1 + deaths), 95 % CI by country below zero, at 1, 3, 6 and 12 months for both levels; "
+              "ViEWS reported",
+              "UCDP GED 26.1 (final), the five UCDP regions pooled (runs/l2_w13_world.json) or, without that run, "
+              "the Middle East (runs/l2_w13_mideast.json)", mark="[V]"),
 ]
 
 BLOCKS = {
@@ -644,11 +646,12 @@ W13_STEPS = ("1", "3", "6", "12")
 
 def _w13(crit) -> Score:
     from world4.data import conflict as l2data
-    f = RUNS / "l2_w13.json"
+    f = next((RUNS / n for n in ("l2_w13_world.json", "l2_w13_mideast.json") if (RUNS / n).is_file()), None)
     if not l2data.available():
         return Score(crit, BLOCKED, cause="no L2 data", waits_on=("python world4_cli.py --install-l2",))
-    if not f.is_file():
-        return Score(crit, BLOCKED, cause="no W13 run", waits_on=("python world4_cli.py --l2-validate",))
+    if f is None:
+        return Score(crit, BLOCKED, cause="no W13 run",
+                     waits_on=("python world4_cli.py --l2-validate --l2-region world",))
     d = json.loads(f.read_text(encoding="utf-8"))
     ver = d["verdict"]
     need = [f"{lv}/{s}" for lv in ("country", "cell") for s in W13_STEPS]

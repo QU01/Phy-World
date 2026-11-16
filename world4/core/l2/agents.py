@@ -31,8 +31,12 @@ Las guerras entre Estados no tienen maquinaria aparte: en UCDP son díadas de do
 (rasgo ``interstate``). Hay tan pocas que su parte del pronóstico es exploratoria aunque el resto no lo sea.
 
 **Lo que es supuesto y no estimación [M]:** la semilla espacial de una díada nueva, el reparto de las
-muertes entre sitios en proporción a los eventos (un evento masivo no concentra sus muertes en un sitio) y
-el techo de eventos por díada y mes (``N_CAP`` veces el máximo histórico de la región).
+muertes de una díada y mes entre sus eventos a partes iguales en esperanza (un evento masivo no concentra
+sus muertes en un sitio) y el techo de eventos por díada y mes (``N_CAP`` veces el máximo histórico de la
+región).
+
+**Escala.** Los miembros se simulan en lotes de ``CHUNK`` con su propio generador (semilla, lote): el
+resultado es el mismo en una región de 3 000 celdas que en una de 20 000, quepa lo que quepa en memoria.
 """
 from __future__ import annotations
 
@@ -52,6 +56,9 @@ BIRTH_SLOTS = 40            # díadas nuevas como máximo por miembro
 BIRTH_WINDOW = 180          # meses de nacimientos que sirven de plantilla
 CENSOR = 24                 # los «nacimientos» de los primeros meses del GED son díadas que ya existían
 N_CAP = 2.0
+CHUNK = 8                   # miembros que se simulan a la vez (fijo: el resultado no depende de la memoria)
+BLOCK_CELLS = 3_000_000     # filas x sitios de probabilidad que se construyen de una vez
+BIG_ROW = 200_000           # muertes de una díada y mes a partir de las cuales se reparten con una multinomial
 FOOT_GRID = {"decay": (0.6, 0.8, 0.9, 0.97), "diffuse": (0.0, 0.03, 0.1, 0.3), "floor": (0.002, 0.02),
              "mix": (0.0, 0.5, 0.9)}
 COUNTRY_DECAY = 0.97        # memoria mensual de la huella de TODA la violencia de un país [M]
@@ -194,10 +201,12 @@ def fit_footprint(P: pn.Panel, t0: int, home: np.ndarray) -> dict:
                 ctot = Wc.sum(1)[hd[di]]
                 cshare = np.where(ctot > 0, Wc[hd[di], si] / np.maximum(ctot, 1e-12), pop_prior[hd[di], si])
                 priors = {mx: mx * cshare + (1 - mx) * pop_prior[hd[di], si] for mx in FOOT_GRID["mix"]}
+                rows, inv = np.unique(di, return_inverse=True)      # la difusión conserva la masa de cada fila
+                Wr = W[rows]
+                tot = Wr.sum(1, dtype=np.float64)[inv]
                 for diffuse in FOOT_GRID["diffuse"]:
-                    sp = spread(W, P.site_nbr, diffuse)
-                    tot = sp.sum(1)[di]
-                    share = np.where(tot > 0, sp[di, si] / np.maximum(tot, 1e-12), 0.0)
+                    sp = spread(Wr, P.site_nbr, diffuse)
+                    share = np.where(tot > 0, sp[inv, si] / np.maximum(tot, 1e-12), 0.0)
                     for floor in FOOT_GRID["floor"]:
                         for mx, pr in priors.items():
                             p = np.where(tot > 0, (1 - floor) * share + floor * pr, pr)
@@ -407,9 +416,46 @@ def _other(tot_actor: np.ndarray, side: np.ndarray, own: np.ndarray, kind: np.nd
 def simulate(P: pn.Panel, M: AgentModel, horizon: int, members: int = 64, seed: int = 0, l1=None,
              births: bool = True) -> AgentRun:
     """``members`` mundos desde ``M.t0``. ``l1`` (K, horizon) es la covariable del L1 por mes de pronóstico."""
-    R, D0, S, K = members, M.D0, P.S, P.K
+    parts = [_simulate(P, M, horizon, min(CHUNK, members - lo), np.random.default_rng([int(seed), c]), l1, births)
+             for c, lo in enumerate(range(0, members, CHUNK))]
+    if len(parts) == 1:
+        return parts[0]
+    return AgentRun(t0=M.t0, **{k: np.concatenate([getattr(q, k) for q in parts], 0)
+                                for k in ("site_deaths", "site_civ", "country_type", "dyad_events", "births",
+                                          "active_dyads")})
+
+
+def _sites(rng, W_rows, cf_rows, prior_rows, foot: dict, site_nbr: np.ndarray, na: np.ndarray) -> np.ndarray:
+    """Sitio de cada evento: ``na[i]`` sorteos de la fila ``i`` de la distribución huella + suelo. Equivale a
+    una multinomial por fila, pero sólo guarda un índice por evento (las filas van por bloques)."""
+    A, S = W_rows.shape
+    out = np.empty(int(na.sum()), np.int64)
+    u = rng.random(len(out))
+    start = np.concatenate([[0], np.cumsum(na)])
+    step = max(1, BLOCK_CELLS // S)
+    for b0 in range(0, A, step):
+        b1 = min(b0 + step, A)
+        w = spread(W_rows[b0:b1], site_nbr, foot["diffuse"])
+        tot = w.sum(1, keepdims=True)
+        prior = prior_rows[b0:b1]
+        if foot["mix"] > 0:
+            cf = cf_rows[b0:b1].astype(np.float64)
+            ctot = cf.sum(1, keepdims=True)
+            prior = np.where(ctot > 0, foot["mix"] * cf / np.maximum(ctot, 1e-300) + (1 - foot["mix"]) * prior, prior)
+        p = np.where(tot > 0, (1 - foot["floor"]) * w / np.maximum(tot, 1e-300) + foot["floor"] * prior, prior)
+        cdf = np.cumsum(p, 1)
+        cdf /= cdf[:, -1:]
+        lo, hi = start[b0], start[b1]
+        local = np.repeat(np.arange(b1 - b0), na[b0:b1])
+        idx = np.searchsorted((cdf + np.arange(b1 - b0)[:, None]).ravel(), u[lo:hi] + local, side="right")
+        out[lo:hi] = np.minimum(idx - local * S, S - 1)
+    return out
+
+
+def _simulate(P: pn.Panel, M: AgentModel, horizon: int, R: int, rng, l1, births: bool) -> AgentRun:
+    """Un lote de ``R`` miembros con su generador."""
+    D0, S, K = M.D0, P.S, P.K
     Dn = D0 + BIRTH_SLOTS
-    rng = np.random.default_rng(seed)
     rep = lambda a, dt=float: np.concatenate([np.repeat(np.asarray(a, dt)[None], R, 0),  # noqa: E731
                                               np.zeros((R, BIRTH_SLOTS), dt)], 1)
     exists = rep(np.ones(D0), bool)
@@ -508,31 +554,33 @@ def simulate(P: pn.Panel, M: AgentModel, horizon: int, members: int = 64, seed: 
             ev_row = np.repeat(np.arange(len(ar)), na)
             marks = M.pools[pool_row[ar, aj][ev_row], rng.integers(0, POOL, len(ev_row))]
             deaths = np.bincount(ev_row, weights=marks, minlength=len(ar))
-            w = spread(W[ar, aj].astype(np.float64), P.site_nbr, foot["diffuse"])
-            tot = w.sum(1, keepdims=True)
             hk = home[ar, aj]
-            prior = M.prior[hk]
-            if foot["mix"] > 0:
-                cf = CF[ar, hk].astype(np.float64)
-                ctot = cf.sum(1, keepdims=True)
-                prior = np.where(ctot > 0, foot["mix"] * cf / np.maximum(ctot, 1e-300) + (1 - foot["mix"]) * prior, prior)
-            p = np.where(tot > 0, (1 - foot["floor"]) * w / np.maximum(tot, 1e-300) + foot["floor"] * prior, prior)
-            p = p / p.sum(1, keepdims=True)
-            counts = rng.multinomial(na, p)                                   # (A, S)
+            site = _sites(rng, W[ar, aj], CF[ar, hk], M.prior[hk], foot, P.site_nbr, na)
+            # las muertes de la díada se reparten entre sus eventos: cada muerte elige uno al azar
             d_int = np.round(deaths).astype(np.int64)
-            d_site = rng.multinomial(d_int, counts / np.maximum(na[:, None], 1)).astype(np.float32)
-            np.add.at(out.site_deaths[:, :, h], (ar,), d_site)
-            np.add.at(out.site_civ[:, :, h], (ar,), d_site * M.civ_share[pool_row[ar, aj]][:, None].astype(np.float32))
-            np.add.at(out.country_type[:, :, h, :], (ar[:, None], P.site_country[None, :],
-                                                      (dtype[ar, aj] - 1)[:, None]), d_site)
-            np.add.at(out.active_dyads[:, :, h], (ar, home[ar, aj]), 1.0)
-            W *= foot["decay"]
-            W[ar, aj] += counts.astype(np.float32)
-            CF *= COUNTRY_DECAY
-            np.add.at(CF, (ar, hk), counts.astype(np.float32))
+            start = np.concatenate([[0], np.cumsum(na)[:-1]])
+            big = d_int > BIG_ROW
+            d_row = np.repeat(np.arange(len(ar)), np.where(big, 0, d_int))
+            d_site = site[start[d_row] + np.floor(rng.random(len(d_row)) * na[d_row]).astype(np.int64)]
+            d_cnt = np.ones(len(d_row), np.float32)
+            for i in np.where(big)[0]:                                        # una fila enorme: multinomial directa
+                c = rng.multinomial(d_int[i], np.full(na[i], 1.0 / na[i]))
+                d_row = np.concatenate([d_row, np.full(na[i], i)])
+                d_site = np.concatenate([d_site, site[start[i]:start[i] + na[i]]])
+                d_cnt = np.concatenate([d_cnt, c.astype(np.float32)])
+            np.add.at(out.site_deaths[:, :, h], (ar[d_row], d_site), d_cnt)
+            np.add.at(out.site_civ[:, :, h], (ar[d_row], d_site),
+                      d_cnt * M.civ_share[pool_row[ar, aj]][d_row].astype(np.float32))
+            np.add.at(out.country_type[:, :, h, :], (ar[d_row], P.site_country[d_site], (dtype[ar, aj] - 1)[d_row]),
+                      d_cnt)
+            np.add.at(out.active_dyads[:, :, h], (ar, hk), 1.0)
+            W *= np.float32(foot["decay"])
+            np.add.at(W, (ar[ev_row], aj[ev_row], site), np.float32(1.0))
+            CF *= np.float32(COUNTRY_DECAY)
+            np.add.at(CF, (ar[ev_row], hk[ev_row], site), np.float32(1.0))
         else:
-            W *= foot["decay"]
-            CF *= COUNTRY_DECAY
+            W *= np.float32(foot["decay"])
+            CF *= np.float32(COUNTRY_DECAY)
         out.dyad_events[:, :, h] = n
 
         # ---- memoria, edad y muerte de las díadas calladas

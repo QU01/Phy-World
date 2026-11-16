@@ -145,9 +145,11 @@ def install(src: str | Path | None = None, region: str = "mideast", log=print) -
     v = verify_raw()
     if not v["ok"]:
         raise ConflictDataError(f"L2 files missing {v['missing']} or with another SHA-256 {v['mismatched']}")
+    log(f"converting {', '.join(regions.names(region))}")
     out = convert(region)
     load.cache_clear()
-    return {**v, "npz": str(out), "npz_sha256": _sha(out)}
+    return {**v, "npz": str(out), "npz_sha256": _sha(out),
+            "regions": {r: str(npz_path(r)) for r in regions.names(region)}}
 
 
 # ------------------------------------------------------------------ conversión
@@ -155,16 +157,16 @@ def _month(ts) -> np.ndarray:
     return (ts.dt.year.to_numpy() - YEAR0) * 12 + ts.dt.month.to_numpy() - 1
 
 
-def _read_ged(raw: Path, reg: regions.Region):
+def _read_ged(raw: Path):
+    """El GED mundial más lo que el candidato añade después de su último día; ordenado por fecha."""
     import pandas as pd
     with zipfile.ZipFile(raw / GED_ZIP) as z, z.open(GED_CSV) as fh:
-        g = pd.read_csv(fh, usecols=GED_COLS, low_memory=False)
-    g = g[g.country_id.isin(reg.gw)].copy()
+        g = pd.read_csv(fh, usecols=GED_COLS + ["region"], low_memory=False)
     g["candidate"] = 0
     cand = raw / CANDIDATE
     if cand.is_file():
-        c = pd.read_csv(cand, usecols=GED_COLS, low_memory=False)
-        c = c[c.country_id.isin(reg.gw) & (c.code_status == "Clear")].copy()
+        c = pd.read_csv(cand, usecols=GED_COLS + ["region"], low_memory=False)
+        c = c[c.code_status == "Clear"].copy()
         c["candidate"] = 1
         last = pd.to_datetime(g.date_start).max()
         c = c[pd.to_datetime(c.date_start) > last]          # el candidato sólo añade lo posterior al GED final
@@ -174,9 +176,51 @@ def _read_ged(raw: Path, reg: regions.Region):
     return g.sort_values(["d0", "id"]).reset_index(drop=True)
 
 
-def _prio(raw: Path, var: str) -> dict:
-    d = json.loads((raw / f"prio_{var}.json").read_text(encoding="utf-8"))
-    return d["cells"]
+_PRIO: dict = {}
+
+
+def _prio(raw: Path, var: str) -> list:
+    if var not in _PRIO:
+        _PRIO[var] = json.loads((raw / f"prio_{var}.json").read_text(encoding="utf-8"))["cells"]
+    return _PRIO[var]
+
+
+def _gwno(raw: Path) -> dict:
+    """País (código GW, con los alias de ``regions.PRIO_ALIAS``) de cada celda de PRIO-GRID."""
+    return {c["gid"]: regions.PRIO_ALIAS.get(int(c["value"]), int(c["value"])) for c in _prio(raw, "gwno")}
+
+
+def country_table() -> dict:
+    """GW -> (ISO3, M49, continente), del paquete ``country_converter`` con las excepciones de
+    ``regions.GW_ISO3``. Sólo hace falta al convertir (extra ``world4[l2]``)."""
+    import logging
+
+    import country_converter as coco
+    lvl = logging.getLogger().level
+    logging.getLogger().setLevel(logging.CRITICAL)
+    try:
+        d = coco.CountryConverter().data
+    finally:
+        logging.getLogger().setLevel(lvl)
+    by_iso = {str(r.ISO3): (int(r.ISOnumeric), str(r.continent)) for r in d.itertuples() if r.ISOnumeric == r.ISOnumeric}
+    out = {int(r.GWcode): (str(r.ISO3), int(r.ISOnumeric), str(r.continent))
+           for r in d.itertuples() if r.GWcode == r.GWcode and r.ISOnumeric == r.ISOnumeric}
+    for g, iso in regions.GW_ISO3.items():
+        out[g] = (iso, *by_iso[iso])
+    return out
+
+
+def resolve_regions(g, gwno: dict) -> dict:
+    """Región -> [(iso3, gw, m49)] para todos los países con celdas en PRIO-GRID o eventos en el GED."""
+    table = country_table()
+    codes = sorted(set(gwno.values()) | {int(x) for x in g.country_id.unique()})
+    ucdp = {int(k): str(v) for k, v in g.drop_duplicates("country_id")[["country_id", "region"]].values}
+    where = regions.assign(codes, ucdp, table)
+    out = {r: [] for r in regions.WORLD}
+    for gw, r in where.items():
+        if gw in table:
+            out[r].append((table[gw][0], gw, table[gw][1]))
+    return out
 
 
 def _rda(path: Path):
@@ -195,22 +239,37 @@ def _actor_kind(name: str) -> int:
 
 
 def convert(region: str = "mideast") -> Path:
-    """Escribe ``l2_<region>.npz``. Necesita ``rdata`` (extra ``world4[l2]``); leer el ``.npz`` no."""
-    import pandas as pd
-    reg = regions.get(region)
+    """Escribe ``l2_<region>.npz`` (uno por región si ``region`` es ``world``; devuelve el último). Necesita
+    ``rdata`` y ``country_converter`` (extra ``world4[l2]``); leer los ``.npz`` no."""
     raw = root() / "raw"
-    gw_idx = {g: k for k, g in enumerate(reg.gw)}
+    g = _read_ged(raw)
+    gwno = _gwno(raw)
+    members = resolve_regions(g, gwno)
+    tables = {"popu": _rda(raw / "unhcr_population.rda"), "flows": _rda(raw / "unhcr_flows.rda"),
+              "idmc": _rda(raw / "unhcr_idmc.rda"), "est": _rda(raw / "popAge1dt.rda"),
+              "proj": _rda(raw / "popproj1dt.rda")}
+    tables["est"] = tables["est"][tables["est"].year >= YEAR0].groupby(["country_code", "year"]).pop.sum().reset_index()
+    tables["last_final_month"] = int(np.minimum(_month(g.d1), _month(g.d0).max())[g.candidate.to_numpy() == 0].max())
+    out = None
+    for name in regions.names(region):
+        reg = regions.build(name, members[name])
+        out = _convert_one(reg, g[g.country_id.isin(reg.gw)].reset_index(drop=True), gwno, tables, int(_month(g.d0).max()) + 1)
+    _PRIO.clear()
+    return out
 
-    # ---- eventos
-    g = _read_ged(raw, reg)
+
+def _convert_one(reg: regions.Region, g, gwno: dict, tables: dict, T: int) -> Path:
+    import pandas as pd
+    raw = root() / "raw"
+    gw_idx = {g_: k for k, g_ in enumerate(reg.gw)}
+
+    # ---- eventos (``T`` es el del GED mundial: todas las regiones acaban en el mismo mes)
     t0, t1 = _month(g.d0), _month(g.d1)
-    T = int(t0.max()) + 1                       # último mes con eventos que EMPIEZAN en él (el siguiente es parcial)
-    t1 = np.minimum(t1, T - 1)
+    t1 = np.minimum(t1, T - 1)                  # el mes siguiente al último con eventos que empiezan es parcial
     located = (g.where_prec.to_numpy() <= 5) & g.priogrid_gid.notna().to_numpy()
     ev_gid = np.where(located, g.priogrid_gid.fillna(0).to_numpy(), 0).astype(np.int64)
 
     # ---- celdas: las del país según PRIO-GRID más cualquiera con un evento de la región
-    gwno = {c["gid"]: int(c["value"]) for c in _prio(raw, "gwno")}
     gids = sorted({gid for gid, v in gwno.items() if v in gw_idx} | set(ev_gid[located].tolist()))
     gids = np.array(gids, np.int64)
     cidx = {int(x): i for i, x in enumerate(gids)}
@@ -246,14 +305,11 @@ def convert(region: str = "mideast") -> Path:
     didx = {int(d): i for i, d in enumerate(dy.dyad_new_id)}
 
     # ---- desplazamiento (ACNUR) y población (WPP)
-    unhcr_last = int(_rda(raw / "unhcr_population.rda").year.max())
-    years = np.arange(YEAR0, unhcr_last + 1)
+    popu, flows, idmc = tables["popu"], tables["flows"], tables["idmc"]
+    years = np.arange(YEAR0, int(popu.year.max()) + 1)
     unit = {iso: k for k, iso in enumerate(reg.iso3)}
     for iso, extra in reg.extra_iso3.items():
         unit.update({e: unit[iso] for e in extra})
-    popu = _rda(raw / "unhcr_population.rda")
-    flows = _rda(raw / "unhcr_flows.rda")
-    idmc = _rda(raw / "unhcr_idmc.rda")
     asylum = sorted({str(x) for x in pd.concat([popu.coa_iso, flows.coa_iso]).dropna().unique() if len(str(x)) == 3})
     jidx = {a: j for j, a in enumerate(asylum)}
     K, J, Y = reg.K, len(asylum), len(years)
@@ -281,9 +337,9 @@ def convert(region: str = "mideast") -> Path:
         m49.update({e: reg.index(iso) for e in extra})
     pop_y = np.arange(YEAR0, POP_YEAR1 + 1)
     pop = np.zeros((K, len(pop_y)))
-    est = _rda(raw / "popAge1dt.rda")
-    est = est[est.country_code.isin(m49) & (est.year >= YEAR0)].groupby(["country_code", "year"]).pop.sum().reset_index()
-    proj = _rda(raw / "popproj1dt.rda")
+    est = tables["est"]
+    est = est[est.country_code.isin(m49)]
+    proj = tables["proj"]
     proj = proj[proj.country_code.isin(m49) & (proj.year <= POP_YEAR1)].copy()
     proj["pop"] = proj.popM + proj.popF                                  # la mediana de la proyección
     for tab in (est, proj):
@@ -291,10 +347,13 @@ def convert(region: str = "mideast") -> Path:
                   tab["pop"].to_numpy() * 1e3)
     first_projected = int(proj.year.min())
 
-    out = npz_path(region)
+    out = npz_path(reg.code)
+    final = g.candidate.to_numpy() == 0
     np.savez_compressed(
-        out, region=np.array(reg.code), iso3=np.array(reg.iso3), year0=np.array(YEAR0), T=np.array(T),
-        last_final_month=np.array(int(t1[g.candidate.to_numpy() == 0].max())),
+        out, region=np.array(reg.code), iso3=np.array(reg.iso3), gw=np.array(reg.gw), m49=np.array(reg.m49),
+        year0=np.array(YEAR0), T=np.array(T),
+        last_final_month=np.array(int(tables["last_final_month"]) if "last_final_month" in tables
+                                  else int(t1[final].max()) if final.any() else T - 1),
         # celdas
         gid=gids, row=row.astype(np.int32), col=col.astype(np.int32), lon=lon, lat=lat, cell_country=cell_country,
         cov=cov, cov_names=np.array(COVARIATES), pop_gpw=pop_gpw, pop_gpw_years=pop_years,
@@ -324,14 +383,17 @@ def convert(region: str = "mideast") -> Path:
     return out
 
 
-@lru_cache(maxsize=2)
+@lru_cache(maxsize=8)
 def load(region: str = "mideast") -> dict:
     p = npz_path(region)
     if not p.is_file():
         raise ConflictDataError(f"no L2 data at {p}: python world4_cli.py --install-l2")
     z = np.load(p, allow_pickle=False)
-    return {k: z[k] for k in z.files}
+    d = {k: z[k] for k in z.files}
+    if "gw" in d:                                # la lista de países de la región viaja con sus datos
+        regions.build(region, list(zip((str(x) for x in d["iso3"]), d["gw"].tolist(), d["m49"].tolist())))
+    return d
 
 
 def available(region: str = "mideast") -> bool:
-    return npz_path(region).is_file()
+    return all(npz_path(r).is_file() for r in regions.names(region))

@@ -354,3 +354,149 @@ def test_mideast_forecast_never_reads_the_future(mideast):
     a = forecast.run(P, t0, 3, members=8, seed=1, foot=foot, displacement=False)
     b = forecast.run(P.truncated(t0), t0, 3, members=8, seed=1, foot=foot, displacement=False)
     assert np.array_equal(a.run.site_deaths, b.run.site_deaths)
+
+
+# ------------------------------------------------------------------ escala mundial: regiones, lotes y agregados
+def test_regions_cover_the_world_and_keep_the_first_one_fixed():
+    assert regions.names("world") == regions.WORLD and len(regions.WORLD) == 5
+    assert regions.names("Mideast") == ("mideast",)
+    with pytest.raises(KeyError):
+        regions.names("atlantis")
+    table = {2: ("USA", 840, "America"), 900: ("AUS", 36, "Oceania"), 640: ("TUR", 792, "Asia"),
+             372: ("GEO", 268, "Asia"), 211: ("BEL", 56, "Europe"), 999: ("XXX", 0, "Antarctica")}
+    where = regions.assign([2, 900, 640, 372, 211, 999], {372: "Europe", 2: "Americas", 640: "Middle East"}, table)
+    assert where == {2: "americas", 900: "asia", 640: "mideast", 372: "europe", 211: "europe"}   # 999: sin región
+    assert regions.assign([630], {630: "Asia"}, {630: ("IRN", 364, "Asia")}) == {630: "mideast"}   # la lista fija manda
+    before = regions.REGIONS.get("americas")
+    try:
+        r = regions.build("americas", [("USA", 2, 840), ("CAN", 20, 124)])
+        assert r.iso3 == ("CAN", "USA") and r.gw == (20, 2) and regions.get("americas") is r
+        assert regions.build("mideast", [("XXX", 1, 1)]) is regions.MIDEAST                      # no se reescribe
+        chn = regions.build("asia", [("CHN", 710, 156)])
+        assert chn.extra_iso3 == {"CHN": ("HKG", "MAC")} and chn.extra_m49 == {"CHN": (344, 446)}
+    finally:
+        for k, v in (("americas", before),):
+            regions.REGIONS.pop(k, None) if v is None else regions.REGIONS.__setitem__(k, v)
+        regions.REGIONS.pop("asia", None)
+
+
+def test_country_codes_resolve_the_known_exceptions():
+    pytest.importorskip("country_converter")
+    from world4.data import conflict
+    t = conflict.country_table()
+    assert t[345][0] == "SRB" and t[678][0] == "YEM" and t[816][0] == "VNM" and t[2][:2] == ("USA", 840)
+    assert t[666][0] == "ISR" and t[710][0] == "CHN" and t[900][2] == "Oceania"
+
+
+def test_members_do_not_depend_on_how_many_are_simulated(P):
+    """Lotes fijos con su generador: los 8 primeros miembros de una corrida de 20 son la corrida de 8."""
+    M = agents.fit(P, T0, foot={"decay": 0.9, "diffuse": 0.1, "floor": 0.02, "mix": 0.5})
+    a = agents.simulate(P, M, 6, members=8, seed=4)
+    b = agents.simulate(P, M, 6, members=20, seed=4)
+    assert b.site_deaths.shape[0] == 20 and b.dyad_events.shape[0] == 20
+    assert np.array_equal(b.site_deaths[:8], a.site_deaths) and np.array_equal(b.births[:8], a.births)
+    assert not np.array_equal(b.site_deaths[8:16], a.site_deaths)             # el segundo lote es otro mundo
+
+
+def test_site_sampler_draws_from_footprint_plus_floor(P):
+    """El muestreo por bloques reparte los eventos como la distribución que dice: huella difundida + suelo."""
+    rng = np.random.default_rng(0)
+    foot = {"decay": 0.9, "diffuse": 0.1, "floor": 0.05, "mix": 0.5}
+    W = np.zeros((3, P.S), np.float32)
+    W[0, 3], W[1, 10], W[1, 11] = 5.0, 1.0, 3.0                                # la fila 2 no tiene huella
+    cf = np.zeros((3, P.S), np.float32)
+    cf[:, 20] = 1.0
+    prior = np.zeros((3, P.S))
+    prior[:, :8] = 1.0 / 8
+    na = np.array([40000, 40000, 40000])
+    old = agents.BLOCK_CELLS
+    try:
+        agents.BLOCK_CELLS = P.S                                              # un bloque por fila: se prueba el troceo
+        site = agents._sites(rng, W, cf, prior, foot, P.site_nbr, na)
+    finally:
+        agents.BLOCK_CELLS = old
+    pr = 0.5 * cf / cf.sum(1, keepdims=True) + 0.5 * prior
+    w = agents.spread(W.astype(float), P.site_nbr, 0.1)
+    expect = np.where(w.sum(1, keepdims=True) > 0, 0.95 * w / np.maximum(w.sum(1, keepdims=True), 1e-300) + 0.05 * pr, pr)
+    for i in range(3):
+        freq = np.bincount(site[i * 40000:(i + 1) * 40000], minlength=P.S) / 40000
+        assert np.abs(freq - expect[i]).max() < 0.01
+        assert np.all(freq[expect[i] == 0] == 0)                              # donde la probabilidad es cero, nada
+
+
+def test_features_for_some_columns_are_the_full_features(P):
+    for lv in ("country", "cell"):
+        full, names = baseline.features(P, lv)
+        cols = [36, 60, T0, P.T]
+        part, names2 = baseline.features(P, lv, cols=cols)
+        assert names == names2 and part.shape == (full.shape[0], 4, full.shape[2])
+        assert np.allclose(part, full[:, cols])
+
+
+def test_displacement_history_is_precomputed_once_and_right(P):
+    E, RK = displacement.history(P)
+    assert displacement.history(P)[0] is E and E.shape == (P.C, P.T) and RK.shape == (P.K, P.T)
+    G = displacement.geometry(P)
+    t = 50
+    pop = P.pop_at(t, "cell")
+    d = displacement.cell_deaths(P, P.site_deaths()[:, t].astype(float), pop)
+    assert np.allclose(E[:, t], displacement.exposure(G, d, pop), rtol=1e-5)
+    th = displacement.fit_cached(P, T0, maxiter=30)                           # sintético: no se guarda en disco
+    assert th["fitted"] and np.isfinite(th["loss"])
+
+
+def test_world_summary_pools_regions_by_country(P, monkeypatch):
+    from world4.validate import l2 as v
+    P2 = pn.from_arrays(synthetic.world(seed=9, iso3=("CCC", "DDD"), region="synthetic2"))
+    monkeypatch.setitem(pn._PANELS, "synthetic", P)
+    monkeypatch.setitem(pn._PANELS, "synthetic2", P2)
+    parts = [v.one_origin((r, 84, 16, 7, {})) for r in ("synthetic", "synthetic2")]
+    assert {q["region"] for q in parts} == {"synthetic", "synthetic2"}
+    s = v.summarise({"synthetic": P, "synthetic2": P2}, parts)
+    one = v.summarise({"synthetic": P}, parts)
+    c, c1 = s["levels"]["country"]["1"]["crps_log"], one["levels"]["country"]["1"]["crps_log"]
+    assert c["n"] == P.K + P2.K and c1["n"] == P.K and s["n_origins"] == 1
+    assert s["regions_pooled"] == ["synthetic", "synthetic2"]
+    assert s["levels"]["cell"]["1"]["crps_log"]["n"] == P.C + P2.C
+    assert all(k in v.verdict(s)["country/1"] for k in ("beats", "loses_to", "forecast_grade"))
+
+
+def test_api_world_merges_regions(P, monkeypatch):
+    from world4 import api, honesty
+    P2 = pn.from_arrays(synthetic.world(seed=9, iso3=("CCC", "DDD"), region="synthetic2"))
+    monkeypatch.setitem(pn._PANELS, "synthetic", P)
+    monkeypatch.setitem(pn._PANELS, "synthetic2", P2)
+    monkeypatch.setattr(regions, "WORLD", ("synthetic", "synthetic2"))
+    r = json.loads(json.dumps(api.l2_forecast("world", 12, as_of=P.label(T0), members=16, hotspots=5)))
+    assert set(r["by_country"]) == {"AAA", "BBB", "CCC", "DDD"} and r["regions"] == ["synthetic", "synthetic2"]
+    assert r["by_country"]["CCC"]["region"] == "synthetic2" and len(r["hotspots"]["cells"]) == 5
+    assert set(r["displacement"]["by_origin"]) == set(r["by_country"])
+    assert set(r["measured_by_region"]) == {"synthetic", "synthetic2"}
+    assert honesty.audit(r) == [] and honesty.exploratory_ok(r, True) == []
+    assert any("five regions" in c for c in r["caveats"])
+    p50 = [c["p50"] for c in r["hotspots"]["cells"]]
+    assert p50 == sorted(p50, reverse=True)                                   # las celdas más expuestas de todo el mundo
+
+
+@pytest.fixture(scope="module")
+def world_panels():
+    from world4.data import conflict
+    if not conflict.available("world"):
+        pytest.skip("datos mundiales del L2 sin convertir: python world4_cli.py --install-l2 --l2-region world")
+    return {r: pn.load(r) for r in regions.WORLD}
+
+
+def test_world_regions_partition_the_countries(world_panels):
+    iso = [c for P in world_panels.values() for c in P.iso3]
+    assert len(iso) == len(set(iso)) and len(iso) >= 185                      # cada país, en una sola región
+    assert world_panels["mideast"].iso3 == regions.MIDEAST.iso3
+    for name, (r, n) in {"USA": ("americas", 0), "RUS": ("europe", 0), "AUS": ("asia", 0), "NGA": ("africa", 0),
+                         "GEO": ("europe", 0), "AFG": ("asia", 0), "SRB": ("europe", 0)}.items():
+        assert name in world_panels[r].iso3, (name, r)
+    for r, P in world_panels.items():
+        assert P.T == world_panels["mideast"].T and P.last_final_month == world_panels["mideast"].last_final_month
+        assert P.ev["country"].min() >= 0 and P.deaths("country").sum() == pytest.approx(P.ev["best"].sum(), rel=1e-6)
+        assert regions.get(r).iso3 == P.iso3
+    rwa = world_panels["africa"]
+    y = rwa.deaths("country")[rwa.iso3.index("RWA"), rwa.month(1994, 1):rwa.month(1995, 1)].sum()
+    assert y > 500_000                                                        # el genocidio de 1994 está en el panel

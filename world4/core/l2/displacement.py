@@ -78,6 +78,32 @@ def cell_deaths(P: pn.Panel, site: np.ndarray, pop: np.ndarray) -> np.ndarray:
     return out + by_k[..., np.maximum(cc, 0)] * share
 
 
+def exposure(G: Geometry, deaths: np.ndarray, pop: np.ndarray) -> np.ndarray:
+    """Muertes por 100 000 habitantes en cada celda y sus ocho vecinas. ``deaths`` (..., C)."""
+    ok = G.nbr >= 0
+    nb = np.maximum(G.nbr, 0)
+    d_nb = deaths + (deaths[..., nb] * ok).sum(-1)
+    p_nb = pop + (pop[nb] * ok).sum(1)
+    return 1e5 * d_nb / np.maximum(p_nb, 1.0)
+
+
+def history(P: pn.Panel) -> tuple[np.ndarray, np.ndarray]:
+    """Exposición (C, T) y muertes por 100 000 del país (K, T) con las muertes observadas; se guarda en el panel."""
+    if "disp_history" not in P._cache:
+        G = geometry(P)
+        site = P.site_deaths()
+        E, RK = np.zeros((P.C, P.T), np.float32), np.zeros((P.K, P.T))
+        inside = G.cc >= 0
+        for t in range(P.T):
+            pop = P.pop_at(t, "cell")
+            d = cell_deaths(P, site[:, t].astype(float), pop)
+            E[:, t] = exposure(G, d, pop)
+            np.add.at(RK[:, t], G.cc[inside], d[inside])
+            RK[:, t] = 1e5 * RK[:, t] / np.maximum(P.pop_at(t), 1.0)
+        P._cache["disp_history"] = (E, RK)
+    return P._cache["disp_history"]
+
+
 class State:
     """Estado (R, ...) de los bloques de población."""
 
@@ -85,13 +111,19 @@ class State:
                  recent: np.ndarray):
         self.G, self.home, self.idp, self.ref, self.memory, self.recent = G, home, idp, ref, memory, recent
 
-    def step(self, th: dict, deaths: np.ndarray, pop: np.ndarray, pop_k: np.ndarray) -> dict:
-        """Un mes. ``deaths`` (R, C); ``pop`` (C,) y ``pop_k`` (K,) del año. Devuelve los flujos por país."""
+    def step(self, th: dict, deaths: np.ndarray, pop: np.ndarray, pop_k: np.ndarray, pre=None) -> dict:
+        """Un mes. ``deaths`` (R, C); ``pop`` (C,) y ``pop_k`` (K,) del año. Devuelve los flujos por país.
+        ``pre`` = (exposición (R, C), muertes por 100 000 del país (R, K)) ya calculadas (no dependen de los
+        parámetros: el ajuste las calcula una vez)."""
         G = self.G
-        ok = G.nbr >= 0
-        d_nb = deaths + (deaths[:, np.maximum(G.nbr, 0)] * ok[None]).sum(2)
-        p_nb = pop + (pop[np.maximum(G.nbr, 0)] * ok).sum(1)
-        e = 1e5 * d_nb / np.maximum(p_nb, 1.0)[None]
+        inside = G.cc >= 0
+        if pre is None:
+            e = exposure(G, deaths, pop)
+            dk = np.zeros((len(deaths), G.K))
+            np.add.at(dk, (slice(None), G.cc[inside]), deaths[:, inside])
+            rate_k = 1e5 * dk / np.maximum(pop_k, 1.0)[None]
+        else:
+            e, rate_k = pre
         self.memory = th["phi"] * self.memory + e
         mult = th.get("mult")
         beta = th["beta"] if mult is None else th["beta"] * np.asarray(mult)[np.maximum(G.cc, 0)][None]
@@ -99,13 +131,10 @@ class State:
         leave = self.home * out_frac
         self.home = self.home - leave
         cross = 1.0 / (1.0 + np.exp(-(th["g0"] + th["g1"] * G.zb)))
-        inside = G.cc >= 0
         new_ref, new_idp = np.zeros((len(leave), G.K)), np.zeros((len(leave), G.K))
         np.add.at(new_ref, (slice(None), G.cc[inside]), (leave * cross[None])[:, inside])
         np.add.at(new_idp, (slice(None), G.cc[inside]), (leave * (1 - cross)[None])[:, inside])
-        dk = np.zeros((len(leave), G.K))
-        np.add.at(dk, (slice(None), G.cc[inside]), deaths[:, inside])
-        self.recent = np.concatenate([self.recent[:, :, 1:], (1e5 * dk / np.maximum(pop_k, 1.0)[None])[:, :, None]], 2)
+        self.recent = np.concatenate([self.recent[:, :, 1:], rate_k[:, :, None]], 2)
         calm = np.exp(-self.recent.mean(2) / th["E0"])
         back_idp, back_ref = th["rho_idp"] * calm * self.idp, th["rho_ref"] * calm * self.ref
         self.idp = self.idp + new_idp - back_idp
@@ -122,7 +151,7 @@ class State:
 def simulate_history(P: pn.Panel, th: dict, t1: int, t_start: int = 0) -> dict:
     """Modelo movido por las muertes observadas de ``[t_start, t1)``. Stocks (K, años) a fin de cada año."""
     G = geometry(P)
-    site = P.site_deaths()
+    E, RK = history(P)
     y0 = P.ym(t_start)[0]
     j0 = int(np.clip(y0 - 1 - int(P.years[0]), 0, len(P.years) - 1))
     ref0 = np.nan_to_num(P.ref_stock[:, :, j0].sum(1)) if y0 - 1 >= int(P.years[0]) else np.zeros(P.K)
@@ -131,8 +160,7 @@ def simulate_history(P: pn.Panel, th: dict, t1: int, t_start: int = 0) -> dict:
     years = np.arange(y0, P.ym(t1 - 1)[0] + 1)
     out = {"years": years, "ref": np.full((P.K, len(years)), np.nan), "idp": np.full((P.K, len(years)), np.nan)}
     for t in range(t_start, t1):
-        pop = P.pop_at(t, "cell")
-        st.step(th, cell_deaths(P, site[:, t], pop)[None], pop, P.pop_at(t))
+        st.step(th, None, P.pop_at(t, "cell"), None, pre=(E[None, :, t], RK[None, :, t]))
         y, m = P.ym(t)
         if m == 12 or t == t1 - 1:
             out["ref"][:, y - y0], out["idp"][:, y - y0] = st.ref[0], st.idp[0]
@@ -163,6 +191,28 @@ def country_loss(th: dict, P: pn.Panel, t1: int) -> tuple[np.ndarray, np.ndarray
 def loss(x: np.ndarray, P: pn.Panel, t1: int) -> float:
     sse, n = country_loss(unpack(x), P, t1)
     return float(sse.sum() / n.sum()) if n.sum() else float("nan")
+
+
+VERSION = 1                              # cambia si cambia el modelo: invalida los parámetros guardados
+
+
+def fit_cached(P: pn.Panel, t0: int, maxiter: int = 250) -> dict:
+    """``fit`` guardado en disco para las regiones reales: el ajuste tarda minutos a escala mundial y sólo
+    depende de la región, del año del origen y de los datos (el mes hasta el que llega el panel)."""
+    import json
+
+    from world4.core.l2 import regions
+    from world4.data import conflict
+    if P.region not in regions.WORLD or not conflict.available(P.region):
+        return fit(P, t0, maxiter)
+    f = conflict.root() / "displacement" / f"{P.region}_{P.ym(t0)[0]}_{P.T}_{maxiter}_v{VERSION}.json"
+    if f.is_file():
+        d = json.loads(f.read_text(encoding="utf-8"))
+        return {**d, "x": np.array(d["x"]), "mult": np.array(d["mult"])}
+    th = fit(P, t0, maxiter)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps({k: (v.tolist() if hasattr(v, "tolist") else v) for k, v in th.items()}), encoding="utf-8")
+    return th
 
 
 def fit(P: pn.Panel, t0: int, maxiter: int = 400, start=None) -> dict:
@@ -207,18 +257,11 @@ def initial_state(P: pn.Panel, th: dict, t0: int, members: int) -> State:
     have = P.ym(t0)[0] - 1 >= int(P.years[0])
     ref = np.nan_to_num(P.ref_stock[:, :, j].sum(1)) if have else np.zeros(P.K)
     idp = np.nan_to_num(P.idp_stock[:, j]) if have else np.zeros(P.K)
-    site = P.site_deaths()
+    E, RK = history(P)
     mem, recent = np.zeros(P.C), np.zeros((P.K, 12))
-    ok = G.nbr >= 0
-    for t in range(max(t0 - 60, 0), t0):
-        pop = P.pop_at(t, "cell")
-        d = cell_deaths(P, site[:, t], pop)
-        d_nb = d + (d[np.maximum(G.nbr, 0)] * ok).sum(1)
-        p_nb = pop + (pop[np.maximum(G.nbr, 0)] * ok).sum(1)
-        mem = th["phi"] * mem + 1e5 * d_nb / np.maximum(p_nb, 1.0)
-        dk = np.zeros(P.K)
-        np.add.at(dk, G.cc[G.cc >= 0], d[G.cc >= 0])
-        recent = np.concatenate([recent[:, 1:], (1e5 * dk / np.maximum(P.pop_at(t), 1.0))[:, None]], 1)
+    for t in range(max(t0 - 60, 0), min(t0, P.T)):
+        mem = th["phi"] * mem + E[:, t]
+        recent = np.concatenate([recent[:, 1:], RK[:, t][:, None]], 1)
     pop = P.pop_at(t0, "cell")
     away = (ref + idp)[np.maximum(G.cc, 0)] * np.where(G.cc >= 0, pop / np.maximum(P.pop_at(t0)[np.maximum(G.cc, 0)], 1.0), 0)
     home = np.maximum(pop - away, 0.0)

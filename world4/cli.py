@@ -105,7 +105,8 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("--target", type=int, default=None, help="target year for --query (1-10 years ahead)")
     n.add_argument("--members", type=int, default=32, help="ensemble members for --query")
     n.add_argument("--atlas-src", default=None, help="local Atlas clone for --install-atlas (else git clone)")
-    n.add_argument("--l2-region", default="mideast", help="F12: L2 region (mideast)")
+    n.add_argument("--l2-region", default="mideast",
+                   help="F12: L2 region: africa, americas, asia, europe, mideast, or world (the five)")
     n.add_argument("--l2-src", default=None, help="F12: directory with the L2 files already downloaded")
     n.add_argument("--l2-period", default="test", choices=("dev", "test"),
                    help="F12: origins of --l2-validate: dev 2005-2014 (model design) or test 2015-2024 (the verdict)")
@@ -332,7 +333,8 @@ def run_install_l2(a) -> int:
     if a.json:
         print(json.dumps(v, indent=1))
     else:
-        ui.kv("result", ui.status(v["ok"], "OK", "MISMATCH"), "", v["npz"])
+        for r, f in v["regions"].items():
+            ui.kv(r, ui.status(v["ok"], "OK", "MISMATCH"), "", f)
         if v["absent_optional"]:
             ui.degraded("candidate events", f"{v['absent_optional']} not on the server: the panel ends with the final GED")
     return EXIT_OK if v["ok"] else EXIT_SPEC
@@ -354,17 +356,24 @@ def run_l2_forecast(a) -> int:
     ui.section("Deaths in the first 12 months, by country" if r["horizon"] >= 12 else "Deaths per month, by country")
     rows = []
     for iso, c in r["by_country"].items():
-        d = c["deaths"]
+        d, h = c["deaths"], c["reference_hurdle"]
         n = min(12, r["horizon"])
-        rows.append((sum(d["p50"][:n]), iso, sum(d["p10"][:n]), sum(d["p90"][:n]), c.get("conflict_12m", {}).get("p")))
-    for p50, iso, p10, p90, pc in sorted(rows, reverse=True):
+        rows.append((sum(d["p50"][:n]), iso, sum(d["p10"][:n]), sum(d["p90"][:n]), c.get("conflict_12m", {}).get("p"),
+                     sum(h["p50"][:n])))
+    rows = sorted(rows, reverse=True)
+    shown = [x for x in rows if x[3] >= 1 or (x[4] or 0) >= 0.05]
+    for p50, iso, p10, p90, pc, ref in shown[:60]:
         ui.kv(iso, f"{p50:9.0f}", "deaths (sum of monthly p50)",
-              f"sum of monthly p10-p90 {p10:.0f}-{p90:.0f}" + (f"; P(>= 25) {pc:.2f}" if pc is not None else ""))
+              f"sum of monthly p10-p90 {p10:.0f}-{p90:.0f}; reference {ref:.0f}"
+              + (f"; P(>= 25) {pc:.2f}" if pc is not None else ""))
+    if len(rows) > len(shown[:60]):
+        print("  " + ui.dim(f"{len(rows) - len(shown[:60])} more countries with no or almost no expected violence (--json has all)"))
     if "displacement" in r:
         ui.section("Displaced at the end of the horizon, by origin (p50, p10-p90)")
-        for iso, c in r["displacement"]["by_origin"].items():
+        for iso, c in sorted(r["displacement"]["by_origin"].items(), key=lambda kv: -(
+                kv[1]["refugees_and_asylum_seekers"]["p50"][-1] + kv[1]["internally_displaced"]["p50"][-1]))[:40]:
             a_, b_ = c["refugees_and_asylum_seekers"], c["internally_displaced"]
-            if a_["p50"][-1] + b_["p50"][-1] >= 1e4:
+            if a_["p50"][-1] + b_["p50"][-1] >= 1e5:
                 ui.kv(iso, f"{a_['p50'][-1] / 1e6:6.2f} M refugees", "",
                       f"{a_['p10'][-1] / 1e6:.2f}-{a_['p90'][-1] / 1e6:.2f}; internal {b_['p50'][-1] / 1e6:.2f} M "
                       f"({b_['p10'][-1] / 1e6:.2f}-{b_['p90'][-1] / 1e6:.2f})")
@@ -381,11 +390,11 @@ def run_l2_validate(a) -> int:
         print(ui.banner())
         ui.step(f"W13: L2 {a.l2_region}, origins of the {a.l2_period} period, against zero, last12 and the hurdle model")
     s = vl2.run(a.l2_region, period=a.l2_period, opt={"l1": bool(a.l1)}, log=log)
-    out = vl2.write(s, RUNS / ("l2_w13.json" if a.l2_period == "test" and not a.l1 else
-                               f"l2_{a.l2_period}{'_l1' if a.l1 else ''}.json"))
+    out = vl2.write(s, RUNS / (f"l2_w13_{a.l2_region}.json" if a.l2_period == "test" and not a.l1 else
+                               f"l2_{a.l2_period}{'_l1' if a.l1 else ''}_{a.l2_region}.json"))
     if a.l2_period == "test" and not a.l1:
         log("displacement: stocks 1-3 years ahead against persistence")
-        vl2.write(vl2.displacement_run(a.l2_region, log=log), RUNS / "l2_displacement.json")
+        vl2.write(vl2.displacement_run(a.l2_region, log=log), RUNS / f"l2_displacement_{a.l2_region}.json")
     if a.json:
         print(json.dumps(s, indent=1))
     else:

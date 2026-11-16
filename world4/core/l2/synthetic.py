@@ -14,7 +14,7 @@ from world4.data import conflict
 ISO3 = ("AAA", "BBB")
 
 
-def world(side: int = 6, months: int = 132, seed: int = 0) -> dict:
+def world(side: int = 6, months: int = 132, seed: int = 0, iso3=ISO3, region: str = "synthetic") -> dict:
     rng = np.random.default_rng(seed)
     C = side * side
     row, col = np.divmod(np.arange(C), side)
@@ -27,7 +27,7 @@ def world(side: int = 6, months: int = 132, seed: int = 0) -> dict:
     pop_years = np.arange(conflict.YEAR0, conflict.YEAR0 + months // 12 + 6)
     pop = np.stack([pop_cell[cell_country == k].sum() * 1.01 ** np.arange(len(pop_years)) for k in range(2)])
 
-    actors = ["Government of AAA", "Government of BBB", "Front One", "Front Two", "Civilians"]
+    actors = [f"Government of {iso3[0]}", f"Government of {iso3[1]}", "Front One", "Front Two", "Civilians"]
     kinds, homes = [0, 0, 1, 1, 2], [0, 1, -1, -1, -1]
     # díada: (lado a, lado b, tipo, país, celda inicial, eventos/mes cuando está activa, muertes por evento)
     dy = [(0, 2, 1, 0, 0, 6.0, 4.0), (1, 3, 1, 1, side - 1, 3.0, 2.0), (2, 3, 2, 0, side, 2.0, 3.0),
@@ -64,7 +64,7 @@ def world(side: int = 6, months: int = 132, seed: int = 0) -> dict:
         r, i = 0.9 * r + 30.0 * deaths_ky[:, y], 0.7 * i + 80.0 * deaths_ky[:, y]
         ref_stock[:, 2, y], ref_stock[:, 3, y], idp[:, y] = 0.7 * r, 0.3 * r, i
     return {
-        "region": np.array("synthetic"), "iso3": np.array(ISO3), "year0": np.array(conflict.YEAR0),
+        "region": np.array(region), "iso3": np.array(iso3), "year0": np.array(conflict.YEAR0),
         "T": np.array(months), "last_final_month": np.array(months - 1),
         "gid": gid.astype(np.int64), "row": row.astype(np.int32), "col": col.astype(np.int32),
         "lon": -180.0 + (col + 0.5) * 0.5, "lat": -90.0 + (row + 0.5) * 0.5, "cell_country": cell_country,
