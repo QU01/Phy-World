@@ -59,6 +59,12 @@ temperature from two lines fitted to Mauna Loa and GISTEMP, a declared 5 % yield
 six explicit rules for what the data do not cover, such as life expectancy when services fall or fertility after a
 crisis. Out of sample from 2000, CO2 is within 3.4 ppm and temperature within 0.13 degC to 2023; the rules change
 no test against data and decide the scarcity scenarios ([docs/V4-informe.md](docs/V4-informe.md)).
+Phase **V5** replaces the single trajectory with the ensemble of models history does not rule out: ten uncertain
+parameters sampled from declared ranges and kept only if they fit 1971-2023, bootstrapped coefficients, and a model
+error measured on the previous split. The industrial peak falls in 2037 / 2071 / 2100 or later (p10 / p50 / p90) and
+is decided by the initial non-renewable resources, which history barely pins down; the population peak (2055-2066,
+9.2-10.0 billion) is robust. From 2000 the bands cover what happened in 11 of 12 indicators but are too wide
+([docs/V5-informe.md](docs/V5-informe.md)).
 
 | Layer | What it is in F0 | Pinned against | Result |
 |---|---|---|---|
@@ -105,6 +111,7 @@ python world4_cli.py --info                 # environment, observables, sources 
 python world4_cli.py --campaign             # acceptance criteria W1-W12
 python world4_cli.py --l0 --scenario 2      # World3-03 behaviour mode
 python world4_cli.py --world3-score         # V1-V4: World3-03, cohorts, regions, technology and climate against the observed world; out-of-sample tests
+python world4_cli.py --world3-bands --members 100   # V5: uncertainty bands to 2100 and their coverage test (~70 s)
 python world4_cli.py --query gdp_pc --region MEX --as-of 2005 --target 2010
 python world4_cli.py --query population --region NGA --as-of 2005 --target 2015
 python world4_cli.py --query resource_rent_share_world --region WLD --as-of 2005 --target 2012
@@ -134,6 +141,7 @@ w3, cohorts = api.run_l0v()                       # World3-03 with population co
 w3, regions = api.run_l0v(groups="regions", origin=2023)   # 10 regions, estimated equations, history to 2023 (V2)
 w3, regions = api.run_l0v(groups="regions", origin=2023, technology="estimated", climate="estimated")   # the whole current World3 (V3, V4)
 api.world3_score()                                # error of each L0 variant against the observed world
+api.world3_bands(members=60)                      # p10/p50/p90 to 2100 from the ensemble history does not rule out (V5)
 ```
 
 ## Tests

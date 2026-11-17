@@ -8,5 +8,6 @@ V3: la tecnología de World3 (rendimiento, uso de recursos, contaminación, cost
 apagada y sigue curvas estimadas con las series mundiales (``technology``).
 V4: carbono y clima a partir del uso de recursos (``carbon``), con daño al rendimiento, y reglas explícitas para la
 demografía en la escasez (``equations.Rules``).
+V5: bandas de incertidumbre con el conjunto de modelos que la historia no descarta (``ensemble``).
 El escenario 1 original no cambia.
 """

@@ -73,6 +73,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="V1-V4: the L0 against observed world series, 2000-2023: World3-03 as it is, with "
                         "population cohorts, by regions with estimated equations and with estimated technology and "
                         "climate (out-of-sample tests)")
+    m.add_argument("--world3-bands", action="store_true",
+                   help="V5: uncertainty bands of the current World3 to 2100 (the ensemble history does not rule out) "
+                        "and their coverage test from 2000; --members sets the ensemble size")
     m.add_argument("--validate", "--validate-f1", dest="validate", action="store_true",
                    help="F1-F5: rolling-origin W3/W5 (Atlas, F1 ... F1-F5) + free hindcasts of population, psi, "
                         "the energy mix, CO2, GMST, cereals and cropland + AR6 carbon-budget check")
@@ -149,7 +152,7 @@ def run_info(a) -> int:
           "cereals, land, N, water; footprint and biocapacity computed" + ("" if _fdd.available() else ": --install-food"))
     from world4.data import world as _wd
     ui.kv("V1 - current World3", "implemented" if _wd.available() else ui.c("WORLD DATA MISSING", "warn"), "",
-          "L0 scored against the observed world; cohorts, regions and estimated technology (--world3-score)"
+          "L0 scored against the observed world (--world3-score) and uncertainty bands to 2100 (--world3-bands)"
           + ("" if _wd.available() else ": --install-world"))
     for ph, what in (
                      ("F6-F8", "regional L0, Bayesian calibration, robust policies"),
@@ -383,6 +386,42 @@ def run_world3_score(a) -> int:
         for origin, res in tech["origins"].items():
             c, w = res["technology"]["climate"], res["world3"]["climate"]
             print(f"  {origin:<8d}{c['co2_ppm_mae']:9.1f} ({w['co2_ppm_mae']:5.1f}){c['gmst_mae']:9.2f} ({w['gmst_mae']:5.2f})")
+    return EXIT_OK
+
+
+def run_world3_bands(a) -> int:
+    from world4.core.l0v import ensemble
+    rep = ensemble.report(members=a.members)
+    if a.json:
+        print(json.dumps(rep, indent=1))
+        return EXIT_OK
+    print(ui.banner())
+    print()
+    e, s = rep["ensemble"], rep["summary"]
+    ui.title(f"Current World3 to 2100: the ensemble history does not rule out ({rep['members']} members)")
+    print("  " + ui.dim(f"{e['kept']} of {e['sampled']} sampled models fit 1971-{rep['origin']} within {e['tolerance']:g} x "
+                        "the best fit in every indicator; behaviour modes, not a forecast"))
+    fmt = lambda v, d=0: f"{v[0]:.{d}f} / {v[1]:.{d}f} / {v[2]:.{d}f}"  # noqa: E731
+    ui.kv("industrial peak, year", fmt(s["industrial_peak_year"]), "p10 / p50 / p90",
+          f"{100 * s['industrial_peak_after_2100']:.0f} % of the members peak in 2100 or later")
+    ui.kv("population peak, year", fmt(s["population_peak_year"]), "", "")
+    ui.kv("population peak, million", fmt(s["population_peak"]), "", "")
+    rows = (("population", "population, million", 0), ("life_expectancy", "life expectancy, years", 1),
+            ("fertility", "children per woman", 2), ("food_pc", "food per person, kg", 0),
+            ("iopc_over_origin", "industrial output per person / 2023", 2), ("nrfr", "resources left, fraction", 2),
+            ("co2", "CO2 above 280 ppm", 0), ("gmst", "temperature over 1951-1980, degC", 2))
+    for year in ("2050", "2100"):
+        ui.section(f"In {year} (p10 / p50 / p90)")
+        for key, label, d in rows:
+            ui.kv(label, fmt(s["at"][int(year)][key] if int(year) in s["at"] else s["at"][year][key], d), "", "")
+    ui.section("What moves the year of the industrial peak (rank correlation across members)")
+    for name, rho in sorted(s["drivers_of_industrial_peak"].items(), key=lambda kv: -abs(kv[1]))[:4]:
+        ui.kv(name, f"{rho:+.2f}", "", "")
+    cov = rep["coverage"]
+    ui.section(f"The test of the bands: data <= {cov['origin']}, share of {cov['origin'] + 1}-{cov['last']} inside p10-p90")
+    print("  " + ui.dim("it should be near 0.80; in brackets, without the model error"))
+    for key, v in cov["indicators"].items():
+        ui.kv(key, f"{v['with_model_error']:.2f} ({v['parameters_only']:.2f})", "", f"{v['n']} years with data")
     return EXIT_OK
 
 
@@ -676,6 +715,7 @@ MODE_NUMBERS = {
                 ("--sow N", "states of the world in the ensemble (default 200)")],
     "--l0": [("--scenario 1-5", "World3-03 scenario of the 2004 book")],
     "--world3-score": [("--scenario 1-5", "World3-03 scenario of the 2004 book (default 1)")],
+    "--world3-bands": [("--members N", "members of the ensemble to run (default 32; 100 for the report)")],
     "--report": [("--report [FILE.html]", "optional; add --theta for a policy, --no-campaign to skip the campaign")],
     "--dashboard": [("--dashboard [DIR]", "optional output directory")],
 }
@@ -845,6 +885,8 @@ def main(argv=None) -> int:
             code = run_install_world(a)
         elif a.world3_score:
             code = run_world3_score(a)
+        elif a.world3_bands:
+            code = run_world3_bands(a)
         elif a.validate:
             code = run_validate(a)
         elif a.build_store:

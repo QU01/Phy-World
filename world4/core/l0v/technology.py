@@ -141,7 +141,7 @@ class TechHook:
             return None
         lyt, rct, ppt = self.tech.paths(t + self.dt)                  # "set" fija el stock ya integrado
         out = {"set": {"lyt": lyt * damage, "rct": rct, "ppt": ppt}}
-        if t >= self.tech.t0 and self.tech.land_restraint != 1.0:
+        if t >= self.tech.t0 and np.any(np.asarray(self.tech.land_restraint) != 1.0):
             out["flow"] = {"al": self.tech.land_restraint, "pal": self.tech.land_restraint}
         return out
 

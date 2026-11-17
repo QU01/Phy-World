@@ -82,6 +82,27 @@ def estimate(cutoff: int | None = None, obs: dict | None = None) -> Carbon:
     return Carbon(airborne=float(airborne), c0=float(c0), tcre=float(slope), t0=float(t0), cutoff=cut)
 
 
+def bootstrap(cutoff: int | None, draws: int, seed: int = 0, block: int = 10, obs: dict | None = None) -> list:
+    """``draws`` versiones de las dos rectas, cada una estimada con los años remuestreados por BLOQUES de ``block``
+    años (los residuos de años vecinos se parecen: remuestrear años sueltos daría bandas demasiado estrechas)."""
+    o = observed(obs)
+    y = o["years"]
+    base = estimate(cutoff, obs)
+    rng = np.random.default_rng(seed)
+    out = []
+    for _ in range(draws):
+        fit = {}
+        for key in ("ppm", "gmst"):
+            idx = np.where(np.isfinite(o[key]) & np.isfinite(o["cum"]) & (y <= base.cutoff))[0]
+            starts = rng.integers(0, len(idx) - block + 1, int(np.ceil(len(idx) / block)))
+            pick = np.concatenate([idx[s0:s0 + block] for s0 in starts])
+            x = o["cum"][pick] / (PPM_GT if key == "ppm" else 1000.0)
+            fit[key] = np.polyfit(x, o[key][pick], 1)
+        out.append(Carbon(airborne=float(fit["ppm"][0]), c0=float(fit["ppm"][1]), tcre=float(fit["gmst"][0]),
+                          t0=float(fit["gmst"][1]), cutoff=base.cutoff))
+    return out
+
+
 @lru_cache(maxsize=8)
 def params(cutoff: int | None = None) -> Carbon:
     return estimate(cutoff)

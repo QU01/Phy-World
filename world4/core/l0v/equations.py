@@ -92,11 +92,12 @@ def _country_panel():
             "weight": pmid}
 
 
-def _within(X, y, w):
-    """Mínimos cuadrados con efectos fijos de país, ponderados: ``X`` (C, T, k), ``y`` y ``w`` (C, T)."""
+def _within(X, y, w, countries=None):
+    """Mínimos cuadrados con efectos fijos de país, ponderados: ``X`` (C, T, k), ``y`` y ``w`` (C, T).
+    ``countries``: índices de los países que entran (con repetición: remuestreo por país)."""
     ok = np.isfinite(X).all(2) & np.isfinite(y)
     xs, ys = [], []
-    for i in range(X.shape[0]):
+    for i in (range(X.shape[0]) if countries is None else countries):
         m = ok[i]
         if m.sum() < 10:
             continue
@@ -106,16 +107,25 @@ def _within(X, y, w):
     return np.linalg.lstsq(np.concatenate(xs), np.concatenate(ys), rcond=None)[0]
 
 
-def estimate(cutoff: int | None = None, e0_terms=E0_TERMS, tfr_terms=TFR_TERMS, floor: float = F_LO) -> dict:
-    """Coeficientes de las dos ecuaciones con datos <= ``cutoff`` (None: todos)."""
+def estimate(cutoff: int | None = None, e0_terms=E0_TERMS, tfr_terms=TFR_TERMS, floor: float = F_LO,
+             countries=None) -> dict:
+    """Coeficientes de las dos ecuaciones con datos <= ``cutoff`` (None: todos). ``countries`` remuestrea países."""
     p = _country_panel()
     n = len(p["years"]) if cutoff is None else int(cutoff - p["years"][0] + 1)
     cut = lambda a: a[:, :n]  # noqa: E731
-    be = _within(np.stack([cut(p[k]) for k in e0_terms], 2), cut(e0_z(p["e0"])), cut(p["weight"]))
-    bf = _within(np.stack([cut(p[k]) for k in tfr_terms], 2), cut(tfr_z(p["tfr"], floor)), cut(p["weight"]))
+    be = _within(np.stack([cut(p[k]) for k in e0_terms], 2), cut(e0_z(p["e0"])), cut(p["weight"]), countries)
+    bf = _within(np.stack([cut(p[k]) for k in tfr_terms], 2), cut(tfr_z(p["tfr"], floor)), cut(p["weight"]), countries)
     return {"cutoff": int(p["years"][n - 1]), "floor": float(floor),
             "e0": {**{k: 0.0 for k in E0_TERMS}, **dict(zip(e0_terms, map(float, be)))},
             "tfr": {**{k: 0.0 for k in TFR_TERMS + ("income",)}, **dict(zip(tfr_terms, map(float, bf)))}}
+
+
+def bootstrap(cutoff: int | None, draws: int, seed: int = 0) -> list:
+    """``draws`` versiones de las ecuaciones, cada una estimada con los países remuestreados con repetición: la
+    incertidumbre de los coeficientes sin suponer que los años de un país son independientes."""
+    n = _country_panel()["e0"].shape[0]
+    rng = np.random.default_rng(seed)
+    return [estimate(cutoff, countries=rng.integers(0, n, n)) for _ in range(draws)]
 
 
 @lru_cache(maxsize=8)

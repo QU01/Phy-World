@@ -80,6 +80,7 @@ def model_series(run, member: int = 0, obs: dict | None = None) -> dict:
     use = np.full(len(years), np.nan)
     use[1:-1] = (nr[:-2] - nr[2:]) / (years[2:] - years[:-2])          # diferencia centrada
     use[0] = (nr[0] - nr[1]) / (years[1] - years[0])
+    use[-1] = (nr[-2] - nr[-1]) / (years[-1] - years[-2])
     return {"years": years, "population": g("pop") / 1e6, "life_expectancy": g("le"), "fertility": g("tf"),
             "birth_rate": g("cbr"), "death_rate": g("cdr"), "output": g("io") + g("so"), "food_pc": g("fpc"),
             "land_yield": g("ly"), "arable_land": g("al") / 1e6, "resource_use": use,

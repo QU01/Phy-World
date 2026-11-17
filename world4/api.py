@@ -150,6 +150,14 @@ def world3_score(scenario: int = 1, variants=None) -> dict:
     return world3.scoreboard(scenario=scenario, variants=variants)
 
 
+def world3_bands(origin: int = 2023, members: int = 60, seed: int = 0) -> dict:
+    """Bandas de incertidumbre del World3 vigente (``world4.core.l0v.ensemble``): el conjunto de modelos que la
+    historia no descarta, proyectado desde ``origin``, con el error del modelo medido en la partición anterior y la
+    prueba de cobertura desde 2000. Necesita ``--install-world``. Exploratorio: modos de comportamiento."""
+    from world4.core.l0v import ensemble
+    return ensemble.report(origin=origin, members=members, seed=seed)
+
+
 def _year(x) -> int:
     return x.year if isinstance(x, date) else int(x)
 
