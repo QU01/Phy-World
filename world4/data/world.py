@@ -14,7 +14,10 @@ Este módulo las instala, las comprueba contra ``world_manifest.json`` (SHA-256)
 | ``gdp``            | 1e9 dólares internacionales 2011  | sueltos   | Maddison Project vía OWID co2-data             |
 | ``fossil_co2``     | Mt CO2/año (carbón+petróleo+gas+antorcha) | 1900-2025 | Global Carbon Budget vía OWID          |
 | ``primary_energy`` | TWh/año                           | 1965-2024 | Energy Institute / EIA vía OWID                |
+| ``co2_fi``, ``luc_co2`` | Mt CO2/año: fósil e industria (con cemento); cambio de uso del suelo | 1900-2025, 1900-2024 | Global Carbon Budget vía OWID |
+| ``cum_co2_fi``, ``cum_luc_co2`` | Mt CO2 acumuladas desde 1750 y 1850 | 1900-2025, 1900-2024 | Global Carbon Budget vía OWID |
 | ``co2_ppm``        | ppm, media anual en Mauna Loa     | 1959-2025 | NOAA GML (espejo ``datasets/co2-ppm``)         |
+| ``gmst``           | °C, anomalía global sobre 1951-1980 | 1900-2024 | NASA GISTEMP v4 (espejo ``datasets/global-temp``) |
 | ``kcal``           | kcal por persona y día            | 1961-2013 | FAO Food Balance Sheets vía owid-datasets      |
 | ``food_veq``       | kcal en equivalente vegetal por persona y día | 1961-2013 | calculada con la misma hoja de FAO  |
 | ``cereal_yield``   | índice, 1961 = 100                | 1961-2014 | Banco Mundial WDI vía owid-datasets            |
@@ -56,6 +59,7 @@ import numpy as np
 WPP_COMMIT = "2da7768ae64fc74105d3f9e98f9a74d37b62f99a"
 CO2_COMMIT = "22d9a01321ddec951b36f2bfc66e05dc6ad50ad8"
 MLO_COMMIT = "52f2be52ee6145eaad67367959af9b1b0a0bd83e"
+TEMP_COMMIT = "b90e8a349acb508d382d40d1cfa393c723bd82ef"
 OWIDDS_COMMIT = "6155d4ca1ea14ef30e753010a25521eeb416e8a2"
 _RAW = "https://raw.githubusercontent.com/"
 _FOOD = "Food supply (FAO, 2020)"
@@ -74,6 +78,7 @@ URLS = {
     "misc1dt.rda": f"{_RAW}PPgp/wpp2024/{WPP_COMMIT}/data/misc1dt.rda",
     "owid-co2-data.csv": f"{_RAW}owid/co2-data/{CO2_COMMIT}/owid-co2-data.csv",
     "co2-annmean-mlo.csv": f"{_RAW}datasets/co2-ppm/{MLO_COMMIT}/data/co2-annmean-mlo.csv",
+    "global-temp-annual.csv": f"{_RAW}datasets/global-temp/{TEMP_COMMIT}/data/annual.csv",
     "food-supply-fao-2020.csv": _owidds(_FOOD),
     "cereal-yield-index.csv": _owidds(_YIELD),
     "land-use-hyde-2017.csv": _owidds(_LAND),
@@ -92,16 +97,22 @@ KCAL_PER_KG = {"Meat food supply quantity (kg/capita/yr)": 2000.0,
                "Fish, Seafood- Food supply quantity (kg/capita/yr)": 1000.0}
 YEAR0, YEAR1 = 1900, 2025
 WORLD = 900                                   # código de la ONU para el agregado mundial
-SERIES = ("pop", "le", "tfr", "cbr", "cdr", "births", "deaths", "gdp", "fossil_co2", "primary_energy", "co2_ppm", "kcal",
+GMST_LAST = 2024                              # el espejo trae años en curso: sólo años completos
+SERIES = ("pop", "le", "tfr", "cbr", "cdr", "births", "deaths", "gdp", "fossil_co2", "primary_energy", "co2_fi", "luc_co2",
+          "cum_co2_fi", "cum_luc_co2", "co2_ppm", "gmst", "kcal",
           "food_veq", "cereal_yield", "cropland")
 UNITS = {"pop": "million persons", "le": "years", "tfr": "children per woman", "cbr": "per 1000", "cdr": "per 1000",
          "births": "million per year", "deaths": "million per year",
          "gdp": "1e9 international-$ 2011", "fossil_co2": "Mt CO2 per year", "primary_energy": "TWh per year",
          "co2_ppm": "ppm", "kcal": "kcal per person per day", "cereal_yield": "index, 1961 = 100",
-         "cropland": "million hectares", "food_veq": "vegetal-equivalent kcal per person per day"}
+         "cropland": "million hectares", "food_veq": "vegetal-equivalent kcal per person per day",
+         "co2_fi": "Mt CO2 per year", "luc_co2": "Mt CO2 per year", "cum_co2_fi": "Mt CO2", "cum_luc_co2": "Mt CO2",
+         "gmst": "degC above 1951-1980"}
 SOURCE_OF = {"pop": "owid_co2_world", "le": "wpp", "tfr": "wpp", "cbr": "wpp", "cdr": "wpp", "births": "wpp", "deaths": "wpp", "gdp": "owid_co2_world",
              "fossil_co2": "owid_co2_world", "primary_energy": "owid_co2_world", "co2_ppm": "noaa_mlo",
-             "kcal": "owid_food_supply", "food_veq": "owid_food_supply", "cereal_yield": "owid_cereal_yield", "cropland": "owid_hyde_land"}
+             "kcal": "owid_food_supply", "food_veq": "owid_food_supply", "cereal_yield": "owid_cereal_yield", "cropland": "owid_hyde_land",
+             "co2_fi": "owid_co2_world", "luc_co2": "owid_co2_world", "cum_co2_fi": "owid_co2_world",
+             "cum_luc_co2": "owid_co2_world", "gmst": "gistemp"}
 
 
 class WorldDataError(RuntimeError):
@@ -212,6 +223,12 @@ def convert() -> Path:
     put("primary_energy", w.year, w.primary_energy_consumption)
     fossil = w[["coal_co2", "oil_co2", "gas_co2", "flaring_co2"]].fillna(0.0).sum(axis=1)
     put("fossil_co2", w.year[fossil > 0], fossil[fossil > 0])
+    for name, col in (("co2_fi", "co2"), ("luc_co2", "land_use_change_co2"), ("cum_co2_fi", "cumulative_co2"),
+                      ("cum_luc_co2", "cumulative_luc_co2")):
+        put(name, w.year, w[col])
+    g = pd.read_csv(raw / "global-temp-annual.csv")
+    g = g[(g.Source == "GISTEMP") & (g.Year <= GMST_LAST)]
+    put("gmst", g.Year, g.Mean)
 
     m = pd.read_csv(raw / "co2-annmean-mlo.csv")
     put("co2_ppm", m["Year"], m["Mean"])

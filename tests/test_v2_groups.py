@@ -35,49 +35,52 @@ def test_world3_tables_give_a_poor_group_an_absurd_life_expectancy():
     assert le[0] < 45 < le[1]
 
 
-def _sector(par=None, G=2):
+INC, FOOD, SERV = np.array([300.0, 900.0]), np.array([380.0, 520.0]), np.array([200.0, 600.0])
+
+
+def _sector(par=None, rules=None):
     par = par or {"floor": eq.F_LO, "e0": {"income": 0.08, "food": 0.6, "time": 0.018}, "tfr": {"e0": -0.05, "time": -0.02}}
-    s = eq.EstimatedSector(G, par, l0.CONSTANTS, l0.TABLES)
-    s.anchor(2000.0, np.array([300.0, 900.0]), np.array([380.0, 520.0]), 3.0, np.array([55.0, 76.0]), np.array([5.0, 1.7]))
+    s = eq.EstimatedSector(2, par, l0.CONSTANTS, l0.TABLES, 0.5, rules if rules is not None else eq.Rules())
+    s.anchor(2000.0, INC, FOOD, SERV, 3.0, np.array([55.0, 76.0]), np.array([5.0, 1.7]))
     return s
 
 
 def test_estimated_equations_start_from_the_observed_and_respond_the_right_way():
-    s = _sector()
-    e0, tfr = s.step(2000.0, np.array([300.0, 900.0]), np.array([380.0, 520.0]), 3.0)
+    e0, tfr = _sector().step(2000.0, INC, FOOD, SERV, 3.0)
     assert np.allclose(e0, [55.0, 76.0]) and np.allclose(tfr, [5.0, 1.7])
-    richer, _ = s.step(2000.0, np.array([600.0, 1800.0]), np.array([380.0, 520.0]), 3.0)
-    fed, tfr_fed = s.step(2000.0, np.array([300.0, 900.0]), np.array([480.0, 620.0]), 3.0)
-    later, tfr_later = s.step(2020.0, np.array([300.0, 900.0]), np.array([380.0, 520.0]), 3.0)
+    richer, _ = _sector().step(2000.0, 2 * INC, FOOD, SERV, 3.0)
+    fed, tfr_fed = _sector().step(2000.0, INC, FOOD + 100, SERV, 3.0)
+    later, tfr_later = _sector().step(2020.0, INC, FOOD, SERV, 3.0)
     assert np.all(richer > e0) and np.all(fed > e0) and np.all(later > e0)
     assert np.all(tfr_fed < tfr) and np.all(tfr_later < tfr)          # más esperanza de vida, menos hijos
     assert np.all(later < eq.E_HI) and np.all(tfr_later > eq.F_LO)
-    dirty, _ = s.step(2000.0, np.array([300.0, 900.0]), np.array([380.0, 520.0]), 40.0)
+    dirty, _ = _sector().step(2000.0, INC, FOOD, SERV, 40.0)
     assert np.all(dirty < e0)                                         # la contaminación sigue con la tabla de World3
 
 
 def test_below_subsistence_world3_food_table_takes_over():
-    s = _sector()
     sfpc = l0.CONSTANTS["sfpc"]
-    scarce, tfr_scarce = s.step(2000.0, np.array([300.0, 900.0]), np.array([0.5 * sfpc, 520.0]), 3.0)
+    scarce, tfr_scarce = _sector().step(2000.0, INC, np.array([0.5 * sfpc, 520.0]), SERV, 3.0)
     only_estimated = eq.e0_of(eq.e0_z(55.0) + 0.6 * np.log(0.5 * sfpc / 380.0))
     assert scarce[0] == pytest.approx(only_estimated * np.interp(0.5, *l0._grid("lmf", l0.TABLES["lmf"])))
     assert scarce[0] < 0.7 * only_estimated and scarce[1] == pytest.approx(76.0)
-    assert tfr_scarce[0] > 5.0                                        # con menos esperanza de vida sube la fecundidad
+    assert tfr_scarce[0] == pytest.approx(5.0)                        # regla 5: la fecundidad no rebota por la crisis
+    _, free = _sector(rules=eq.NO_RULES).step(2000.0, INC, np.array([0.5 * sfpc, 520.0]), SERV, 3.0)
+    assert free[0] > 5.5                                              # sin la regla, la ecuación la devuelve arriba
 
 
 def test_zero_coefficients_freeze_the_rates():
     s = _sector({**eq.ZERO, "floor": eq.F_LO})
-    e0, tfr = s.step(2050.0, np.array([3000.0, 90.0]), np.array([600.0, 300.0]), 3.0)
+    e0, tfr = s.step(2050.0, np.array([3000.0, 90.0]), np.array([600.0, 300.0]), 2 * SERV, 3.0)
     assert np.allclose(e0, [55.0, 76.0]) and np.allclose(tfr, [5.0, 1.7])
 
 
 def test_logit_transforms_are_inverses_and_bounded():
     e = np.array([25.0, 50.0, 80.0, 91.0])
     assert np.allclose(eq.e0_of(eq.e0_z(e)), e)
-    f = np.array([1.0, 2.1, 6.5])
+    f = np.array([1.2, 2.1, 6.5])
     assert np.allclose(eq.tfr_of(eq.tfr_z(f)), f)
-    assert eq.tfr_of(-50.0) == pytest.approx(eq.F_LO) and eq.e0_of(50.0) == pytest.approx(eq.E_HI)
+    assert eq.F_LO == 1.0 and eq.tfr_of(-50.0) == pytest.approx(eq.F_LO) and eq.e0_of(50.0) == pytest.approx(eq.E_HI)
 
 
 def test_cohorts_take_group_patterns_sex_ratios_and_migrants():

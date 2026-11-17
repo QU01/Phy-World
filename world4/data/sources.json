@@ -405,9 +405,10 @@
    "vintage": "commit 22d9a01 (rows to 2025)",
    "lag_years": 1,
    "used_in": [
-    "world series of the L0 (V1)"
+    "world series of the L0 (V1)",
+    "carbon and climate of the L0 (V4)"
    ],
-   "note": "World population, GDP (single years before 2015: 1950, 1960, ..., 2010), fossil CO2 by fuel and primary energy. V2 also reads GDP by country (164 countries). Pinned by commit and SHA-256 (world_manifest.json). Not vendored."
+   "note": "World population, GDP (single years before 2015: 1950, 1960, ..., 2010), fossil CO2 by fuel and primary energy. V2 also reads GDP by country (164 countries). Pinned by commit and SHA-256 (world_manifest.json). Not vendored. V4 also reads total fossil and industry CO2, land-use-change CO2 and their cumulative sums."
   },
   "noaa_mlo": {
    "name": "NOAA GML Mauna Loa annual mean CO2 (mirror datasets/co2-ppm on GitHub)",
@@ -456,6 +457,18 @@
     "world series of the L0 (V3)"
    ],
    "note": "World cropland, compared with World3's arable land. Not vendored."
+  },
+  "gistemp": {
+   "name": "NASA GISTEMP v4 global annual mean surface temperature anomaly (mirror datasets/global-temp on GitHub)",
+   "license": "Public domain (US Government work); mirror under ODC-PDDL",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "commit b90e8a3 (complete years to 2024)",
+   "lag_years": 0,
+   "used_in": [
+    "carbon and climate of the L0 (V4)"
+   ],
+   "note": "Anomaly over 1951-1980. HadCRUT5 (the truth of F4) was not reachable in the V4 session. Not vendored."
   }
  },
  "reference_models": {

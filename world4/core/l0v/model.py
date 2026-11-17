@@ -171,7 +171,7 @@ class GroupCoupler:
     def __init__(self, gi, constants: dict, tables: dict, *, start: int = 1950, dt: float = 0.5,
                  origin: int | None = None, fertility: str = "model", mortality: str = "model",
                  migration: bool = True, equations: str = "estimated", par: dict | None = None,
-                 drivers: dict | None = None):
+                 drivers: dict | None = None, rules=None):
         from world4.core.l0v.popsector import PopSector
         from world4.sectors.population import migration_profile
         for name, v in (("fertility", fertility), ("mortality", mortality)):
@@ -194,7 +194,8 @@ class GroupCoupler:
             self.sector = PopSector(gi.G, constants, tables, dt)
         else:
             from world4.core.l0v import equations as _eq
-            self.sector = _eq.EstimatedSector(gi.G, par or _eq.params(), constants, tables)
+            self.sector = _eq.EstimatedSector(gi.G, par or _eq.params(), constants, tables, dt,
+                                              rules if rules is not None else _eq.Rules())
         self.profile = migration_profile()
         i = int(start - gi.years[0])
         tot = gi.popM[i].sum(1) + gi.popF[i].sum(1)
@@ -239,7 +240,7 @@ class GroupCoupler:
         anchor_now = not world3 and abs(t - self.origin) < EPS            # las ecuaciones parten de lo observado aquí
         if anchor_now:
             jo = int(self.origin - gi.years[0])
-            self.sector.anchor(t, ypc * rho, fpc * phi, ppolx, gi.e0[jo], gi.tfr[jo])
+            self.sector.anchor(t, ypc * rho, fpc * phi, sopc * rho, ppolx, gi.e0[jo], gi.tfr[jo])
         if self.c is None:                                                # el paso que termina en t0: entra el dato
             self.c = Cohorts(gi.popM[i0], gi.popF[i0], dt=self.dt, n=self.G)
             return {"set": {k: v.sum() for k, v in self.c.groups().items()}}
@@ -255,7 +256,7 @@ class GroupCoupler:
         if history or anchor_now:
             le, tf = self._at(t, gi.e0), self._at(t, gi.tfr)
         elif not world3:
-            le, tf = self.sector.step(t, ypc * rho, fpc * phi, ppolx)
+            le, tf = self.sector.step(t, ypc * rho, fpc * phi, sopc * rho, ppolx)
         observed = gi.years[0] <= t <= gi.years[-1]
         if self.fertility == "observed" and observed:
             tf = self._at(t, gi.tfr)
@@ -326,7 +327,7 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
         dt: float = 0.5, n: int = 1, start: int = 1950, fertility: str = "model", mortality: str = "model",
         groups=None, origin: int | None = None, migration: bool = True, equations: str = "estimated",
         cutoff: int | None = None, par: dict | None = None, economy: str = "model", technology=None,
-        record=None, inputs: WorldInputs | None = None):
+        climate=None, rules=None, record=None, inputs: WorldInputs | None = None):
     """World3-03 con cohortes desde ``start``. Devuelve ``(World3Run, CohortRun)``, o ``(World3Run, GroupRun)``
     si ``groups`` nombra una partición (``"regions"``, ``"income"``, ``"world"``) o trae un ``GroupInputs``.
 
@@ -337,7 +338,14 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
     (diagnóstico, hasta 2022; después sigue la de World3 reescalada).
 
     ``technology``: None deja la tecnología de World3 (apagada en el escenario 1); ``"estimated"`` usa las curvas
-    de ``world4.core.l0v.technology`` estimadas con datos <= ``cutoff``; también admite un ``Tech``."""
+    de ``world4.core.l0v.technology`` estimadas con datos <= ``cutoff``; también admite un ``Tech``.
+
+    ``climate``: None, ``"estimated"`` o un ``Carbon`` (``world4.core.l0v.carbon``): el calentamiento desde el
+    origen que causan las emisiones del modelo resta rendimiento agrícola. Necesita ``technology``.
+
+    ``rules``: las reglas de las ecuaciones estimadas para la escasez (``equations.Rules``; por defecto, todas).
+
+    La corrida devuelta lleva ``origin`` y ``cutoff`` como atributos, para que el marcador sepa qué es historia."""
     from world4.core import l0
     from world4.core.l0v import technology as _tech
     tech = None
@@ -346,6 +354,12 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
         sc_t0 = l0.SCENARIOS[scenario][1]
         tables = {**tech.tables({**l0.TABLES, **sc_t0, **(tables or {})}), **(tables or {})}
         constants = {**tech.constants({**l0.CONSTANTS, **l0.SCENARIOS[scenario][0]}), **(constants or {})}
+    carbon_par = None
+    if climate is not None:
+        from world4.core.l0v import carbon as _carbon
+        if tech is None:
+            raise ValueError("climate needs technology: the damage acts on the yield technology curve")
+        carbon_par = _carbon.params(cutoff) if isinstance(climate, str) else climate
     if groups is None:
         hook = CohortCoupler(n, start=start, dt=dt, fertility=fertility, mortality=mortality, inputs=inputs)
     else:
@@ -362,10 +376,15 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
                                               record=("iopc", "sopc", "fpc", "io", "so", "pop")))
         hook = GroupCoupler(gi, {**l0.CONSTANTS, **sc_c, **(constants or {})}, {**l0.TABLES, **sc_t, **(tables or {})},
                             start=start, origin=origin, dt=dt, fertility=fertility, mortality=mortality,
-                            migration=migration, equations=equations, drivers=drivers,
+                            migration=migration, equations=equations, drivers=drivers, rules=rules,
                             par=par if par is not None or equations == "world3" else _eq_params(cutoff))
-    full = hook if tech is None else _tech.compose(_tech.TechHook(tech, dt), hook)
+    run_origin = None if groups is None else int(start if origin is None else origin)
+    tech_hook = None if tech is None else _tech.TechHook(tech, dt, climate=carbon_par, origin=run_origin)
+    full = hook if tech is None else _tech.compose(tech_hook, hook)
     r = l0.run(scenario=scenario, constants=constants, tables=tables, n=n, t1=t1, dt=dt,
                record=record or l0.RECORD, hook=full)
     hook.patch(r)
+    if tech_hook is not None:
+        tech_hook.patch(r)
+    r.origin, r.cutoff = run_origin, cutoff
     return r, hook.result()

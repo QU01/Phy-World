@@ -1,5 +1,5 @@
 {
- "source": "UN WPP 2024 (R package PPgp/wpp2024 at commit 2da7768ae64fc74105d3f9e98f9a74d37b62f99a); OWID co2-data at commit 22d9a01321ddec951b36f2bfc66e05dc6ad50ad8 (Global Carbon Budget, Maddison Project, Energy Institute); NOAA GML Mauna Loa annual mean CO2 (mirror datasets/co2-ppm at commit 52f2be52ee6145eaad67367959af9b1b0a0bd83e); OWID owid-datasets at commit 6155d4ca1ea14ef30e753010a25521eeb416e8a2 (FAO Food Balance Sheets, World Bank WDI cereal yield, HYDE 3.2 land use)",
+ "source": "UN WPP 2024 (R package PPgp/wpp2024 at commit 2da7768ae64fc74105d3f9e98f9a74d37b62f99a); OWID co2-data at commit 22d9a01321ddec951b36f2bfc66e05dc6ad50ad8 (Global Carbon Budget, Maddison Project, Energy Institute); NOAA GML Mauna Loa annual mean CO2 (mirror datasets/co2-ppm at commit 52f2be52ee6145eaad67367959af9b1b0a0bd83e); OWID owid-datasets at commit 6155d4ca1ea14ef30e753010a25521eeb416e8a2 (FAO Food Balance Sheets, World Bank WDI cereal yield, HYDE 3.2 land use); NASA GISTEMP v4 global annual means (mirror datasets/global-temp at commit b90e8a349acb508d382d40d1cfa393c723bd82ef)",
  "downloaded": "2026-11-16",
  "files": {
   "e01dt.rda": {
@@ -28,6 +28,9 @@
   },
   "land-use-hyde-2017.csv": {
    "sha256": "0e3d35d827a978b3936e8e1897491c0339e90e782e41b927b580cff382249e20"
+  },
+  "global-temp-annual.csv": {
+   "sha256": "68ac8e86aee9fd9d01e6269c6a9eb3ce81dcc3cba7220842ff6e2c4e42e102e1"
   }
  }
 }

@@ -8,7 +8,9 @@ Cada indicador empareja una salida del modelo con una serie de ``world4.data.wor
   equivalente vegetal (las de origen animal cuentan por 7, como en World3);
   rendimiento de la tierra frente al de los cereales; tierra cultivable frente a las tierras de cultivo de HYDE
   (ésta en hectáreas, sin índice); uso de recursos (caída anual del stock ``nr``) frente al
-  CO2 de combustibles fósiles; contaminación persistente frente al CO2 atmosférico sobre 280 ppm.
+  CO2 de combustibles fósiles; y el CO2 atmosférico sobre 280 ppm que implican las emisiones del modelo
+  (``world4.core.l0v.carbon``) frente al de Mauna Loa, en ppm. La contaminación persistente de World3 ya no se
+  compara con nada: no tiene equivalente medible.
 
 El error de un indicador es la media de ``|modelo / real - 1|`` en los años de la ventana que tienen dato
 (por defecto 2000-2023: hasta 2000 el escenario 1 sigue bien a la población y es después cuando se separa).
@@ -46,15 +48,29 @@ INDICATORS = (
     Indicator("land_yield", "land yield", "cereal_yield", True, "cereal yield (World Bank)"),
     Indicator("arable_land", "arable land", "cropland", False, "cropland (HYDE)"),
     Indicator("resource_use", "resource use", "fossil_co2", True, "fossil CO2 emissions"),
-    Indicator("pollution", "persistent pollution", "co2_ppm", True, "atmospheric CO2 above 280 ppm"),
+    Indicator("co2", "atmospheric CO2 above 280 ppm", "co2_ppm", False, "Mauna Loa; model: emissions from resource use"),
 )
-HEADLINE = ("population", "life_expectancy", "output", "food_pc", "resource_use", "pollution")
-ECONOMY_KEYS = ("output", "food_pc", "land_yield", "arable_land", "resource_use", "pollution")
+HEADLINE = ("population", "life_expectancy", "output", "food_pc", "resource_use", "co2")
+ECONOMY_KEYS = ("output", "food_pc", "land_yield", "arable_land", "resource_use", "co2")
 # variables de l0.run que el marcador necesita
-NEEDS = ("pop", "le", "tf", "cbr", "cdr", "io", "so", "fpc", "ly", "al", "nr", "ppolx")
+NEEDS = ("pop", "le", "tf", "cbr", "cdr", "io", "so", "fpc", "ly", "al", "nr")
 
 
-def model_series(run, member: int = 0) -> dict:
+def _co2_excess(run, years, obs, member):
+    """El CO2 sobre 280 ppm que implica la corrida; NaN si no hay series de carbono con que calcularlo."""
+    from world4.core.l0v import carbon
+    try:
+        if obs is None:
+            from world4.data import world
+            obs = world.load()
+        par = carbon.estimate(getattr(run, "cutoff", None), obs)
+        d = carbon.diagnose(run, par, getattr(run, "origin", None), obs, member)
+    except (KeyError, RuntimeError):
+        return np.full(len(years), np.nan)
+    return np.interp(years, d["years"], d["co2_ppm"]) - PREINDUSTRIAL_PPM
+
+
+def model_series(run, member: int = 0, obs: dict | None = None) -> dict:
     """Salidas de una corrida (``World3Run``) en años enteros: ``{"years": ..., indicador: valores}``."""
     t = np.asarray(run.time, float)
     ok = np.isclose(t, np.round(t))
@@ -66,7 +82,8 @@ def model_series(run, member: int = 0) -> dict:
     use[0] = (nr[0] - nr[1]) / (years[1] - years[0])
     return {"years": years, "population": g("pop") / 1e6, "life_expectancy": g("le"), "fertility": g("tf"),
             "birth_rate": g("cbr"), "death_rate": g("cdr"), "output": g("io") + g("so"), "food_pc": g("fpc"),
-            "land_yield": g("ly"), "arable_land": g("al") / 1e6, "resource_use": use, "pollution": g("ppolx")}
+            "land_yield": g("ly"), "arable_land": g("al") / 1e6, "resource_use": use,
+            "co2": _co2_excess(run, years, obs, member)}
 
 
 def observed(obs: dict | None = None) -> dict:
@@ -88,7 +105,7 @@ def _at(years, values, y):
 
 def paired(run, obs: dict | None = None, member: int = 0) -> dict:
     """Por indicador: años con dato real y, en ellos, modelo y real (como índice si el indicador lo es)."""
-    m, o = model_series(run, member), observed(obs)
+    m, o = model_series(run, member, obs), observed(obs)
     out = {}
     for ind in INDICATORS:
         yo, vo = o["years"], o[ind.key]
@@ -136,7 +153,7 @@ VARIANTS = {
     # V2: 10 regiones con ecuaciones estimadas; historia observada hasta 2000 y, desde ahí, el modelo con datos <= 2000
     "groups": {"groups": "regions", "origin": 2000, "cutoff": 2000},
     # V3: lo mismo con la tecnología estimada (rendimientos, recursos, contaminación, coste de capital, tierra)
-    "full": {"groups": "regions", "origin": 2000, "cutoff": 2000, "technology": "estimated"},
+    "full": {"groups": "regions", "origin": 2000, "cutoff": 2000, "technology": "estimated", "climate": "estimated"},
 }
 HINDCAST_KEYS = ("population", "life_expectancy", "fertility", "birth_rate", "death_rate")
 
@@ -230,11 +247,13 @@ def technology_hindcast(origins=(1990, 2000, 2010), groups: str = "regions", sce
     out = {"groups": groups, "last": last, "origins": {}}
     for origin in origins:
         res = {}
+        from world4.core.l0v import carbon
         for name, tech in (("technology", "estimated"), ("world3", None)):
             r, _ = model.run(scenario=scenario, groups=groups, origin=origin, cutoff=origin, technology=tech,
-                             t1=float(last))
+                             climate=tech, t1=float(last))
             sc = score(r, window=(origin + 1, last))
             res[name] = {k: {"mae_pct": v["mae_pct"], "model_last": v.get("model_last"),
                              "observed_last": v.get("observed_last")} for k, v in sc.items()}
+            res[name]["climate"] = carbon.check(r, carbon.params(origin), origin, window=(origin + 1, last))
         out["origins"][int(origin)] = res
     return out

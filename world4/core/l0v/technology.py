@@ -101,19 +101,54 @@ class Tech:
 
 
 class TechHook:
-    """Gancho de ``l0.run`` que pone los tres stocks de tecnología en su curva."""
+    """Gancho de ``l0.run`` que pone los tres stocks de tecnología en su curva y frena el cambio de tierra.
 
-    def __init__(self, tech: Tech, dt: float = 0.5):
-        self.tech, self.dt = tech, dt
+    Con ``climate`` (un ``carbon.Carbon``) lleva además la cuenta de las emisiones del modelo desde ``origin`` (o
+    desde el corte de ``climate``), del calentamiento que causan, y resta rendimiento con la regla de
+    ``Carbon.damage``."""
+
+    def __init__(self, tech: Tech, dt: float = 0.5, climate=None, origin: int | None = None, obs: dict | None = None):
+        self.tech, self.dt, self.climate = tech, dt, climate
+        self.rec = {"time": [], "warming": []}
+        if climate is not None:
+            from world4.core.l0v import carbon
+            o = carbon.observed(obs)
+            self.ref = int(climate.cutoff if origin is None else origin)
+            self.fi_anchor = float(o["fi"][o["years"] == carbon.ANCHOR][0])
+            self.anchor_year = float(carbon.ANCHOR)
+            self.luc = carbon.luc_after(o, self.ref)
+            self.prev = self.use_anchor = None
+            self.cum = 0.0                                             # GtCO2 emitidas desde ``ref``
+
+    def _warming(self, t, st):
+        nr = np.array(st["nr"], float, copy=True)
+        warming = 0.0 * nr
+        if self.prev is not None:
+            use = (self.prev - nr) / self.dt                           # uso de recursos del paso anterior, por año
+            if abs(t - self.anchor_year) < 1e-9:
+                self.use_anchor = use
+            if t > self.ref and self.use_anchor is not None:
+                self.cum = self.cum + (self.fi_anchor * use / self.use_anchor + self.luc) * self.dt
+                warming = self.climate.tcre * self.cum / 1000.0
+        self.prev = nr
+        self.rec["time"].append(t)
+        self.rec["warming"].append(np.array(warming, float, copy=True))
+        return warming
 
     def __call__(self, t, st, a):
+        damage = 1.0 if self.climate is None else self.climate.damage(self._warming(t, st))
         if t + self.dt < self.tech.t0:
             return None
         lyt, rct, ppt = self.tech.paths(t + self.dt)                  # "set" fija el stock ya integrado
-        out = {"set": {"lyt": lyt, "rct": rct, "ppt": ppt}}
+        out = {"set": {"lyt": lyt * damage, "rct": rct, "ppt": ppt}}
         if t >= self.tech.t0 and self.tech.land_restraint != 1.0:
             out["flow"] = {"al": self.tech.land_restraint, "pal": self.tech.land_restraint}
         return out
+
+    def patch(self, run) -> None:
+        """Añade a la corrida el calentamiento desde el origen que el gancho usó (``warming``, °C)."""
+        if self.climate is not None:
+            run.series["warming"] = np.stack(self.rec["warming"])
 
 
 def compose(*hooks):

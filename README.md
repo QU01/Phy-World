@@ -54,6 +54,11 @@ up to 2000 only, the 2000-2023 error falls from 26.7 % to 6.6 % in output, from 
 and from 106 % to 13.6 % in resource use. In the projection the famine of scenario 1 disappears and the limit
 becomes non-renewable resources; when it bites depends on assumptions history does not pin down
 ([docs/V3-informe.md](docs/V3-informe.md)).
+Phase **V4** adds carbon and climate (emissions from the model's resource use, atmospheric CO2 and global
+temperature from two lines fitted to Mauna Loa and GISTEMP, a declared 5 % yield loss per degree of warming) and
+six explicit rules for what the data do not cover, such as life expectancy when services fall or fertility after a
+crisis. Out of sample from 2000, CO2 is within 3.4 ppm and temperature within 0.13 degC to 2023; the rules change
+no test against data and decide the scarcity scenarios ([docs/V4-informe.md](docs/V4-informe.md)).
 
 | Layer | What it is in F0 | Pinned against | Result |
 |---|---|---|---|
@@ -99,7 +104,7 @@ The Atlas data are not shipped here: several derive from sources that cannot be 
 python world4_cli.py --info                 # environment, observables, sources and licences
 python world4_cli.py --campaign             # acceptance criteria W1-W12
 python world4_cli.py --l0 --scenario 2      # World3-03 behaviour mode
-python world4_cli.py --world3-score         # V1-V3: World3-03, cohorts, regions and estimated technology against the observed world; out-of-sample tests
+python world4_cli.py --world3-score         # V1-V4: World3-03, cohorts, regions, technology and climate against the observed world; out-of-sample tests
 python world4_cli.py --query gdp_pc --region MEX --as-of 2005 --target 2010
 python world4_cli.py --query population --region NGA --as-of 2005 --target 2015
 python world4_cli.py --query resource_rent_share_world --region WLD --as-of 2005 --target 2012
@@ -127,7 +132,7 @@ api.query("conflict_hazard", "COL", 2000, 2005)   # Distribution with p10/p50/p9
 api.run_l0(scenario=1)
 w3, cohorts = api.run_l0v()                       # World3-03 with population cohorts by age and sex (V1)
 w3, regions = api.run_l0v(groups="regions", origin=2023)   # 10 regions, estimated equations, history to 2023 (V2)
-w3, regions = api.run_l0v(groups="regions", origin=2023, technology="estimated")   # the same with estimated technology (V3)
+w3, regions = api.run_l0v(groups="regions", origin=2023, technology="estimated", climate="estimated")   # the whole current World3 (V3, V4)
 api.world3_score()                                # error of each L0 variant against the observed world
 ```
 

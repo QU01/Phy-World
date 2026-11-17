@@ -6,27 +6,53 @@ se sustituyen por dos ecuaciones logísticas, acotadas, estimadas con el panel d
 ``world4.data.world`` (efectos fijos de país, ponderado por población, datos <= ``cutoff``):
 
     logit[(e0 - 20) / (92 - 20)]      = u + b_y · ln(ingreso por persona) + b_k · ln(alimento por persona) + b_t · t
-    logit[(TFR - 0,8) / (8,5 - TFR)]  = v + c_e · e0 + c_t · t
+    logit[(TFR - 1,0) / (8,5 - TFR)]  = v + c_e · e0 + c_t · t
 
 * La esperanza de vida sube con el ingreso, con el alimento y con el tiempo (la técnica sanitaria que se difunde).
 * La fecundidad baja con la esperanza de vida (sobreviven más hijos) y con el tiempo; el ingreso NO entra: las
   formas con ingreso predicen de más la caída posterior a 2000 (``selection``).
 * En el modelo las ecuaciones van ANCLADAS: cada grupo parte de su valor observado en el año de arranque y la
   ecuación sólo da el cambio desde entonces. Así no importan las unidades de World3 (sólo entran cocientes).
-* Lo que los datos no cubren queda como en World3: por debajo de la subsistencia manda su tabla de alimento
-  (``lmf``), y la contaminación multiplica con su tabla (``lmp``).
+**Reglas para lo que los datos no cubren** (``Rules``; son decisiones declaradas, no estimaciones). En la muestra
+la esperanza de vida casi siempre sube y los servicios casi nunca caen, así que las ecuaciones no dicen qué pasa en
+una escasez. Sin reglas, con la industria un 84 % menor la esperanza de vida seguía subiendo hasta 85 años, y
+cuando el alimento faltaba la fecundidad volvía a 5 hijos (medido en V2 y V3). Las reglas:
 
-Suelo de la fecundidad (0,8) y techo de la esperanza de vida (92): no los identifica el ajuste [S]; el suelo
-pesa mucho en 2100 y será un eje de incertidumbre, no un valor calibrado.
+1. **Alimento.** Por debajo de la subsistencia manda la tabla de alimento de World3 (``lmf``).
+2. **Contaminación.** Multiplica con la tabla de World3 (``lmp``).
+3. **Servicios de salud.** Si los servicios por persona de un grupo caen por debajo de los que tenía en el origen,
+   su esperanza de vida se multiplica por la tabla de salud de World3 (``lmhs2``, con su retardo de 20 años)
+   relativa a su valor en el origen. Por encima no actúa: ahí mandan los datos.
+4. **El progreso necesita servicios.** El término del tiempo de las dos ecuaciones (la técnica sanitaria y la
+   difusión de la baja fecundidad) avanza a un ritmo proporcional a ``min(1, servicios / servicios en el origen)``:
+   con los servicios a la mitad, el progreso va a la mitad.
+5. **La fecundidad no rebota por una crisis.** En la ecuación de la fecundidad entra la esperanza de vida MÁXIMA
+   alcanzada desde el origen, no la del momento.
+6. **Suelo de la fecundidad: 1,0 hijos por mujer**, el valor regional más bajo observado (1,02 en Asia oriental
+   en 2023). Techo de la esperanza de vida: 92 años.
+
+Las reglas 3 a 5 no cambian nada mientras los servicios y la esperanza de vida suban, que es lo que pasa en todas
+las pruebas con datos; sólo deciden las proyecciones con escasez.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import lru_cache
 
 import numpy as np
 
 E_LO, E_HI = 20.0, 92.0
-F_LO, F_HI = 0.8, 8.5
+F_LO, F_HI = 1.0, 8.5
+
+
+@dataclass(frozen=True)
+class Rules:
+    health_table: bool = True             # regla 3
+    progress_needs_services: bool = True  # regla 4
+    fertility_ratchet: bool = True        # regla 5
+
+
+NO_RULES = Rules(False, False, False)
 E0_TERMS = ("income", "food", "time")
 TFR_TERMS = ("e0", "time")
 ZERO = {"e0": {k: 0.0 for k in E0_TERMS}, "tfr": {k: 0.0 for k in TFR_TERMS}}        # congelar las tasas
@@ -99,30 +125,53 @@ def params(cutoff: int | None = None) -> dict:
 
 
 class EstimatedSector:
-    """Las dos ecuaciones para ``G`` grupos, ancladas en lo observado en el arranque."""
+    """Las dos ecuaciones para ``G`` grupos, ancladas en lo observado en el arranque, con las reglas de ``Rules``."""
 
-    def __init__(self, G: int, par: dict, constants: dict, tables: dict):
+    def __init__(self, G: int, par: dict, constants: dict, tables: dict, dt: float = 0.5, rules: Rules = Rules()):
         from world4.core import l0
-        self.G, self.par = G, par
+        self.G, self.par, self.dt, self.rules = G, par, dt, rules
         self.floor = float(par.get("floor", F_LO))
-        self.sfpc = float(np.asarray(constants["sfpc"], float).reshape(-1)[0])
-        self.lmf, self.lmp = l0._grid("lmf", tables["lmf"]), l0._grid("lmp", tables["lmp"])
+        const = lambda k: float(np.asarray(constants[k], float).reshape(-1)[0])  # noqa: E731
+        self.sfpc, self.hsid = const("sfpc"), const("hsid")
+        self.tab = {k: l0._grid(k, tables[k]) for k in ("lmf", "lmp", "hsapc", "lmhs2")}
         self.ref = None
 
-    def anchor(self, t, income, food, ppolx, e0, tfr):
-        """Fija el punto de partida: los regresores en ``t`` y la e0 y la fecundidad observadas de cada grupo."""
-        self.ref = {"t": float(t), "income": np.log(income), "food": np.log(food),
-                    "lmp": float(np.interp(ppolx, *self.lmp)), "ze": e0_z(np.asarray(e0, float)),
-                    "zf": tfr_z(np.asarray(tfr, float), self.floor), "e0": np.asarray(e0, float)}
+    def _health(self, effective):
+        return np.interp(effective, *self.tab["lmhs2"])
 
-    def step(self, t, income, food, ppolx):
-        """``(e0, TFR)`` de cada grupo en ``t``. ``income`` y ``food``: por persona, en las unidades del modelo."""
-        r, pe, pf = self.ref, self.par["e0"], self.par["tfr"]
-        dy, dk, dt = np.log(income) - r["income"], np.log(food) - r["food"], t - r["t"]
-        base = e0_of(r["ze"] + pe["income"] * dy + pe["food"] * dk + pe["time"] * dt)
-        famine = np.interp(np.minimum(np.asarray(food, float) / self.sfpc, 1.0), *self.lmf)      # 1 si hay subsistencia
-        e0 = base * famine * float(np.interp(ppolx, *self.lmp)) / r["lmp"]
-        tfr = tfr_of(r["zf"] + pf["e0"] * (e0 - r["e0"]) + pf["time"] * dt + pf.get("income", 0.0) * dy, self.floor)
+    def anchor(self, t, income, food, services, ppolx, e0, tfr):
+        """Fija el punto de partida: los regresores en ``t`` y la e0 y la fecundidad observadas de cada grupo."""
+        e0 = np.asarray(e0, float)
+        services = np.asarray(services, float)
+        self.ehspc = np.interp(services, *self.tab["hsapc"])               # servicios de salud efectivos (retardados)
+        self.ref = {"t": float(t), "income": np.log(income), "food": np.log(food), "services": services,
+                    "lmp": float(np.interp(ppolx, *self.tab["lmp"])), "health": self._health(self.ehspc),
+                    "ze": e0_z(e0), "zf": tfr_z(np.asarray(tfr, float), self.floor), "e0": e0}
+        self.clock = np.zeros(self.G)                                      # años de progreso desde el origen
+        self.last_t = float(t)
+        self.e0_max = e0.copy()
+
+    def step(self, t, income, food, services, ppolx):
+        """``(e0, TFR)`` de cada grupo en ``t``. ``income``, ``food`` y ``services``: por persona, en las unidades
+        del modelo (sólo entran cocientes con el origen)."""
+        r, pe, pf, rules = self.ref, self.par["e0"], self.par["tfr"], self.rules
+        services = np.asarray(services, float)
+        step = t - self.last_t
+        self.last_t = float(t)
+        pace = np.minimum(1.0, services / r["services"]) if rules.progress_needs_services else 1.0
+        self.clock = self.clock + pace * step
+        dy, dk = np.log(income) - r["income"], np.log(food) - r["food"]
+        base = e0_of(r["ze"] + pe["income"] * dy + pe["food"] * dk + pe["time"] * self.clock)
+        famine = np.interp(np.minimum(np.asarray(food, float) / self.sfpc, 1.0), *self.tab["lmf"])   # 1 si hay subsistencia
+        health = 1.0
+        if rules.health_table:
+            self.ehspc = self.ehspc + step * (np.interp(services, *self.tab["hsapc"]) - self.ehspc) / self.hsid
+            health = np.minimum(1.0, self._health(self.ehspc) / r["health"])
+        e0 = base * famine * health * float(np.interp(ppolx, *self.tab["lmp"])) / r["lmp"]
+        self.e0_max = np.maximum(self.e0_max, e0)
+        seen = self.e0_max if rules.fertility_ratchet else e0
+        tfr = tfr_of(r["zf"] + pf["e0"] * (seen - r["e0"]) + pf["time"] * self.clock + pf.get("income", 0.0) * dy,
+                     self.floor)
         return e0, tfr
 
 

@@ -91,9 +91,10 @@ def test_scoreboard_is_zero_against_itself_and_sees_a_mutant():
     obs = {"years": m["years"], "pop": m["population"], "le": m["life_expectancy"], "tfr": m["fertility"],
            "cbr": m["birth_rate"], "cdr": m["death_rate"], "gdp": m["output"], "food_veq": m["food_pc"],
            "cereal_yield": m["land_yield"], "cropland": m["arable_land"], "fossil_co2": m["resource_use"],
-           "co2_ppm": m["pollution"] + world3.PREINDUSTRIAL_PPM}
+           "co2_ppm": np.full(len(m["years"]), 400.0)}
     s = world3.score(r, obs)
     assert set(s) == {i.key for i in world3.INDICATORS}
+    assert s.pop("co2")["n"] == 0                      # sin series de carbono no hay CO2 que comparar
     assert max(v["mae_pct"] for v in s.values()) < 1e-9
     s2 = world3.score(l0.run(constants={"nri": 2e12}), obs, window=(2030, 2060))
     assert s2["output"]["mae_pct"] > 5
@@ -133,7 +134,7 @@ def test_world_series_cover_what_the_scoreboard_reads(world_ready):
 def test_scenario_1_score_is_the_measured_one(world_ready):
     s = world3.score(l0.run())
     expect = {"population": 4.7, "life_expectancy": 8.4, "output": 26.7, "food_pc": 14.1, "arable_land": 17.5,
-              "resource_use": 106.4, "pollution": 109.5}
+              "resource_use": 106.4, "co2": 32.7}
     for k, v in expect.items():
         assert s[k]["mae_pct"] == pytest.approx(v, abs=0.1), k
     assert s["population"]["bias_pct"] < 0 < s["resource_use"]["bias_pct"]

@@ -70,9 +70,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="V1: download the observed world series the L0 is scored against (UN WPP, OWID, NOAA, FAO; "
                         "SHA-256 checked); installs the WPP age files too")
     m.add_argument("--world3-score", action="store_true",
-                   help="V1-V3: the L0 against observed world series, 2000-2023: World3-03 as it is, with "
-                        "population cohorts, by regions with estimated equations and with estimated technology "
-                        "(out-of-sample tests)")
+                   help="V1-V4: the L0 against observed world series, 2000-2023: World3-03 as it is, with "
+                        "population cohorts, by regions with estimated equations and with estimated technology and "
+                        "climate (out-of-sample tests)")
     m.add_argument("--validate", "--validate-f1", dest="validate", action="store_true",
                    help="F1-F5: rolling-origin W3/W5 (Atlas, F1 ... F1-F5) + free hindcasts of population, psi, "
                         "the energy mix, CO2, GMST, cereals and cropland + AR6 carbon-budget check")
@@ -352,7 +352,7 @@ def run_world3_score(a) -> int:
     print("  " + ui.dim("regions: 10 regions with estimated equations; observed history to 2000, then the model with "
                         "data <= 2000"))
     print("  " + ui.dim("+technology: the same with yields, resource and pollution intensity, capital cost and land "
-                        "estimated with data <= 2000"))
+                        "estimated with data <= 2000, and climate damage to yields"))
     if check is None:
         ui.degraded("L0 cohorts", "WPP age data not installed: only World3-03 as it is (python world4_cli.py --install-world)")
     else:
@@ -377,6 +377,12 @@ def run_world3_score(a) -> int:
         for origin, res in tech["origins"].items():
             cells = "".join(f"{res['technology'][k]['mae_pct']:9.1f} ({res['world3'][k]['mae_pct']:5.1f})" for k, _ in labels)
             print(f"  {origin:<8d}{cells}")
+        print()
+        print("  " + ui.dim("carbon and climate from the model's resource use, mean absolute error from origin + 1"))
+        print("  " + f"{'origin':<8s}{'CO2, ppm':>18s}{'GMST, degC':>18s}")
+        for origin, res in tech["origins"].items():
+            c, w = res["technology"]["climate"], res["world3"]["climate"]
+            print(f"  {origin:<8d}{c['co2_ppm_mae']:9.1f} ({w['co2_ppm_mae']:5.1f}){c['gmst_mae']:9.2f} ({w['gmst_mae']:5.2f})")
     return EXIT_OK
 
 

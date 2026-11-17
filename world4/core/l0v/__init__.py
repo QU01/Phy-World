@@ -6,5 +6,7 @@ V2: el mundo se parte en grupos de países (``groups``) con esperanza de vida y 
 (``equations``); la historia hasta un año origen es la observada y desde ahí corre el modelo.
 V3: la tecnología de World3 (rendimiento, uso de recursos, contaminación, coste de capital, tierra) deja de estar
 apagada y sigue curvas estimadas con las series mundiales (``technology``).
+V4: carbono y clima a partir del uso de recursos (``carbon``), con daño al rendimiento, y reglas explícitas para la
+demografía en la escasez (``equations.Rules``).
 El escenario 1 original no cambia.
 """
