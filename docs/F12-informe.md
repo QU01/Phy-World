@@ -314,6 +314,7 @@ Orígenes de enero de 2012, 2015, 2018, 2021 y 2023; error absoluto medio de asi
 - Conversión de las cinco regiones: 23 s.
 - W13 mundial (100 corridas de origen): 26 min. Desplazamiento (25 ajustes y pronósticos): 16 min.
 - Una corrida de origen de África (64 miembros, 36 meses, con las referencias): 70 s y 1,2 GB.
+- Pronóstico mundial en vivo (`--l2-forecast --l2-region world`, 12 meses, 64 miembros, 191 países): la primera vez más de 12 min, casi todo en ajustar el desplazamiento de cada región; con esos parámetros ya guardados, 56 s. `--no-displacement` evita el ajuste. La salida pasa la auditoría de honestidad (W11) sin violaciones.
 
 ### Cómo reproducir
 
