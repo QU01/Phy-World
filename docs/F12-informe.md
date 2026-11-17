@@ -1,11 +1,12 @@
-# F12 de Phy-World (World4): la capa de eventos (L2), Oriente Medio
+# F12 de Phy-World (World4): la capa de eventos (L2), de Oriente Medio al mundo
 
-- **Fecha:** 2026-11-16
-- **Estado:** construida y medida.
-  - **W13: ROJO.** El simulador de agentes no supera a sus referencias en el periodo de prueba; causa nombrada y medida (§4).
-  - El puente L2 → L1 sí mejora el evento anual de conflicto (§6).
-  - El desplazamiento es exploratorio y pierde contra la persistencia (§7).
-- **Pruebas:** 27 nuevas (`tests/test_f12_l2.py`), todas sobre un mundo sintético salvo dos que usan el panel real si está instalado.
+- **Fecha:** 2026-11-16 (Oriente Medio) y 2026-11-17 (ampliación mundial, §12).
+- **Estado:** construida y medida en las cinco regiones de UCDP.
+  - **W13: ROJO, también a escala mundial.** El simulador de agentes no supera a sus referencias; causa nombrada y medida (§4 y §12).
+  - El puente L2 → L1 sí mejora el evento anual de conflicto (§6; medido sólo en Oriente Medio).
+  - El desplazamiento es exploratorio y pierde contra la persistencia (§7 y §12).
+- **Pruebas:** 36 nuevas (`tests/test_f12_l2.py`), sobre un mundo sintético salvo tres que usan los paneles reales si están instalados.
+- **Orden de lectura:** §1-§11 son la primera región tal como se midió; §12 es la ampliación y manda donde difieran.
 - **Máquina:** contenedor Linux de 4 núcleos y 16 GB; Python 3.13. Es la primera vez que World4 corre fuera de Windows (§8).
 
 El nombre «L2» lo dejó libre la hoja de ruta: FaIR y los cultivos, que iban a ser un L2 aparte, viven en el L1 desde F4/F5. F11 sigue reservada al estimador estructural sobre el L1 completo.
@@ -15,7 +16,7 @@ El nombre «L2» lo dejó libre la hoja de ruta: FaIR y los cultivos, que iban a
 | Pieza | Qué hace |
 |---|---|
 | `data/conflict.py`, `l2_manifest.json` | Descarga y comprueba (SHA-256) UCDP GED 26.1, UCDP Candidate, PRIO-GRID 2.0, ACNUR y WPP; escribe `data_cache/l2/l2_mideast.npz`. |
-| `core/l2/regions.py` | Qué países forman una región. Hoy `mideast`: los 15 Estados de la región «Middle East» de UCDP. |
+| `core/l2/regions.py` | Qué países forman cada región. `mideast` son los 15 Estados de la región «Middle East» de UCDP; desde §12, las cinco regiones de UCDP y `world`. |
 | `core/l2/panel.py` | El panel por **sitio** (celda, país), celda y país; rasgos con retardo; `truncated(t0)`, el corte «a fecha de». |
 | `core/l2/baseline.py` | La vara: `zero`, `last12` (los 12 meses anteriores de la unidad) y `hurdle` (logit de ocurrencia + regresión del log de las muertes, directo por horizonte). |
 | `core/l2/agents.py` | El simulador: actores, díadas, huella espacial, nacimiento y muerte de díadas. |
@@ -198,11 +199,127 @@ python world4_cli.py --campaign                            # W13 con el resto
 
 ## 11. Qué sigue
 
-En orden de lo que ataca las causas medidas:
+En orden de lo que ataca las causas medidas (§12 refuerza el primer punto: a escala mundial es, con diferencia, el mayor):
 
 1. **Que el simulador no itere a ciegas.** Su error crece con el horizonte más que el de `hurdle`. Dos remedios: calibrar activación e intensidad contra el error a varios pasos (ABC-SMC de F7 sobre estadísticos resumen), o condicionar el total mensual por país a `hurdle` y dejar al simulador el reparto entre díadas, celdas y desplazamiento.
 2. **ViEWS como referencia** (§9): hacen falta dos hosts.
 3. **Cablear el puente L2 → L1** en el estimador estructural para los países de la región, con su propia medición en W9a.
 4. **Desplazamiento:** una respuesta por tipo de violencia y datos mensuales de ACNUR; hoy sólo hay stocks anuales.
-5. **Una segunda región** (el Sahel o el Cuerno de África): el código sólo conoce `mideast` por `regions.py`.
+5. **Acoplar las regiones** (hecha la ampliación de §12): hoy un actor no ve sus frentes en otra región.
 6. **Eventos que UCDP no registra** (protesta, represión): hace falta otra fuente, y ACLED tiene restricciones de uso que hay que abrir antes.
+
+## 12. Ampliación mundial (2026-11-17)
+
+### Qué cambió
+
+- **Regiones.** `africa`, `americas`, `asia` (con Oceanía), `europe` (con Rusia y el Cáucaso) y `mideast`: las cinco de UCDP. `world` no es una región, es la lista de las cinco. Un país con eventos va donde lo pone UCDP; uno sin eventos, por su continente; `mideast` sigue siendo una lista fija.
+- **Los mismos ficheros.** El GED, PRIO-GRID, ACNUR y WPP ya eran mundiales: no hay descargas nuevas ni cambia el manifiesto. Los códigos de país salen de `country_converter` al convertir, con cuatro excepciones declaradas (Serbia 345, Yemen 678, Vietnam 816, Chequia 316).
+- **Unidades que suman territorios** (así los codifican UCDP y PRIO-GRID): ISR con Palestina, MAR con el Sáhara Occidental, CHN con Hong Kong y Macao.
+- **El simulador, por lotes.** Los miembros se simulan de 8 en 8, cada lote con su generador: el resultado no depende de la memoria de la máquina, y los 8 primeros miembros de una corrida de 64 son la corrida de 8 (prueba).
+- **Muestreo de sitios por bloques.** Antes una multinomial densa por díada; ahora un índice por evento. La distribución es la misma (prueba contra las frecuencias esperadas); lo que cambia son los sorteos.
+- **Memoria.** Rasgos sólo en las columnas que se usan, series en `float32`, exposición del desplazamiento precalculada y sus parámetros guardados en disco.
+- **El modelo no se tocó.** La forma se eligió con Oriente Medio 2005-2014. Para las otras cuatro regiones no hubo periodo de desarrollo: todo lo que sigue es prueba.
+
+### El panel
+
+| Región | Países | Celdas | Eventos | Muertes | Díadas | Actores |
+|---|---|---|---|---|---|---|
+| África | 53 | 10 286 | 77 627 | 2 171 234 | 1 092 | 1 012 |
+| Américas | 35 | 20 683 | 58 048 | 252 803 | 262 | 252 |
+| Asia y Oceanía | 44 | 14 704 | 102 315 | 605 255 | 354 | 332 |
+| Europa | 44 | 16 404 | 60 745 | 562 660 | 86 | 91 |
+| Oriente Medio | 15 | 2 782 | 130 157 | 755 320 | 265 | 239 |
+| **Mundo** | **191** | **64 859** | **428 892** | **4 347 272** | **2 059** | **1 926** |
+
+El panel de Oriente Medio es idéntico, array por array, al de la primera medición. Las celdas suman 41 más que las 64 818 de PRIO-GRID: las de frontera con eventos de dos regiones están en ambas.
+
+### W13 mundial, prueba 2015-2024 (CRPS de ln(1 + muertes); 20 orígenes por región)
+
+| Nivel | Meses | N | Agentes | `hurdle` | `last12` | `zero` | Agentes − `last12` | Agentes − `hurdle` |
+|---|---|---|---|---|---|---|---|---|
+| País | 1 | 3 820 | 0,1550 | 0,1579 | **0,1541** | 0,759 | +0,001 [−0,007, +0,009] | −0,003 [−0,009, +0,003] |
+| País | 3 | 3 820 | 0,1814 | 0,1838 | **0,1726** | 0,761 | +0,009 [+0,002, +0,016] | −0,002 [−0,009, +0,005] |
+| País | 6 | 3 820 | 0,1933 | 0,1923 | **0,1826** | 0,748 | +0,011 [+0,002, +0,019] | +0,001 [−0,007, +0,010] |
+| País | 12 | 3 820 | 0,2226 | 0,2124 | **0,2041** | 0,755 | +0,019 [+0,006, +0,033] | +0,010 [−0,002, +0,026] |
+| País | 24 | 3 629 | 0,3113 | 0,2525 | **0,2384** | 0,763 | +0,073 [+0,038, +0,115] | +0,059 [+0,029, +0,098] |
+| País | 36 | 3 247 | 0,4452 | 0,2863 | **0,2800** | 0,770 | +0,165 [+0,089, +0,253] | +0,159 [+0,087, +0,244] |
+| Celda | 1 | 1 297 180 | 0,0094 | **0,0088** | 0,0089 | 0,0134 | +0,0005 [+0,0001, +0,0012] | +0,0006 [+0,0002, +0,0014] |
+| Celda | 3 | 1 297 180 | 0,0103 | 0,0095 | **0,0094** | 0,0133 | +0,0009 [+0,0003, +0,0021] | +0,0009 [+0,0003, +0,0020] |
+| Celda | 6 | 1 297 180 | 0,0111 | 0,0095 | 0,0095 | 0,0129 | +0,0016 [+0,0006, +0,0033] | +0,0015 [+0,0006, +0,0033] |
+| Celda | 12 | 1 297 180 | 0,0132 | **0,0102** | 0,0103 | 0,0130 | +0,0029 [+0,0012, +0,0061] | +0,0030 [+0,0013, +0,0063] |
+
+### Por región (agentes / mejor referencia; entre paréntesis, cuál)
+
+| Región | País, 1 mes | País, 12 meses | País, 36 meses | Celda, 1 mes | Celda, 12 meses |
+|---|---|---|---|---|---|
+| África | **0,249** / 0,252 (`last12`) | 0,373 / 0,334 (`last12`) | 0,931 / 0,414 (`last12`) | 0,0219 / 0,0211 (`hurdle`) | 0,0321 / 0,0239 (`hurdle`) |
+| Américas | 0,138 / 0,134 (`last12`) | 0,177 / 0,156 (`last12`) | 0,255 / 0,217 (`last12`) | 0,0051 / 0,0045 (`last12`) | 0,0057 / 0,0049 (`last12`) |
+| Asia y Oceanía | 0,103 / 0,099 (`last12`) | 0,134 / 0,115 (`last12`) | 0,215 / 0,174 (`last12`) | 0,0099 / 0,0096 (`hurdle`) | 0,0138 / 0,0107 (`hurdle`) |
+| Europa | 0,053 / 0,046 (`last12`) | **0,071** / 0,077 (`last12`) | **0,115** / 0,121 (`last12`) | 0,0017 / 0,0014 (`hurdle`) | 0,0046 / 0,0026 (`last12`) |
+| Oriente Medio | 0,318 / 0,305 (`hurdle`) | 0,500 / 0,457 (`hurdle`) | 0,816 / 0,634 (`hurdle`) | 0,0382 / 0,0356 (`last12`) | 0,0476 / 0,0411 (`hurdle`) |
+
+**Lectura:**
+
+- **A un mes y por país el simulador empata con las dos referencias** (0,155 frente a 0,154 y 0,158; los dos IC incluyen el cero). Es lo único que no pierde.
+- **De 3 a 12 meses pierde contra la persistencia** con IC que excluye el cero, y empata con `hurdle`.
+- **A 24 y 36 meses pierde contra todo, y mucho.** A 36 meses su error es un 59 % mayor que el de la persistencia. En África es más del doble (0,931 frente a 0,414): iterar tres años con casi 500 díadas vivas hace que la violencia simulada se dispare.
+- **Por celda pierde en los cuatro horizontes,** entre un 7 % y un 30 %. A 12 meses es peor que pronosticar cero en África (0,0321 frente a 0,0272) y en Europa (0,0046 frente a 0,0036), y en el agregado mundial queda igual que cero (0,0132 frente a 0,0130).
+- **Fuera de Oriente Medio la mejor referencia por país es la persistencia, no el modelo estadístico.** `hurdle` sólo gana a `last12` en Oriente Medio. Lo que en §4 parecía una vara general era una propiedad de esa región.
+- **Europa es la excepción a favor:** a 12 y 36 meses el simulador sale mejor que las dos referencias (0,071 frente a 0,077 y 0,087), sin IC que lo separe. Es la región con menos díadas (20 recientes) y una guerra que domina todo.
+- **Sigue acertando mejor si habrá violencia que cuánta:** el Brier de «al menos una muerte» a un mes es el mejor o empata en África (0,0552 frente a 0,0556 de `last12`), Américas (0,0430 frente a 0,0437) y Oriente Medio (0,0606 frente a 0,0642); en Asia y Europa gana la persistencia.
+- **Veredicto: ROJO.** `--campaign` lee esta corrida. Nada del L2 es de grado de pronóstico en ninguna región.
+
+### Oriente Medio, dos corridas del mismo modelo
+
+Los números de §4 son de la primera corrida. Con el muestreo nuevo (misma distribución, otros sorteos) la corrida mundial repite la región:
+
+| Nivel | Meses | Agentes, primera | Agentes, segunda | `hurdle` | `last12` |
+|---|---|---|---|---|---|
+| País | 1 | 0,3216 | 0,3181 | 0,3049 | 0,3345 |
+| País | 3 | 0,3689 | 0,3692 | 0,3351 | 0,3721 |
+| País | 6 | 0,4261 | 0,4296 | 0,4135 | 0,4177 |
+| País | 12 | 0,5125 | 0,4999 | 0,4566 | 0,4886 |
+| País | 24 | 0,6602 | 0,6527 | 0,5659 | 0,6161 |
+| País | 36 | 0,8151 | 0,8155 | 0,6336 | 0,7323 |
+| Celda | 1 | 0,0382 | 0,0382 | 0,0356 | 0,0356 |
+| Celda | 12 | 0,0481 | 0,0476 | 0,0411 | 0,0417 |
+
+Las referencias no se mueven en el cuarto decimal y el simulador se mueve como máximo un 2,5 % (a 12 meses): ruido de 64 miembros. El veredicto es el mismo.
+
+### Desplazamiento mundial
+
+Orígenes de enero de 2012, 2015, 2018, 2021 y 2023; error absoluto medio de asinh(personas / 10 000):
+
+| Stock | Años | N | Persistencia | Modelo con las muertes observadas | Pronóstico completo (p50) | Cobertura p10-p90 |
+|---|---|---|---|---|---|---|
+| Refugiados y solicitantes | 1 | 955 | **0,084** | 0,138 | 0,142 | 0,25 |
+| Refugiados y solicitantes | 2 | 955 | **0,159** | 0,232 | 0,251 | 0,33 |
+| Refugiados y solicitantes | 3 | 955 | **0,210** | 0,290 | 0,327 | 0,38 |
+| Desplazados internos | 1 | 282 | **0,319** | 0,467 | 0,481 | 0,22 |
+| Desplazados internos | 2 | 296 | **0,546** | 0,671 | 0,708 | 0,28 |
+| Desplazados internos | 3 | 298 | **0,723** | 0,816 | 0,948 | 0,27 |
+
+- **Pierde contra la persistencia en el mundo como perdía en Oriente Medio,** y las bandas siguen cubriendo un tercio de lo que deberían.
+- **Por región, a un año:** empata en Américas (refugiados 0,102 frente a 0,103) y en los desplazados internos de Asia (0,288 frente a 0,285); pierde en el resto, y donde más en África (refugiados 0,238 frente a 0,124).
+
+### Límites que añade la escala mundial
+
+- **Las regiones no se ven entre sí.** Un actor con frentes en dos regiones (el Estado Islámico, los gobiernos que intervienen fuera) no acopla unos con otros.
+- **Nada está correlacionado entre regiones.** La banda de un total mundial sale demasiado estrecha: no se debe sumar.
+- **El país de una celda es el de 2014** (PRIO-GRID) y su población, el reparto de 2010 escalado al total de la ONU.
+- **La forma del modelo se eligió con una región.** En las otras cuatro puede haber formas mejores que no se buscaron.
+
+### Coste (4 núcleos, `OMP_NUM_THREADS=1`)
+
+- Conversión de las cinco regiones: 23 s.
+- W13 mundial (100 corridas de origen): 26 min. Desplazamiento (25 ajustes y pronósticos): 16 min.
+- Una corrida de origen de África (64 miembros, 36 meses, con las referencias): 70 s y 1,2 GB.
+
+### Cómo reproducir
+
+```bash
+python world4_cli.py --install-l2 --l2-region world
+OMP_NUM_THREADS=1 python world4_cli.py --l2-validate --l2-region world     # runs/l2_w13_world.json
+python world4_cli.py --l2-forecast --l2-region world --horizon 12
+```
+

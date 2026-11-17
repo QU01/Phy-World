@@ -114,6 +114,8 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("--as-of-month", default=None, metavar="YYYY-MM",
                    help="F12: first forecast month for --l2-forecast (default: the month after the last data)")
     n.add_argument("--l1", action="store_true", help="F12: feed the L1 conflict probability to the L2 (needs --build-store)")
+    n.add_argument("--no-displacement", action="store_true",
+                   help="F12: --l2-forecast without the displacement module (its first fit takes minutes per region)")
     o = p.add_argument_group("output")
     o.add_argument("--json", action="store_true", help="print the result as JSON and nothing else")
     o.add_argument("--strict", action="store_true", help="exit 4 if anything was degraded")
@@ -343,7 +345,8 @@ def run_install_l2(a) -> int:
 def run_l2_forecast(a) -> int:
     from world4 import api
     try:
-        r = api.l2_forecast(a.l2_region, a.horizon, as_of=a.as_of_month, members=max(a.members, 16), l1=a.l1)
+        r = api.l2_forecast(a.l2_region, a.horizon, as_of=a.as_of_month, members=max(a.members, 16), l1=a.l1,
+                            displacement=not a.no_displacement)
     except api.QueryError as e:
         raise SpecError(str(e)) from e
     if a.json:
