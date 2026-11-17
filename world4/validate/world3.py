@@ -4,8 +4,10 @@ Cada indicador empareja una salida del modelo con una serie de ``world4.data.wor
 
 * **directos** (mismas unidades): población, esperanza de vida, fecundidad, natalidad, mortalidad;
 * **por índice** (1970 = 1), porque World3 mide en unidades propias y el dato real es un APODERADO [declarado]:
-  producción (industria + servicios) frente al PIB; alimento por persona frente a las kilocalorías por persona;
-  rendimiento de la tierra frente al de los cereales; uso de recursos (caída anual del stock ``nr``) frente al
+  producción (industria + servicios) frente al PIB; alimento por persona frente a las kilocalorías por persona en
+  equivalente vegetal (las de origen animal cuentan por 7, como en World3);
+  rendimiento de la tierra frente al de los cereales; tierra cultivable frente a las tierras de cultivo de HYDE
+  (ésta en hectáreas, sin índice); uso de recursos (caída anual del stock ``nr``) frente al
   CO2 de combustibles fósiles; contaminación persistente frente al CO2 atmosférico sobre 280 ppm.
 
 El error de un indicador es la media de ``|modelo / real - 1|`` en los años de la ventana que tienen dato
@@ -40,14 +42,16 @@ INDICATORS = (
     Indicator("birth_rate", "crude birth rate", "cbr", False),
     Indicator("death_rate", "crude death rate", "cdr", False),
     Indicator("output", "output (industry + services)", "gdp", True, "world GDP (Maddison)"),
-    Indicator("food_pc", "food per person", "kcal", True, "kcal per person per day (FAO)"),
+    Indicator("food_pc", "food per person", "food_veq", True, "vegetal-equivalent kcal per person (FAO)"),
     Indicator("land_yield", "land yield", "cereal_yield", True, "cereal yield (World Bank)"),
+    Indicator("arable_land", "arable land", "cropland", False, "cropland (HYDE)"),
     Indicator("resource_use", "resource use", "fossil_co2", True, "fossil CO2 emissions"),
     Indicator("pollution", "persistent pollution", "co2_ppm", True, "atmospheric CO2 above 280 ppm"),
 )
 HEADLINE = ("population", "life_expectancy", "output", "food_pc", "resource_use", "pollution")
+ECONOMY_KEYS = ("output", "food_pc", "land_yield", "arable_land", "resource_use", "pollution")
 # variables de l0.run que el marcador necesita
-NEEDS = ("pop", "le", "tf", "cbr", "cdr", "io", "so", "fpc", "ly", "nr", "ppolx")
+NEEDS = ("pop", "le", "tf", "cbr", "cdr", "io", "so", "fpc", "ly", "al", "nr", "ppolx")
 
 
 def model_series(run, member: int = 0) -> dict:
@@ -62,7 +66,7 @@ def model_series(run, member: int = 0) -> dict:
     use[0] = (nr[0] - nr[1]) / (years[1] - years[0])
     return {"years": years, "population": g("pop") / 1e6, "life_expectancy": g("le"), "fertility": g("tf"),
             "birth_rate": g("cbr"), "death_rate": g("cdr"), "output": g("io") + g("so"), "food_pc": g("fpc"),
-            "land_yield": g("ly"), "resource_use": use, "pollution": g("ppolx")}
+            "land_yield": g("ly"), "arable_land": g("al") / 1e6, "resource_use": use, "pollution": g("ppolx")}
 
 
 def observed(obs: dict | None = None) -> dict:
@@ -131,6 +135,8 @@ VARIANTS = {
     "cohorts_obs_both": {"fertility": "observed", "mortality": "observed"},      # el motor de cohortes solo
     # V2: 10 regiones con ecuaciones estimadas; historia observada hasta 2000 y, desde ahí, el modelo con datos <= 2000
     "groups": {"groups": "regions", "origin": 2000, "cutoff": 2000},
+    # V3: lo mismo con la tecnología estimada (rendimientos, recursos, contaminación, coste de capital, tierra)
+    "full": {"groups": "regions", "origin": 2000, "cutoff": 2000, "technology": "estimated"},
 }
 HINDCAST_KEYS = ("population", "life_expectancy", "fertility", "birth_rate", "death_rate")
 
@@ -213,3 +219,22 @@ def group_check(groups: str = "regions", start: int = 1950) -> dict:
     return {"groups": list(gi.names), "years": [int(g.years[sel][0]), int(g.years[sel][-1])],
             "world_mean_abs_pct": float(100 * np.abs(world).mean()), "world_max_abs_pct": float(100 * np.abs(world).max()),
             "group_last_pct": {n: float(100 * (mod[-1, k] / real[-1, k] - 1)) for k, n in enumerate(gi.names)}}
+
+
+def technology_hindcast(origins=(1990, 2000, 2010), groups: str = "regions", scenario: int = 1,
+                        last: int = WINDOW[1]) -> dict:
+    """Prueba fuera de muestra del modelo completo: demografía por grupos y tecnología, las dos estimadas con datos
+    <= ``origin`` (los cortes guardados en ``l0v_technology.json``). Error medio de ``origin + 1`` a ``last`` de
+    todos los indicadores, con la tecnología estimada y con la de World3 (apagada en el escenario 1)."""
+    from world4.core.l0v import model
+    out = {"groups": groups, "last": last, "origins": {}}
+    for origin in origins:
+        res = {}
+        for name, tech in (("technology", "estimated"), ("world3", None)):
+            r, _ = model.run(scenario=scenario, groups=groups, origin=origin, cutoff=origin, technology=tech,
+                             t1=float(last))
+            sc = score(r, window=(origin + 1, last))
+            res[name] = {k: {"mae_pct": v["mae_pct"], "model_last": v.get("model_last"),
+                             "observed_last": v.get("observed_last")} for k, v in sc.items()}
+        out["origins"][int(origin)] = res
+    return out

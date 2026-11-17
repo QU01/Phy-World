@@ -11,7 +11,7 @@
 - **Pruebas:** 100 pasan (19 nuevas, 11 de ellas necesitan los datos); 93 se saltan por datos del Atlas sin instalar, como antes.
 - **Reproducir:**
   - `pip install -e .[world]` y `python world4_cli.py --install-world` (el panel de países necesita `pycountry`);
-  - `python world4_cli.py --world3-score` (marcador y prueba con origen móvil, unos 10 s);
+  - `python world4_cli.py --world3-score` (marcador y prueba con origen móvil, unos segundos);
   - `python -c "from world4.core.l0v import equations as e; print(e.selection())"` (la tabla con la que se eligió la forma).
 
 ## 1. Qué se construyó

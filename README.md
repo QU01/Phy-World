@@ -47,6 +47,13 @@ its own cohorts, and replaces World3's fertility and life-expectancy tables with
 the origin only), world population to 2023 is within 2.4 % from 1980, 1.8 % from 1990, 1.2 % from 2000 and 0.3 %
 from 2010. The behaviour to 2100 is not usable yet: it rests on extrapolations the data do not cover
 ([docs/V2-informe.md](docs/V2-informe.md)).
+Phase **V3** estimates World3's technology with data instead of leaving it off: yield, resource use and pollution
+per unit of activity follow curves fitted to cereal yields and fossil CO2, the capital cost of technology is fitted
+to GDP (it comes out as zero or negative, not World3's surcharge), and arable land follows HYDE cropland. With data
+up to 2000 only, the 2000-2023 error falls from 26.7 % to 6.6 % in output, from 14.1 % to 2.2 % in food per person
+and from 106 % to 13.6 % in resource use. In the projection the famine of scenario 1 disappears and the limit
+becomes non-renewable resources; when it bites depends on assumptions history does not pin down
+([docs/V3-informe.md](docs/V3-informe.md)).
 
 | Layer | What it is in F0 | Pinned against | Result |
 |---|---|---|---|
@@ -92,7 +99,7 @@ The Atlas data are not shipped here: several derive from sources that cannot be 
 python world4_cli.py --info                 # environment, observables, sources and licences
 python world4_cli.py --campaign             # acceptance criteria W1-W12
 python world4_cli.py --l0 --scenario 2      # World3-03 behaviour mode
-python world4_cli.py --world3-score         # V1-V2: World3-03, cohorts and regions against the observed world; rolling-origin test
+python world4_cli.py --world3-score         # V1-V3: World3-03, cohorts, regions and estimated technology against the observed world; out-of-sample tests
 python world4_cli.py --query gdp_pc --region MEX --as-of 2005 --target 2010
 python world4_cli.py --query population --region NGA --as-of 2005 --target 2015
 python world4_cli.py --query resource_rent_share_world --region WLD --as-of 2005 --target 2012
@@ -120,6 +127,7 @@ api.query("conflict_hazard", "COL", 2000, 2005)   # Distribution with p10/p50/p9
 api.run_l0(scenario=1)
 w3, cohorts = api.run_l0v()                       # World3-03 with population cohorts by age and sex (V1)
 w3, regions = api.run_l0v(groups="regions", origin=2023)   # 10 regions, estimated equations, history to 2023 (V2)
+w3, regions = api.run_l0v(groups="regions", origin=2023, technology="estimated")   # the same with estimated technology (V3)
 api.world3_score()                                # error of each L0 variant against the observed world
 ```
 

@@ -70,8 +70,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="V1: download the observed world series the L0 is scored against (UN WPP, OWID, NOAA, FAO; "
                         "SHA-256 checked); installs the WPP age files too")
     m.add_argument("--world3-score", action="store_true",
-                   help="V1-V2: the L0 against observed world series, 2000-2023: World3-03 as it is, with "
-                        "population cohorts, and by regions with estimated equations (rolling-origin test)")
+                   help="V1-V3: the L0 against observed world series, 2000-2023: World3-03 as it is, with "
+                        "population cohorts, by regions with estimated equations and with estimated technology "
+                        "(out-of-sample tests)")
     m.add_argument("--validate", "--validate-f1", dest="validate", action="store_true",
                    help="F1-F5: rolling-origin W3/W5 (Atlas, F1 ... F1-F5) + free hindcasts of population, psi, "
                         "the energy mix, CO2, GMST, cereals and cropland + AR6 carbon-budget check")
@@ -148,7 +149,7 @@ def run_info(a) -> int:
           "cereals, land, N, water; footprint and biocapacity computed" + ("" if _fdd.available() else ": --install-food"))
     from world4.data import world as _wd
     ui.kv("V1 - current World3", "implemented" if _wd.available() else ui.c("WORLD DATA MISSING", "warn"), "",
-          "L0 scored against the observed world; cohorts by age and sex; demography by regions (--world3-score)"
+          "L0 scored against the observed world; cohorts, regions and estimated technology (--world3-score)"
           + ("" if _wd.available() else ": --install-world"))
     for ph, what in (
                      ("F6-F8", "regional L0, Bayesian calibration, robust policies"),
@@ -320,7 +321,7 @@ def run_install_world(a) -> int:
 
 
 WORLD3_VARIANTS = (("original", "World3-03"), ("cohorts", "cohorts"), ("cohorts_obs_both", "+real rates"),
-                   ("groups", "regions"))
+                   ("groups", "regions"), ("full", "+technology"))
 
 
 def run_world3_score(a) -> int:
@@ -332,8 +333,9 @@ def run_world3_score(a) -> int:
     sb = world3.scoreboard(scenario=a.scenario)
     check = world3.cohort_check() if wpp.available() else None
     hind = world3.hindcast(scenario=a.scenario) if wpp.available() else None
+    tech = world3.technology_hindcast(scenario=a.scenario) if wpp.available() else None
     if a.json:
-        print(json.dumps({**sb, "cohort_engine_check": check, "hindcast": hind}, indent=1))
+        print(json.dumps({**sb, "cohort_engine_check": check, "hindcast": hind, "technology_hindcast": tech}, indent=1))
         return EXIT_OK
     print(ui.banner())
     print()
@@ -349,6 +351,8 @@ def run_world3_score(a) -> int:
     print("  " + ui.dim("+real rates: diagnosis, the cohorts are driven by the observed fertility and life expectancy"))
     print("  " + ui.dim("regions: 10 regions with estimated equations; observed history to 2000, then the model with "
                         "data <= 2000"))
+    print("  " + ui.dim("+technology: the same with yields, resource and pollution intensity, capital cost and land "
+                        "estimated with data <= 2000"))
     if check is None:
         ui.degraded("L0 cohorts", "WPP age data not installed: only World3-03 as it is (python world4_cli.py --install-world)")
     else:
@@ -363,6 +367,15 @@ def run_world3_score(a) -> int:
         print("  " + f"{'origin':<8s}" + "".join(f"{lab:>18s}" for _, lab in labels))
         for origin, res in hind["origins"].items():
             cells = "".join(f"{res['estimated'][k]['mae_pct']:9.1f} ({res['frozen'][k]['mae_pct']:5.1f})" for k, _ in labels)
+            print(f"  {origin:<8d}{cells}")
+        print()
+        ui.title(f"The whole model, out of sample: demography and technology with data <= origin, to {tech['last']}")
+        print("  " + ui.dim("mean absolute error from origin + 1, %; in brackets, with World3's technology (off in scenario 1)"))
+        labels = (("output", "output"), ("food_pc", "food/person"), ("land_yield", "yield"), ("arable_land", "land"),
+                  ("resource_use", "resources"), ("population", "population"))
+        print("  " + f"{'origin':<8s}" + "".join(f"{lab:>18s}" for _, lab in labels))
+        for origin, res in tech["origins"].items():
+            cells = "".join(f"{res['technology'][k]['mae_pct']:9.1f} ({res['world3'][k]['mae_pct']:5.1f})" for k, _ in labels)
             print(f"  {origin:<8d}{cells}")
     return EXIT_OK
 

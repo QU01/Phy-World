@@ -16,7 +16,9 @@ Este módulo las instala, las comprueba contra ``world_manifest.json`` (SHA-256)
 | ``primary_energy`` | TWh/año                           | 1965-2024 | Energy Institute / EIA vía OWID                |
 | ``co2_ppm``        | ppm, media anual en Mauna Loa     | 1959-2025 | NOAA GML (espejo ``datasets/co2-ppm``)         |
 | ``kcal``           | kcal por persona y día            | 1961-2013 | FAO Food Balance Sheets vía owid-datasets      |
+| ``food_veq``       | kcal en equivalente vegetal por persona y día | 1961-2013 | calculada con la misma hoja de FAO  |
 | ``cereal_yield``   | índice, 1961 = 100                | 1961-2014 | Banco Mundial WDI vía owid-datasets            |
+| ``cropland``       | millones de hectáreas             | 1900-2016 | HYDE 3.2 vía owid-datasets (decenal hasta 2000)|
 
 Además, del mundo (código ONU 900) y para el modelo de cohortes de ``world4.core.l0v``: el patrón de
 fecundidad por edad por quinquenio (``asfr7``, ``asfr_periods``), la razón de sexos al nacer (``srb``) y las
@@ -28,6 +30,11 @@ WPP (236) y año 1950-2023, fecundidad total, esperanza de vida, nacimientos y m
 OWID, 164 países, 95-99 % de la población mundial) y kilocalorías por persona (FAO, 1961-2013), con el código
 ISO3 y la subregión de la ONU (``UNlocations.txt``). Los huecos se dejan como NaN: quien agrupa decide.
 La conversión necesita ``pycountry`` además de ``rdata`` (extra ``world4[world]``).
+
+``food_veq`` es el alimento como lo cuenta World3: cada kilocaloría de origen animal vale ``ANIMAL_FACTOR`` (7)
+vegetales. Las kilocalorías animales no vienen en la hoja de FAO que se descarga; se calculan con los kilos por
+persona de carne, leche, huevos y pescado y un contenido energético medio de cada uno (``KCAL_PER_KG``) [S]: dan
+el 13 % de las kilocalorías en 1961 y el 16 % en 2013.
 
 El PIB mundial de Maddison sólo trae años sueltos antes de 2015 (1950, 1960, ..., 2010) [declarado]: las series
 anuales del Banco Mundial y FAOSTAT posterior a 2013 quedan fuera hasta poder descargarlas.
@@ -53,6 +60,7 @@ OWIDDS_COMMIT = "6155d4ca1ea14ef30e753010a25521eeb416e8a2"
 _RAW = "https://raw.githubusercontent.com/"
 _FOOD = "Food supply (FAO, 2020)"
 _YIELD = "Cereal yield index - (World Bank (2017) & OWID)"
+_LAND = "Land Use Data - HYDE (2017)"
 
 
 def _owidds(name: str) -> str:
@@ -68,6 +76,7 @@ URLS = {
     "co2-annmean-mlo.csv": f"{_RAW}datasets/co2-ppm/{MLO_COMMIT}/data/co2-annmean-mlo.csv",
     "food-supply-fao-2020.csv": _owidds(_FOOD),
     "cereal-yield-index.csv": _owidds(_YIELD),
+    "land-use-hyde-2017.csv": _owidds(_LAND),
     "UNlocations.txt": f"{_RAW}PPgp/wpp2024/{WPP_COMMIT}/data/UNlocations.txt",
 }
 # nombres de OWID/FAO que no están en la tabla de países de co2-data, y el código de Kosovo (sin ISO oficial)
@@ -76,17 +85,23 @@ FAO_ALIASES = {"Czech Republic": "CZE", "Macedonia": "MKD", "Swaziland": "SWZ", 
 ISO_EXTRA = {412: "XKX"}
 OWID_ISO_FIX = {"OWID_KOS": "XKX"}
 MANIFEST = Path(__file__).with_name("world_manifest.json")
+ANIMAL_FACTOR = 7.0                           # kg vegetales por kg de producto animal en World3
+KCAL_PER_KG = {"Meat food supply quantity (kg/capita/yr)": 2000.0,
+               "Milk - Excluding Butter - Food supply quantity (kg/capita/yr)": 600.0,
+               "Eggs - Food supply quantity (kg/capita/yr)": 1450.0,
+               "Fish, Seafood- Food supply quantity (kg/capita/yr)": 1000.0}
 YEAR0, YEAR1 = 1900, 2025
 WORLD = 900                                   # código de la ONU para el agregado mundial
 SERIES = ("pop", "le", "tfr", "cbr", "cdr", "births", "deaths", "gdp", "fossil_co2", "primary_energy", "co2_ppm", "kcal",
-          "cereal_yield")
+          "food_veq", "cereal_yield", "cropland")
 UNITS = {"pop": "million persons", "le": "years", "tfr": "children per woman", "cbr": "per 1000", "cdr": "per 1000",
          "births": "million per year", "deaths": "million per year",
          "gdp": "1e9 international-$ 2011", "fossil_co2": "Mt CO2 per year", "primary_energy": "TWh per year",
-         "co2_ppm": "ppm", "kcal": "kcal per person per day", "cereal_yield": "index, 1961 = 100"}
+         "co2_ppm": "ppm", "kcal": "kcal per person per day", "cereal_yield": "index, 1961 = 100",
+         "cropland": "million hectares", "food_veq": "vegetal-equivalent kcal per person per day"}
 SOURCE_OF = {"pop": "owid_co2_world", "le": "wpp", "tfr": "wpp", "cbr": "wpp", "cdr": "wpp", "births": "wpp", "deaths": "wpp", "gdp": "owid_co2_world",
              "fossil_co2": "owid_co2_world", "primary_energy": "owid_co2_world", "co2_ppm": "noaa_mlo",
-             "kcal": "owid_food_supply", "cereal_yield": "owid_cereal_yield"}
+             "kcal": "owid_food_supply", "food_veq": "owid_food_supply", "cereal_yield": "owid_cereal_yield", "cropland": "owid_hyde_land"}
 
 
 class WorldDataError(RuntimeError):
@@ -203,9 +218,14 @@ def convert() -> Path:
     f = pd.read_csv(raw / "food-supply-fao-2020.csv")
     f = f[f.Entity == "World"]
     put("kcal", f.Year, f.iloc[:, 2])
+    animal = sum(f[col] * k for col, k in KCAL_PER_KG.items()) / 365.0
+    put("food_veq", f.Year, f.iloc[:, 2] + (ANIMAL_FACTOR - 1) * animal)
     c = pd.read_csv(raw / "cereal-yield-index.csv")
     c = c[c.Entity == "World"]
     put("cereal_yield", c.Year, c.iloc[:, 2])
+    h = pd.read_csv(raw / "land-use-hyde-2017.csv", usecols=[0, 1, 2])
+    h = h[h.Entity == "World"]
+    put("cropland", h.Year, h.iloc[:, 2], 1e-6)
 
     wraw = wpp.root() / "raw"
     fa = _rda_world(wraw / "percentASFR5dt.rda")

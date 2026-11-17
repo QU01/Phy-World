@@ -431,7 +431,7 @@
    "used_in": [
     "world series of the L0 (V1)"
    ],
-   "note": "kcal per person per day, the proxy for World3's food per person. Ends in 2013 (the old FBS methodology): FAOSTAT itself was not reachable in the V1 session. Not vendored."
+   "note": "kcal per person per day, and the vegetal-equivalent food World3 counts in (animal kcal x 7, computed from the kg of meat, milk, eggs and fish of the same sheet): the proxy for World3's food per person. Ends in 2013 (the old FBS methodology): FAOSTAT itself was not reachable in the V1 session. Not vendored."
   },
   "owid_cereal_yield": {
    "name": "OWID owid-datasets: Cereal yield index (World Bank WDI 2017), World row",
@@ -444,6 +444,18 @@
     "world series of the L0 (V1)"
    ],
    "note": "Index 1961 = 100, the proxy for World3's land yield. Not vendored."
+  },
+  "owid_hyde_land": {
+   "name": "OWID owid-datasets: Land Use Data - HYDE (2017), World row (HYDE 3.2, Klein Goldewijk et al.)",
+   "license": "CC BY 4.0 (OWID's); HYDE 3.2 is CC BY 3.0",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "commit 6155d4c (decadal to 2000, yearly 2001-2016)",
+   "lag_years": 2,
+   "used_in": [
+    "world series of the L0 (V3)"
+   ],
+   "note": "World cropland, compared with World3's arable land. Not vendored."
   }
  },
  "reference_models": {

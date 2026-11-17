@@ -325,8 +325,8 @@ def _eq_params(cutoff):
 def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None = None, t1: float = 2100.0,
         dt: float = 0.5, n: int = 1, start: int = 1950, fertility: str = "model", mortality: str = "model",
         groups=None, origin: int | None = None, migration: bool = True, equations: str = "estimated",
-        cutoff: int | None = None,
-        par: dict | None = None, economy: str = "model", record=None, inputs: WorldInputs | None = None):
+        cutoff: int | None = None, par: dict | None = None, economy: str = "model", technology=None,
+        record=None, inputs: WorldInputs | None = None):
     """World3-03 con cohortes desde ``start``. Devuelve ``(World3Run, CohortRun)``, o ``(World3Run, GroupRun)``
     si ``groups`` nombra una partición (``"regions"``, ``"income"``, ``"world"``) o trae un ``GroupInputs``.
 
@@ -334,8 +334,18 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
     observadas de cada grupo, y desde ``origin`` mandan las ecuaciones; ``equations`` elige las ecuaciones de esperanza de vida y fecundidad (``"estimated"`` o
     ``"world3"``); ``cutoff`` es el último año de datos con el que se estiman (None: todos) y ``par`` las da
     hechas; ``economy="observed"`` mueve la demografía con la economía real en lugar de con la de World3
-    (diagnóstico, hasta 2022; después sigue la de World3 reescalada)."""
+    (diagnóstico, hasta 2022; después sigue la de World3 reescalada).
+
+    ``technology``: None deja la tecnología de World3 (apagada en el escenario 1); ``"estimated"`` usa las curvas
+    de ``world4.core.l0v.technology`` estimadas con datos <= ``cutoff``; también admite un ``Tech``."""
     from world4.core import l0
+    from world4.core.l0v import technology as _tech
+    tech = None
+    if technology is not None:
+        tech = _tech.params(cutoff) if isinstance(technology, str) else technology
+        sc_t0 = l0.SCENARIOS[scenario][1]
+        tables = {**tech.tables({**l0.TABLES, **sc_t0, **(tables or {})}), **(tables or {})}
+        constants = {**tech.constants({**l0.CONSTANTS, **l0.SCENARIOS[scenario][0]}), **(constants or {})}
     if groups is None:
         hook = CohortCoupler(n, start=start, dt=dt, fertility=fertility, mortality=mortality, inputs=inputs)
     else:
@@ -354,7 +364,8 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
                             start=start, origin=origin, dt=dt, fertility=fertility, mortality=mortality,
                             migration=migration, equations=equations, drivers=drivers,
                             par=par if par is not None or equations == "world3" else _eq_params(cutoff))
+    full = hook if tech is None else _tech.compose(_tech.TechHook(tech, dt), hook)
     r = l0.run(scenario=scenario, constants=constants, tables=tables, n=n, t1=t1, dt=dt,
-               record=record or l0.RECORD, hook=hook)
+               record=record or l0.RECORD, hook=full)
     hook.patch(r)
     return r, hook.result()
