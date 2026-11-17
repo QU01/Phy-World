@@ -186,8 +186,10 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
 
     ``hook(t, stocks, aux)`` (opcional) se llama en cada paso, ya calculados los auxiliares y antes
     de integrar, para acoplar un módulo externo por separación de operadores (``world4.core.social``).
-    Puede devolver ``{"flow": {stock: m}, "scale": {stock: m}}``: ``flow`` multiplica el flujo de ese
-    stock en este paso; ``scale`` multiplica el stock ya integrado. Sin gancho nada cambia.
+    Puede devolver ``{"flow": {stock: m}, "scale": {stock: m}, "set": {stock: v}}``: ``flow`` multiplica el
+    flujo de ese stock en este paso; ``scale`` multiplica el stock ya integrado; ``set`` lo sustituye por ``v``
+    (un módulo que lleva su propia contabilidad de ese stock, como las cohortes de ``world4.core.l0v``). Sin
+    gancho nada cambia.
     """
     sc_c, sc_t = SCENARIOS[scenario]
     C = {**CONSTANTS, **sc_c, **(constants or {})}
@@ -388,6 +390,8 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
             st[k2] = st[k2] + dt * fl
         for k2, m in ((adj or {}).get("scale") or {}).items():
             st[k2] = st[k2] * m
+        for k2, v in ((adj or {}).get("set") or {}).items():
+            st[k2] = np.broadcast_to(np.asarray(v, float), (n,)).copy()
         for k2, dv in derivs.items():
             sm[k2].s = sm[k2].s + dt * dv
 

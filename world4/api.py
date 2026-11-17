@@ -132,6 +132,20 @@ def run_l0(scenario: int = 1, **kw):
     return l0.run(scenario=scenario, **kw)
 
 
+def run_l0v(scenario: int = 1, **kw):
+    """World3-03 con la población por cohortes de edad y sexo (``world4.core.l0v``): ``(World3Run, CohortRun)``.
+    Necesita ``--install-world``. Es un modo de comportamiento, no un pronóstico."""
+    from world4.core.l0v import model
+    return model.run(scenario=scenario, **kw)
+
+
+def world3_score(scenario: int = 1, variants=None) -> dict:
+    """El marcador del L0: error de cada variante de World3 frente a las series mundiales observadas, 2000-2023
+    (``world4.validate.world3``). Necesita ``--install-world``."""
+    from world4.validate import world3
+    return world3.scoreboard(scenario=scenario, variants=variants)
+
+
 def _year(x) -> int:
     return x.year if isinstance(x, date) else int(x)
 

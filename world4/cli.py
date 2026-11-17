@@ -6,6 +6,7 @@ degradations. F0 offers: --info, --campaign, --install-atlas, --l0 and --query; 
 --build-store and --structural; F1 adds --install-wpp and --validate (W3/W4/W5 runs); F3 adds --install-energy; F4 adds --install-climate; F5 adds --install-food. The wizard (no arguments)
 arrives in F9: with no mode, a terminal gets the wizard and a pipe gets --info. F9 adds --help-numbers,
 --fidelity, --report, --dashboard and --mcp, and WALLS / TIGHT / THE LAST BLOCKER when a policy is infeasible.
+V1 (current World3) adds --install-world and --world3-score (the L0 against observed world series; cohorts by age and sex).
 """
 from __future__ import annotations
 
@@ -32,7 +33,8 @@ def _data_errors() -> tuple:
     from world4.structural.store import StoreMissing
     out = [AtlasDataError, PosteriorMissing, StoreMissing, FileNotFoundError]
     for mod, name in (("world4.data.wpp", "WPPDataError"), ("world4.data.energy", "EnergyDataError"),
-                      ("world4.data.climate", "ClimateDataError"), ("world4.data.food", "FoodDataError")):
+                      ("world4.data.climate", "ClimateDataError"), ("world4.data.food", "FoodDataError"),
+                      ("world4.data.world", "WorldDataError")):
         try:
             out.append(getattr(__import__(mod, fromlist=[name]), name))
         except (ImportError, AttributeError):
@@ -64,6 +66,12 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--install-food", action="store_true",
                    help="F5: download FAOSTAT (crops, land use, fertilisers, N budget, emissions, food balances) and "
                         "WDI water withdrawals (SHA-256 checked)")
+    m.add_argument("--install-world", action="store_true",
+                   help="V1: download the observed world series the L0 is scored against (UN WPP, OWID, NOAA, FAO; "
+                        "SHA-256 checked); installs the WPP age files too")
+    m.add_argument("--world3-score", action="store_true",
+                   help="V1: the L0 against observed world series, 2000-2023: World3-03 as it is and with "
+                        "population cohorts by age and sex")
     m.add_argument("--validate", "--validate-f1", dest="validate", action="store_true",
                    help="F1-F5: rolling-origin W3/W5 (Atlas, F1 ... F1-F5) + free hindcasts of population, psi, "
                         "the energy mix, CO2, GMST, cereals and cropland + AR6 carbon-budget check")
@@ -138,6 +146,10 @@ def run_info(a) -> int:
     from world4.data import food as _fdd
     ui.kv("F5 - food", "implemented" if _fdd.available() else ui.c("FOOD DATA MISSING", "warn"), "",
           "cereals, land, N, water; footprint and biocapacity computed" + ("" if _fdd.available() else ": --install-food"))
+    from world4.data import world as _wd
+    ui.kv("V1 - current World3", "implemented" if _wd.available() else ui.c("WORLD DATA MISSING", "warn"), "",
+          "L0 scored against the observed world; cohorts by age and sex (--world3-score)"
+          + ("" if _wd.available() else ": --install-world"))
     for ph, what in (
                      ("F6-F8", "regional L0, Bayesian calibration, robust policies"),
                      ("F9-F12", "product, Studio addon, full Prime Radiant, hardening")):
@@ -291,6 +303,56 @@ def run_install_energy(a) -> int:
     else:
         ui.kv("result", ui.status(v["ok"], "OK", "MISMATCH"), "", v["npz"])
     return EXIT_OK if v["ok"] else EXIT_SPEC
+
+
+def run_install_world(a) -> int:
+    from world4.data import world
+    log = (lambda *x: None) if a.json else (lambda m: ui.step(m))
+    if not a.json:
+        print(ui.banner())
+        ui.step("observed world series for the L0 (UN WPP 2024, OWID, NOAA, FAO and World Bank via OWID)")
+    v = world.install(log=log)
+    if a.json:
+        print(json.dumps(v, indent=1))
+    else:
+        ui.kv("result", ui.status(v["ok"], "OK", "MISMATCH"), "", v["npz"])
+    return EXIT_OK if v["ok"] else EXIT_SPEC
+
+
+WORLD3_VARIANTS = (("original", "World3-03"), ("cohorts", "cohorts"), ("cohorts_obs_fertility", "+real TFR"),
+                   ("cohorts_obs_mortality", "+real e0"), ("cohorts_obs_both", "+both"))
+
+
+def run_world3_score(a) -> int:
+    from world4.core import l0
+    from world4.data import wpp
+    from world4.validate import world3
+    if a.scenario not in l0.SCENARIOS:
+        raise SpecError(f"--scenario must be one of {sorted(l0.SCENARIOS)}")
+    sb = world3.scoreboard(scenario=a.scenario)
+    check = world3.cohort_check() if wpp.available() else None
+    if a.json:
+        print(json.dumps({**sb, "cohort_engine_check": check}, indent=1))
+        return EXIT_OK
+    print(ui.banner())
+    print()
+    ui.title(f"L0 against the observed world, {sb['window'][0]}-{sb['window'][1]} - scenario {a.scenario}")
+    print("  " + ui.dim("mean absolute error, % of the observed value; a fit to the past, not an out-of-sample test"))
+    cols = [(k, lab) for k, lab in WORLD3_VARIANTS if k in sb["runs"]]
+    print("  " + " " * 30 + "".join(f"{lab:>11s}" for _, lab in cols))
+    for ind in sb["indicators"]:
+        row = "".join(f"{sb['runs'][k][ind['key']]['mae_pct']:11.1f}" for k, _ in cols)
+        print(f"  {ind['label']:<30s}{row}" + ("  " + ui.dim("vs " + ind["proxy"]) if ind["proxy"] else ""))
+    print()
+    print("  " + ui.dim("cohorts: population by age and sex; fertility and life expectancy from World3's equations"))
+    print("  " + ui.dim("+real TFR / +real e0: diagnosis, the cohorts are driven by the observed series up to 2023"))
+    if check is None:
+        ui.degraded("L0 cohorts", "WPP age data not installed: only World3-03 as it is (python world4_cli.py --install-world)")
+    else:
+        print()
+        ui.kv("cohort engine alone", f"{check['total_mean_abs_pct']:.2f} % mean, {check['total_max_abs_pct']:.2f} % max",
+              "", f"world population error {check['years'][0]}-{check['years'][1]} with real TFR and e0")
+    return EXIT_OK
 
 
 def run_install_climate(a) -> int:
@@ -582,6 +644,7 @@ MODE_NUMBERS = {
                 ("--narrative ssp1..ssp5", "the world the policy lands in (default ssp2)"),
                 ("--sow N", "states of the world in the ensemble (default 200)")],
     "--l0": [("--scenario 1-5", "World3-03 scenario of the 2004 book")],
+    "--world3-score": [("--scenario 1-5", "World3-03 scenario of the 2004 book (default 1)")],
     "--report": [("--report [FILE.html]", "optional; add --theta for a policy, --no-campaign to skip the campaign")],
     "--dashboard": [("--dashboard [DIR]", "optional output directory")],
 }
@@ -747,6 +810,10 @@ def main(argv=None) -> int:
             code = run_install_climate(a)
         elif a.install_food:
             code = run_install_food(a)
+        elif a.install_world:
+            code = run_install_world(a)
+        elif a.world3_score:
+            code = run_world3_score(a)
         elif a.validate:
             code = run_validate(a)
         elif a.build_store:
@@ -787,7 +854,8 @@ def main(argv=None) -> int:
     except DATA_ERRORS as exc:
         ui.err(f"missing data or model file: {exc}")
         print("  " + ui.dim("install it first: --install-atlas, --install-wpp, --install-energy, --install-climate, "
-                            "--install-food (the message above names which); W4_HOME says where it goes"))
+                            "--install-food, --install-world (the message above names which); W4_HOME says where "
+                            "it goes"))
         return EXIT_SPEC
     if a.strict and ui.strict_verdict():
         if not a.json:

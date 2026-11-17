@@ -1,0 +1,27 @@
+{
+ "source": "UN WPP 2024 (R package PPgp/wpp2024 at commit 2da7768ae64fc74105d3f9e98f9a74d37b62f99a); OWID co2-data at commit 22d9a01321ddec951b36f2bfc66e05dc6ad50ad8 (Global Carbon Budget, Maddison Project, Energy Institute); NOAA GML Mauna Loa annual mean CO2 (mirror datasets/co2-ppm at commit 52f2be52ee6145eaad67367959af9b1b0a0bd83e); OWID owid-datasets at commit 6155d4ca1ea14ef30e753010a25521eeb416e8a2 (FAO Food Balance Sheets, World Bank WDI cereal yield)",
+ "downloaded": "2026-11-16",
+ "files": {
+  "e01dt.rda": {
+   "sha256": "dc4d15e14b734a3d208eb29ea0dabfdf4a900ef552acf7b41829a62cf862e2ba"
+  },
+  "tfr1dt.rda": {
+   "sha256": "b48ae026ccf489892c69564bc243a1535464085e5801eea13584c62ea7a89fa9"
+  },
+  "misc1dt.rda": {
+   "sha256": "bde4c18dd0d9e0d615745ea31100f4f9a19740e46c6fac167b0a385df8895252"
+  },
+  "owid-co2-data.csv": {
+   "sha256": "300fb68fe6b0d514ed7f5cf773df77d7e24a495438d84b76e2f39eba1584a0f7"
+  },
+  "co2-annmean-mlo.csv": {
+   "sha256": "b1548ededea6f9b7eecac370753de8d8da6e0afafe1041f749a11db78c2e33c4"
+  },
+  "food-supply-fao-2020.csv": {
+   "sha256": "e5bf24c869dc55dc583b4a7a58f8f947951e09927d5807cdbbcc5544be21a760"
+  },
+  "cereal-yield-index.csv": {
+   "sha256": "9fad57bef42628d75315c2216531d386c604b991795d748d003340cda81bc58f"
+  }
+ }
+}

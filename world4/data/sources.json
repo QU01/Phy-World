@@ -106,9 +106,10 @@
    "lag_years": 1,
    "used_in": [
     "demografia",
-    "population (F1)"
+    "population (F1)",
+    "world series and cohorts of the L0 (V1)"
    ],
-   "note": "Years 2024+ are a PROJECTION published 2024-07, not data: known_time of all of them is 2024-07-11. F1 also reads the age-sex files of the R package PPgp/wpp2024 (wpp_manifest.json); their 1950-2023 estimates are revised history (revision leak not measured)."
+   "note": "Years 2024+ are a PROJECTION published 2024-07, not data: known_time of all of them is 2024-07-11. F1 also reads the age-sex files of the R package PPgp/wpp2024 (wpp_manifest.json); their 1950-2023 estimates are revised history (revision leak not measured). V1 (current World3) reads the world aggregate (code 900): e0, TFR, crude rates, births and deaths (e01dt, tfr1dt, misc1dt at commit 2da7768, world_manifest.json), and the world mortality and fertility age patterns from the F1 files."
   },
   "epr": {
    "name": "Ethnic Power Relations 2021",
@@ -395,6 +396,54 @@
     "food (F5) water"
    ],
    "note": "Agricultural freshwater withdrawals; sparse (AQUASTAT reports every ~5 years). Not vendored."
+  },
+  "owid_co2_world": {
+   "name": "OWID co2-data, World rows (Global Carbon Budget; Maddison Project Database 2023; Energy Institute; HYDE and UN population)",
+   "license": "CC BY 4.0 (OWID's; the underlying data keeps its own)",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "commit 22d9a01 (rows to 2025)",
+   "lag_years": 1,
+   "used_in": [
+    "world series of the L0 (V1)"
+   ],
+   "note": "World population, GDP (single years before 2015: 1950, 1960, ..., 2010), fossil CO2 by fuel and primary energy. Pinned by commit and SHA-256 (world_manifest.json). Not vendored."
+  },
+  "noaa_mlo": {
+   "name": "NOAA GML Mauna Loa annual mean CO2 (mirror datasets/co2-ppm on GitHub)",
+   "license": "Public domain (US Government work); mirror under ODC-PDDL",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "commit 52f2be5 (1959-2025)",
+   "lag_years": 0,
+   "used_in": [
+    "world series of the L0 (V1)"
+   ],
+   "note": "Atmospheric CO2 above 280 ppm is the proxy for World3's persistent pollution index. Not vendored."
+  },
+  "owid_food_supply": {
+   "name": "OWID owid-datasets: Food supply (FAO, 2020), World row (FAO Food Balance Sheets)",
+   "license": "CC BY 4.0 (OWID's); FAO Statistical Database Terms of Use for the underlying data",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "commit 6155d4c (1961-2013)",
+   "lag_years": 2,
+   "used_in": [
+    "world series of the L0 (V1)"
+   ],
+   "note": "kcal per person per day, the proxy for World3's food per person. Ends in 2013 (the old FBS methodology): FAOSTAT itself was not reachable in the V1 session. Not vendored."
+  },
+  "owid_cereal_yield": {
+   "name": "OWID owid-datasets: Cereal yield index (World Bank WDI 2017), World row",
+   "license": "CC BY 4.0",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "commit 6155d4c (1961-2014)",
+   "lag_years": 2,
+   "used_in": [
+    "world series of the L0 (V1)"
+   ],
+   "note": "Index 1961 = 100, the proxy for World3's land yield. Not vendored."
   }
  },
  "reference_models": {

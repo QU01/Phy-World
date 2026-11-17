@@ -36,6 +36,11 @@ line says nothing, `--help-numbers`, `--fidelity`, WALLS / TIGHT / THE LAST BLOC
 a self-contained HTML report (`--report`), the Atlas globe with World4 layers (`--dashboard`), an MCP server
 (`--mcp`), and honesty measured as a criterion (W11). The science is in
 [docs/Quasar_World4_Science.md](docs/Quasar_World4_Science.md).
+Phase **V1** starts a *current World3*: the L0 is scored against observed world series (population, life
+expectancy, GDP, food, fossil CO2, atmospheric CO2; `--world3-score`) and its population can run as cohorts by
+single age and sex instead of four boxes (`api.run_l0v()`). Measured: the cohort engine reproduces world
+population 1950-2023 within 1 % given the real fertility and life expectancy, and it shows that World3's own
+fertility equation, not its age structure, is what remains wrong ([docs/V1-informe.md](docs/V1-informe.md)).
 
 | Layer | What it is in F0 | Pinned against | Result |
 |---|---|---|---|
@@ -68,6 +73,7 @@ python -m venv .venv
 .venv/Scripts/python -m pip install -e .[climate]             # FaIR 2.2.4 (F4)
 .venv/Scripts/python world4_cli.py --install-climate          # FaIR calibration 1.6.0 + HadCRUT5, SHA-256 checked (F4)
 .venv/Scripts/python world4_cli.py --install-food             # FAOSTAT + WDI water, SHA-256 checked (F5)
+.venv/Scripts/python world4_cli.py --install-world            # observed world series for the L0 + WPP by age (V1)
 ```
 
 The Atlas data are not shipped here: several derive from sources that cannot be redistributed
@@ -79,6 +85,7 @@ The Atlas data are not shipped here: several derive from sources that cannot be 
 python world4_cli.py --info                 # environment, observables, sources and licences
 python world4_cli.py --campaign             # acceptance criteria W1-W12
 python world4_cli.py --l0 --scenario 2      # World3-03 behaviour mode
+python world4_cli.py --world3-score         # V1: World3-03 and its cohort variant against the observed world, 2000-2023
 python world4_cli.py --query gdp_pc --region MEX --as-of 2005 --target 2010
 python world4_cli.py --query population --region NGA --as-of 2005 --target 2015
 python world4_cli.py --query resource_rent_share_world --region WLD --as-of 2005 --target 2012
@@ -104,6 +111,8 @@ Exit codes: 0 ok, 2 spec error, 3 infeasible (for `--theta`: a declared limit is
 from world4 import api
 api.query("conflict_hazard", "COL", 2000, 2005)   # Distribution with p10/p50/p90, unit, caveats
 api.run_l0(scenario=1)
+w3, cohorts = api.run_l0v()                       # World3-03 with population cohorts by age and sex (V1)
+api.world3_score()                                # error of each L0 variant against the observed world
 ```
 
 ## Tests
