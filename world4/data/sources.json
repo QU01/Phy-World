@@ -109,7 +109,7 @@
     "population (F1)",
     "world series and cohorts of the L0 (V1)"
    ],
-   "note": "Years 2024+ are a PROJECTION published 2024-07, not data: known_time of all of them is 2024-07-11. F1 also reads the age-sex files of the R package PPgp/wpp2024 (wpp_manifest.json); their 1950-2023 estimates are revised history (revision leak not measured). V1 (current World3) reads the world aggregate (code 900): e0, TFR, crude rates, births and deaths (e01dt, tfr1dt, misc1dt at commit 2da7768, world_manifest.json), and the world mortality and fertility age patterns from the F1 files."
+   "note": "Years 2024+ are a PROJECTION published 2024-07, not data: known_time of all of them is 2024-07-11. F1 also reads the age-sex files of the R package PPgp/wpp2024 (wpp_manifest.json); their 1950-2023 estimates are revised history (revision leak not measured). V1 (current World3) reads the world aggregate (code 900): e0, TFR, crude rates, births and deaths (e01dt, tfr1dt, misc1dt at commit 2da7768, world_manifest.json), and the world mortality and fertility age patterns from the F1 files; V2 reads the same indicators by country and UNlocations.txt for the UN subregions."
   },
   "epr": {
    "name": "Ethnic Power Relations 2021",
@@ -407,7 +407,7 @@
    "used_in": [
     "world series of the L0 (V1)"
    ],
-   "note": "World population, GDP (single years before 2015: 1950, 1960, ..., 2010), fossil CO2 by fuel and primary energy. Pinned by commit and SHA-256 (world_manifest.json). Not vendored."
+   "note": "World population, GDP (single years before 2015: 1950, 1960, ..., 2010), fossil CO2 by fuel and primary energy. V2 also reads GDP by country (164 countries). Pinned by commit and SHA-256 (world_manifest.json). Not vendored."
   },
   "noaa_mlo": {
    "name": "NOAA GML Mauna Loa annual mean CO2 (mirror datasets/co2-ppm on GitHub)",

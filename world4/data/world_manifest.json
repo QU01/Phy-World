@@ -22,6 +22,9 @@
   },
   "cereal-yield-index.csv": {
    "sha256": "9fad57bef42628d75315c2216531d386c604b991795d748d003340cda81bc58f"
+  },
+  "UNlocations.txt": {
+   "sha256": "9d8cc77383c4dbd368a4c2cbbeeeff9dfc7037ace7c8ecb709ff17a0786be6eb"
   }
  }
 }

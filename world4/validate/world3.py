@@ -129,7 +129,10 @@ VARIANTS = {
     "cohorts_obs_fertility": {"fertility": "observed"},                 # diagnóstico: fecundidad total real
     "cohorts_obs_mortality": {"mortality": "observed"},                 # diagnóstico: esperanza de vida real
     "cohorts_obs_both": {"fertility": "observed", "mortality": "observed"},      # el motor de cohortes solo
+    # V2: 10 regiones con ecuaciones estimadas; historia observada hasta 2000 y, desde ahí, el modelo con datos <= 2000
+    "groups": {"groups": "regions", "origin": 2000, "cutoff": 2000},
 }
+HINDCAST_KEYS = ("population", "life_expectancy", "fertility", "birth_rate", "death_rate")
 
 
 def run_variant(name: str, scenario: int = 1, **kw):
@@ -172,3 +175,41 @@ def cohort_check(start: int = 1950) -> dict:
             "total_max_abs_pct": float(100 * np.abs(err).max()), "total_mean_abs_pct": float(100 * np.abs(err).mean()),
             "total_last_pct": float(100 * err[-1]),
             "group_max_abs_pct": {g: float(100 * np.abs(e).max()) for g, e in groups.items()}}
+
+
+def hindcast(origins=(1980, 1990, 2000, 2010), groups: str = "regions", economy: str = "model",
+             scenario: int = 1, last: int = WINDOW[1]) -> dict:
+    """Prueba fuera de muestra de la demografía por grupos, con origen móvil: para cada ``origin`` las ecuaciones
+    se estiman con datos <= ``origin``, la historia hasta ``origin`` es la observada y el modelo corre solo hasta
+    ``last``. Error medio de ``origin + 1`` a ``last`` de la versión estimada y de la que CONGELA la fecundidad y la
+    esperanza de vida de cada grupo en su valor del origen. ``economy="observed"`` aísla la demografía de los
+    errores de la economía de World3."""
+    from world4.core.l0v import equations, model
+    out = {"groups": groups, "economy": economy, "last": last, "origins": {}}
+    for origin in origins:
+        res = {}
+        for name, par in (("estimated", None), ("frozen", {**equations.ZERO, "floor": equations.F_LO})):
+            r, _ = model.run(scenario=scenario, groups=groups, origin=origin, cutoff=origin, par=par, economy=economy,
+                             t1=float(last))
+            sc = score(r, window=(origin + 1, last))
+            res[name] = {k: {"mae_pct": sc[k]["mae_pct"], "model_last": sc[k]["model_last"],
+                             "observed_last": sc[k]["observed_last"]} for k in HINDCAST_KEYS}
+        out["origins"][int(origin)] = res
+    return out
+
+
+def group_check(groups: str = "regions", start: int = 1950) -> dict:
+    """El motor por grupos SOLO: cohortes de cada grupo con su fecundidad, su esperanza de vida y su migración
+    observadas. Error de la población mundial y de la de cada grupo frente a WPP, a 31 de diciembre (%)."""
+    from world4.core.l0v import groups as _groups
+    from world4.core.l0v import model
+    gi = _groups.inputs(groups)
+    _, g = model.run(groups=gi, start=start, origin=int(gi.years[-1]), t1=float(gi.years[-1]) + 1.0)
+    sel = np.isin(g.years, gi.years)
+    i = np.searchsorted(gi.years, g.years[sel])
+    mod = g.popM[sel].sum(2) + g.popF[sel].sum(2)                       # (años, G)
+    real = gi.popM[i].sum(2) + gi.popF[i].sum(2)
+    world = mod.sum(1) / real.sum(1) - 1
+    return {"groups": list(gi.names), "years": [int(g.years[sel][0]), int(g.years[sel][-1])],
+            "world_mean_abs_pct": float(100 * np.abs(world).mean()), "world_max_abs_pct": float(100 * np.abs(world).max()),
+            "group_last_pct": {n: float(100 * (mod[-1, k] / real[-1, k] - 1)) for k, n in enumerate(gi.names)}}

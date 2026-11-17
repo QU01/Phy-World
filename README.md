@@ -41,6 +41,12 @@ expectancy, GDP, food, fossil CO2, atmospheric CO2; `--world3-score`) and its po
 single age and sex instead of four boxes (`api.run_l0v()`). Measured: the cohort engine reproduces world
 population 1950-2023 within 1 % given the real fertility and life expectancy, and it shows that World3's own
 fertility equation, not its age structure, is what remains wrong ([docs/V1-informe.md](docs/V1-informe.md)).
+Phase **V2** splits the world into fixed groups of countries (10 regions by default, or 4 income groups), each with
+its own cohorts, and replaces World3's fertility and life-expectancy tables with two equations estimated on a
+236-country panel. History up to an origin year is data; the model runs from there. Out of sample (data up to
+the origin only), world population to 2023 is within 2.4 % from 1980, 1.8 % from 1990, 1.2 % from 2000 and 0.3 %
+from 2010. The behaviour to 2100 is not usable yet: it rests on extrapolations the data do not cover
+([docs/V2-informe.md](docs/V2-informe.md)).
 
 | Layer | What it is in F0 | Pinned against | Result |
 |---|---|---|---|
@@ -73,7 +79,8 @@ python -m venv .venv
 .venv/Scripts/python -m pip install -e .[climate]             # FaIR 2.2.4 (F4)
 .venv/Scripts/python world4_cli.py --install-climate          # FaIR calibration 1.6.0 + HadCRUT5, SHA-256 checked (F4)
 .venv/Scripts/python world4_cli.py --install-food             # FAOSTAT + WDI water, SHA-256 checked (F5)
-.venv/Scripts/python world4_cli.py --install-world            # observed world series for the L0 + WPP by age (V1)
+.venv/Scripts/python -m pip install -e .[world]                # rdata + pycountry (V1, V2)
+.venv/Scripts/python world4_cli.py --install-world            # observed world series and country panel for the L0 + WPP by age (V1, V2)
 ```
 
 The Atlas data are not shipped here: several derive from sources that cannot be redistributed
@@ -85,7 +92,7 @@ The Atlas data are not shipped here: several derive from sources that cannot be 
 python world4_cli.py --info                 # environment, observables, sources and licences
 python world4_cli.py --campaign             # acceptance criteria W1-W12
 python world4_cli.py --l0 --scenario 2      # World3-03 behaviour mode
-python world4_cli.py --world3-score         # V1: World3-03 and its cohort variant against the observed world, 2000-2023
+python world4_cli.py --world3-score         # V1-V2: World3-03, cohorts and regions against the observed world; rolling-origin test
 python world4_cli.py --query gdp_pc --region MEX --as-of 2005 --target 2010
 python world4_cli.py --query population --region NGA --as-of 2005 --target 2015
 python world4_cli.py --query resource_rent_share_world --region WLD --as-of 2005 --target 2012
@@ -112,6 +119,7 @@ from world4 import api
 api.query("conflict_hazard", "COL", 2000, 2005)   # Distribution with p10/p50/p90, unit, caveats
 api.run_l0(scenario=1)
 w3, cohorts = api.run_l0v()                       # World3-03 with population cohorts by age and sex (V1)
+w3, regions = api.run_l0v(groups="regions", origin=2023)   # 10 regions, estimated equations, history to 2023 (V2)
 api.world3_score()                                # error of each L0 variant against the observed world
 ```
 

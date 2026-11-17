@@ -23,6 +23,12 @@ fecundidad por edad por quinquenio (``asfr7``, ``asfr_periods``), la razón de s
 tasas de mortalidad por edad y sexo por quinquenio (``mxM``, ``mxF``, ``mx_periods``; grupos de ``wpp.MX_GROUPS``).
 Salen de los ficheros crudos de ``world4.data.wpp`` (``--install-wpp``), que ``install`` trae si faltan.
 
+**Panel de países** (``world_countries.npz``, para los grupos de países de ``world4.core.l0v``): por país de
+WPP (236) y año 1950-2023, fecundidad total, esperanza de vida, nacimientos y muertes (WPP), PIB (Maddison vía
+OWID, 164 países, 95-99 % de la población mundial) y kilocalorías por persona (FAO, 1961-2013), con el código
+ISO3 y la subregión de la ONU (``UNlocations.txt``). Los huecos se dejan como NaN: quien agrupa decide.
+La conversión necesita ``pycountry`` además de ``rdata`` (extra ``world4[world]``).
+
 El PIB mundial de Maddison sólo trae años sueltos antes de 2015 (1950, 1960, ..., 2010) [declarado]: las series
 anuales del Banco Mundial y FAOSTAT posterior a 2013 quedan fuera hasta poder descargarlas.
 
@@ -62,7 +68,13 @@ URLS = {
     "co2-annmean-mlo.csv": f"{_RAW}datasets/co2-ppm/{MLO_COMMIT}/data/co2-annmean-mlo.csv",
     "food-supply-fao-2020.csv": _owidds(_FOOD),
     "cereal-yield-index.csv": _owidds(_YIELD),
+    "UNlocations.txt": f"{_RAW}PPgp/wpp2024/{WPP_COMMIT}/data/UNlocations.txt",
 }
+# nombres de OWID/FAO que no están en la tabla de países de co2-data, y el código de Kosovo (sin ISO oficial)
+FAO_ALIASES = {"Czech Republic": "CZE", "Macedonia": "MKD", "Swaziland": "SWZ", "Sudan (former)": "SDN",
+               "Ethiopia PDR": "ETH"}
+ISO_EXTRA = {412: "XKX"}
+OWID_ISO_FIX = {"OWID_KOS": "XKX"}
 MANIFEST = Path(__file__).with_name("world_manifest.json")
 YEAR0, YEAR1 = 1900, 2025
 WORLD = 900                                   # código de la ONU para el agregado mundial
@@ -88,6 +100,10 @@ def root() -> Path:
 
 def npz_path() -> Path:
     return root() / "world_obs.npz"
+
+
+def countries_path() -> Path:
+    return root() / "world_countries.npz"
 
 
 def manifest() -> dict:
@@ -130,12 +146,13 @@ def install(log=print) -> dict:
     if not v["ok"]:
         raise WorldDataError(f"world files missing {v['missing']} or with another SHA-256 {v['mismatched']}")
     convert()
+    convert_countries()
     load.cache_clear()
-    return {**v, "npz": str(npz_path()), "npz_sha256": _sha(npz_path())}
+    load_countries.cache_clear()
+    return {**v, "npz": str(npz_path()), "npz_sha256": _sha(npz_path()), "countries_npz": str(countries_path())}
 
 
-def _rda_world(path: Path):
-    """Las filas del mundo (código 900) de un ``.rda`` de WPP, indexadas por año."""
+def _rda(path: Path):
     import pandas as pd
     import rdata
     with warnings.catch_warnings():
@@ -143,9 +160,15 @@ def _rda_world(path: Path):
         obj = rdata.read_rda(path)
     df = pd.DataFrame(obj[list(obj)[0]]).reset_index(drop=True)
     df.columns = [str(c) for c in df.columns]
-    df = df[pd.to_numeric(df.country_code) == WORLD].copy()
+    df["country_code"] = pd.to_numeric(df.country_code).astype(int)
     df["year"] = df.year.astype(int)
     return df
+
+
+def _rda_world(path: Path):
+    """Las filas del mundo (código 900) de un ``.rda`` de WPP, indexadas por año."""
+    df = _rda(path)
+    return df[df.country_code == WORLD].copy()
 
 
 def convert() -> Path:
@@ -202,6 +225,64 @@ def convert() -> Path:
     return p
 
 
+def convert_countries() -> Path:
+    """El panel de países: ``(país, año)`` con los países en el orden de ``wpp.load()["codes"]``."""
+    import pandas as pd
+    import pycountry
+    from world4.data import wpp
+    raw = root() / "raw"
+    codes = wpp.load()["codes"].astype(int)
+    years = np.arange(wpp.YEAR0, wpp.YEAR1 + 1)
+    ci = {int(c): i for i, c in enumerate(codes)}
+    C, Y = len(codes), len(years)
+    num2iso = {int(c.numeric): c.alpha_3 for c in pycountry.countries}
+    num2iso.update(ISO_EXTRA)
+    iso3 = np.array([num2iso.get(int(c), "") for c in codes])
+    iso2i = {s: i for i, s in enumerate(iso3) if s}
+
+    def grid():
+        return np.full((C, Y), np.nan)
+
+    def fill(arr, rows, yr, val, scale=1.0):
+        rows, yr, val = np.asarray(rows), np.asarray(yr, int), np.asarray(val, float) * scale
+        ok = (rows >= 0) & (yr >= years[0]) & (yr <= years[-1]) & np.isfinite(val)
+        arr[rows[ok], yr[ok] - years[0]] = val[ok]
+
+    out = {k: grid() for k in ("tfr", "e0", "births", "deaths", "gdp", "kcal")}
+    for name, fn, col, scale in (("e0", "e01dt.rda", "e0B", 1.0), ("tfr", "tfr1dt.rda", "tfr", 1.0),
+                                 ("births", "misc1dt.rda", "births", 1e3), ("deaths", "misc1dt.rda", "deaths", 1e3)):
+        d = _rda(raw / fn)
+        fill(out[name], d.country_code.map(ci).fillna(-1).astype(int), d.year, d[col], scale)
+
+    o = pd.read_csv(raw / "owid-co2-data.csv", usecols=["country", "year", "iso_code", "gdp"])
+    o["iso_code"] = o.iso_code.replace(OWID_ISO_FIX)
+    name2iso = {**dict(zip(o.country, o.iso_code)), **FAO_ALIASES}
+    g = o[o.gdp.notna() & o.iso_code.notna()]
+    fill(out["gdp"], g.iso_code.map(iso2i).fillna(-1).astype(int), g.year, g.gdp)
+    f = pd.read_csv(raw / "food-supply-fao-2020.csv", usecols=[0, 1, 2])
+    f.columns = ["entity", "year", "kcal"]
+    fill(out["kcal"], f.entity.map(name2iso).map(iso2i).fillna(-1).astype(int), f.year, f.kcal)
+
+    u = pd.read_csv(raw / "UNlocations.txt", sep="\t")
+    u = u[u.location_type == 4]
+    sub = {int(c): str(r) for c, r in zip(u.country_code, u.reg_name)}
+    area = {int(c): str(r) for c, r in zip(u.country_code, u.area_name)}
+    p = countries_path()
+    np.savez_compressed(p, codes=codes, iso3=iso3, years=years,
+                        subregion=np.array([sub.get(int(c), "") for c in codes]),
+                        area=np.array([area.get(int(c), "") for c in codes]), **out)
+    return p
+
+
+@lru_cache(maxsize=1)
+def load_countries() -> dict:
+    p = countries_path()
+    if not p.is_file():
+        raise WorldDataError(f"no country panel at {p}: python world4_cli.py --install-world")
+    z = np.load(p)
+    return {k: z[k] for k in z.files}
+
+
 @lru_cache(maxsize=1)
 def load() -> dict:
     p = npz_path()
@@ -212,7 +293,7 @@ def load() -> dict:
 
 
 def available() -> bool:
-    return npz_path().is_file()
+    return npz_path().is_file() and countries_path().is_file()
 
 
 def series(name: str):

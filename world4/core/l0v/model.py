@@ -131,12 +131,229 @@ class CohortCoupler:
                 run.series[name][idx] = 1000 * res[key] / run.series["pop"][idx]
 
 
+@dataclass
+class GroupRun:
+    names: tuple
+    time: np.ndarray                                   # tiempos en los que mandan las cohortes
+    series: dict = field(default_factory=dict)         # pop, births, deaths, tfr, le, income: (T, G); world_tfr, world_le: (T,)
+    years: np.ndarray = None                           # años con foto por edad (a 31 de diciembre)
+    popM: np.ndarray = None                            # (años, G, 101)
+    popF: np.ndarray = None
+
+    def __getitem__(self, k):
+        return self.series[k]
+
+
+class GroupCoupler:
+    """El gancho de ``l0.run`` con el mundo partido en grupos de países (``world4.core.l0v.groups``).
+
+    World3 da el producto (industria + servicios) por persona, el alimento por persona y la contaminación del
+    MUNDO. Cada grupo recibe su parte: su ingreso por persona es el del mundo por su ingreso relativo ``rho`` (y
+    el alimento por ``phi``), renormalizados con las poblaciones del modelo para que la suma de los grupos sea el
+    total de World3. Con eso, las ecuaciones dan la esperanza de vida y la fecundidad de cada grupo, y sus
+    cohortes dan nacimientos y muertes. World3 recibe la suma.
+
+    ``origin`` separa la historia del modelo: hasta ``origin`` las cohortes de cada grupo llevan su fecundidad y
+    su esperanza de vida OBSERVADAS (la historia es dato; el motor la reproduce con un 1 % de error), al final
+    del año ``origin`` la población por edad vuelve a ser la observada, y desde ahí mandan las ecuaciones. Con
+    ``origin = start`` las ecuaciones mandan desde el principio.
+
+    ``equations="estimated"`` (por defecto): las ecuaciones estimadas con datos de ``equations.py``, ancladas en
+    lo observado en ``origin``; ``par`` son sus coeficientes. ``equations="world3"``: las tablas de World3
+    evaluadas por grupo (``popsector``), que corren desde 1900 con el reparto de ``start`` para que sus retardos
+    tengan historia; se conservan porque su fallo es un resultado (``docs/V2-informe.md``).
+
+    ``rho`` y ``phi`` son los observados (1950-2022 y 1961-2013); fuera de esos años se quedan en el último
+    valor [S: el reparto relativo no cambia]. La migración neta entre grupos es la observada hasta ``origin`` y
+    después se queda en la media de los diez años anteriores [S].
+    """
+
+    def __init__(self, gi, constants: dict, tables: dict, *, start: int = 1950, dt: float = 0.5,
+                 origin: int | None = None, fertility: str = "model", mortality: str = "model",
+                 migration: bool = True, equations: str = "estimated", par: dict | None = None,
+                 drivers: dict | None = None):
+        from world4.core.l0v.popsector import PopSector
+        from world4.sectors.population import migration_profile
+        for name, v in (("fertility", fertility), ("mortality", mortality)):
+            if v not in ("model", "observed"):
+                raise ValueError(f"{name} must be 'model' or 'observed', got {v!r}")
+        if start not in gi.years:
+            raise ValueError(f"start must be a WPP year ({gi.years[0]}-{gi.years[-1]}), got {start}")
+        self.gi, self.G, self.dt, self.start, self.t0 = gi, gi.G, dt, int(start), start + 0.5
+        self.origin = int(start if origin is None else origin)
+        if not start <= self.origin <= gi.years[-1]:
+            raise ValueError(f"origin must be between start ({start}) and {gi.years[-1]}, got {origin}")
+        self.fertility, self.mortality, self.migration = fertility, mortality, migration
+        j = int(self.origin - gi.years[0])
+        recent = gi.migration[max(1, j - 9): j + 1]                        # los diez años hasta el origen
+        self.mig_after = recent.mean(0) if len(recent) else np.zeros(gi.G)
+        if equations not in ("estimated", "world3"):
+            raise ValueError(f"equations must be 'estimated' or 'world3', got {equations!r}")
+        self.equations, self.drivers = equations, drivers
+        if equations == "world3":
+            self.sector = PopSector(gi.G, constants, tables, dt)
+        else:
+            from world4.core.l0v import equations as _eq
+            self.sector = _eq.EstimatedSector(gi.G, par or _eq.params(), constants, tables)
+        self.profile = migration_profile()
+        i = int(start - gi.years[0])
+        tot = gi.popM[i].sum(1) + gi.popF[i].sum(1)
+        self.share0 = tot / tot.sum()
+        self.c: Cohorts | None = None
+        self.rec = {k: [] for k in ("time", "pop", "births", "deaths", "tfr", "le", "income", "world_tfr", "world_le")}
+        self.snap = {"years": [], "popM": [], "popF": []}
+
+    def _at(self, t, arr):
+        """Serie anual ``(Y, G)`` en ``t``, sostenida fuera de sus años."""
+        y = self.gi.years
+        return np.array([np.interp(t, y, arr[:, g]) for g in range(self.G)])
+
+    def _world_rates(self, mx, tfr, pattern):
+        c, inp = self.c, self.gi
+        W = c.N[:, 1]
+        f = tfr[:, None] * c._along(pattern)
+        wtfr = float(((W * f).sum(0) / np.maximum(W.sum(0), 1e-9))[:-1].sum() / c.k)
+        by = c.by_age()                                                   # (G, 2, 101)
+        pooled = (by * mx).sum(0) / np.maximum(by.sum(0), 1e-9)
+        return wtfr, float(lifetable.e0_both(pooled[0], pooled[1]) + np.interp(self._t, inp.offset_t, inp.offset))
+
+    def __call__(self, t, st, a):
+        gi = self.gi
+        self._t = t
+        pops = self.c.total() if self.c is not None else self.share0
+        share = pops / pops.sum()
+        rho, phi = self._at(t, gi.rho), self._at(t, gi.phi)
+        rho, phi = rho / (share * rho).sum(), phi / (share * phi).sum()   # reparto de media 1
+        scalar = lambda k: float(np.asarray(a[k], float).reshape(-1)[0])  # noqa: E731
+        iopc, sopc, fpc, ppolx = scalar("iopc"), scalar("sopc"), scalar("fpc"), scalar("ppolx")
+        ypc = (scalar("io") + scalar("so")) / scalar("pop")
+        if self.drivers is not None:                                      # diagnóstico: la economía observada
+            iopc, sopc, fpc, ypc = (float(np.interp(t, self.drivers["time"], self.drivers[k]))
+                                    for k in ("iopc", "sopc", "fpc", "ypc"))
+        world3 = self.equations == "world3"
+        if world3:
+            le, tf = self.sector.step(t, iopc * rho, sopc * rho, fpc * phi, ppolx, scalar("pop"))
+        if t < self.t0 - self.dt - EPS:
+            return None
+        i0 = int(self.start - gi.years[0])
+        anchor_now = not world3 and abs(t - self.origin) < EPS            # las ecuaciones parten de lo observado aquí
+        if anchor_now:
+            jo = int(self.origin - gi.years[0])
+            self.sector.anchor(t, ypc * rho, fpc * phi, ppolx, gi.e0[jo], gi.tfr[jo])
+        if self.c is None:                                                # el paso que termina en t0: entra el dato
+            self.c = Cohorts(gi.popM[i0], gi.popF[i0], dt=self.dt, n=self.G)
+            return {"set": {k: v.sum() for k, v in self.c.groups().items()}}
+        if abs((t - 0.5) - round(t - 0.5)) < EPS:                         # t = año + 0,5: fin de ese año
+            b = self.c.by_age()
+            self.snap["years"].append(int(round(t - 0.5)))
+            self.snap["popM"].append(b[:, 0].copy())
+            self.snap["popF"].append(b[:, 1].copy())
+        if self.origin > self.start and abs(t - (self.origin + 0.5)) < EPS:   # fin del año origen: el estado es dato
+            jo = int(self.origin - gi.years[0])
+            self.c = Cohorts(gi.popM[jo], gi.popF[jo], dt=self.dt, n=self.G)
+        history = t < self.origin - EPS                                   # la historia es dato
+        if history or anchor_now:
+            le, tf = self._at(t, gi.e0), self._at(t, gi.tfr)
+        elif not world3:
+            le, tf = self.sector.step(t, ypc * rho, fpc * phi, ppolx)
+        observed = gi.years[0] <= t <= gi.years[-1]
+        if self.fertility == "observed" and observed:
+            tf = self._at(t, gi.tfr)
+        if self.mortality == "observed" and observed:
+            le = self._at(t, gi.e0)
+        j = int(np.clip(round(t) - gi.years[0], 0, len(gi.years) - 1))
+        pattern, srb = gi.pattern[j], gi.srb[j]
+        mx = np.stack([gi.families[g].mx(le[g]) for g in range(self.G)])
+        wtfr, wle = self._world_rates(mx, tf, pattern)
+        pop_before = self.c.total()
+        births, deaths = self.c.step(mx, tf, pattern, srb)
+        if self.migration:
+            year = int(np.ceil(t + self.dt - 0.5 - EPS))                  # año natural en curso
+            net = gi.migration[year - gi.years[0]] if year <= self.origin else self.mig_after
+            self.c.migrate(net * self.dt, self.profile)
+        for k, v in (("time", t), ("pop", pop_before), ("births", births / self.dt), ("deaths", deaths / self.dt),
+                     ("tfr", tf), ("le", le), ("income", rho), ("world_tfr", wtfr), ("world_le", wle)):
+            self.rec[k].append(np.array(v, float, copy=True))
+        return {"set": {k: v.sum() for k, v in self.c.groups().items()}}
+
+    def result(self) -> GroupRun:
+        s = {k: np.stack(self.rec[k]) for k in self.rec if k != "time"}
+        return GroupRun(names=self.gi.names, time=np.array(self.rec["time"], float), series=s,
+                        years=np.array(self.snap["years"], int), popM=np.stack(self.snap["popM"]),
+                        popF=np.stack(self.snap["popF"]))
+
+    def patch(self, run) -> None:
+        """Tasas brutas, esperanza de vida y fecundidad total del mundo pasan a ser las de la suma de los grupos."""
+        res = self.result()
+        idx = np.searchsorted(run.time, res.time - EPS)
+        for name, key in (("cbr", "births"), ("cdr", "deaths")):
+            if name in run.series and "pop" in run.series:
+                run.series[name][idx, 0] = 1000 * res[key].sum(1) / run.series["pop"][idx, 0]
+        for name, key in (("le", "world_le"), ("tf", "world_tfr")):
+            if name in run.series:
+                run.series[name][idx, 0] = res[key]
+
+
+def observed_economy(base, anchor: int = 1970) -> dict:
+    """Las entradas económicas de la demografía si la economía de World3 hubiera seguido a la real: el valor de
+    ``base`` (una corrida de World3) en ``anchor`` por el índice observado (PIB por persona para el producto
+    industrial, de servicios y total por persona; kilocalorías para el alimento). Antes del primer dato y después
+    del último, la corrida ``base`` reescalada para empalmar."""
+    from world4.core.l0v import groups as _groups
+    dr = _groups.world_drivers()
+    t = np.asarray(base.time, float)
+    yrs = dr["years"].astype(float)
+    ia = int(np.argmin(np.abs(t - anchor)))
+    i0 = int(np.argmin(np.abs(t - yrs[0])))
+    out = {"time": t}
+    i1 = int(np.argmin(np.abs(t - yrs[-1])))
+    series = {k: np.asarray(base[k], float)[:, 0] for k in ("iopc", "sopc", "fpc")}
+    series["ypc"] = (np.asarray(base["io"], float)[:, 0] + np.asarray(base["so"], float)[:, 0]) \
+        / np.asarray(base["pop"], float)[:, 0]
+    for key, idx in (("iopc", dr["gdp_pc"]), ("sopc", dr["gdp_pc"]), ("ypc", dr["gdp_pc"]), ("fpc", dr["kcal"])):
+        m = series[key]
+        obs = m[ia] * np.interp(t, yrs, idx)
+        out[key] = np.where(t < yrs[0], m * obs[i0] / m[i0], np.where(t > yrs[-1], m * obs[i1] / m[i1], obs))
+    return out
+
+
+def _eq_params(cutoff):
+    from world4.core.l0v import equations
+    return equations.params(cutoff)
+
+
 def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None = None, t1: float = 2100.0,
         dt: float = 0.5, n: int = 1, start: int = 1950, fertility: str = "model", mortality: str = "model",
-        record=None, inputs: WorldInputs | None = None):
-    """World3-03 con cohortes desde ``start``. Devuelve ``(World3Run, CohortRun)``."""
+        groups=None, origin: int | None = None, migration: bool = True, equations: str = "estimated",
+        cutoff: int | None = None,
+        par: dict | None = None, economy: str = "model", record=None, inputs: WorldInputs | None = None):
+    """World3-03 con cohortes desde ``start``. Devuelve ``(World3Run, CohortRun)``, o ``(World3Run, GroupRun)``
+    si ``groups`` nombra una partición (``"regions"``, ``"income"``, ``"world"``) o trae un ``GroupInputs``.
+
+    Con grupos: hasta ``origin`` (por defecto ``start``) las cohortes llevan la fecundidad y la esperanza de vida
+    observadas de cada grupo, y desde ``origin`` mandan las ecuaciones; ``equations`` elige las ecuaciones de esperanza de vida y fecundidad (``"estimated"`` o
+    ``"world3"``); ``cutoff`` es el último año de datos con el que se estiman (None: todos) y ``par`` las da
+    hechas; ``economy="observed"`` mueve la demografía con la economía real en lugar de con la de World3
+    (diagnóstico, hasta 2022; después sigue la de World3 reescalada)."""
     from world4.core import l0
-    hook = CohortCoupler(n, start=start, dt=dt, fertility=fertility, mortality=mortality, inputs=inputs)
+    if groups is None:
+        hook = CohortCoupler(n, start=start, dt=dt, fertility=fertility, mortality=mortality, inputs=inputs)
+    else:
+        if n != 1:
+            raise ValueError("groups of countries need n = 1 (one world)")
+        from world4.core.l0v import groups as _groups
+        gi = _groups.inputs(groups) if isinstance(groups, str) else groups
+        sc_c, sc_t = l0.SCENARIOS[scenario]
+        if economy not in ("model", "observed"):
+            raise ValueError(f"economy must be 'model' or 'observed', got {economy!r}")
+        drivers = None
+        if economy == "observed":
+            drivers = observed_economy(l0.run(scenario=scenario, constants=constants, tables=tables, dt=dt, t1=t1,
+                                              record=("iopc", "sopc", "fpc", "io", "so", "pop")))
+        hook = GroupCoupler(gi, {**l0.CONSTANTS, **sc_c, **(constants or {})}, {**l0.TABLES, **sc_t, **(tables or {})},
+                            start=start, origin=origin, dt=dt, fertility=fertility, mortality=mortality,
+                            migration=migration, equations=equations, drivers=drivers,
+                            par=par if par is not None or equations == "world3" else _eq_params(cutoff))
     r = l0.run(scenario=scenario, constants=constants, tables=tables, n=n, t1=t1, dt=dt,
                record=record or l0.RECORD, hook=hook)
     hook.patch(r)

@@ -61,8 +61,9 @@ class Cohorts:
         """Una magnitud por edad simple (..., 101), promediada sobre las edades que cada casilla recorre en el paso."""
         return (1 - self.w) * by_age[..., self.age] + self.w * by_age[..., self.nxt]
 
-    def step(self, mx, tfr, pattern, srb: float = 1.05):
-        """Avanza ``dt``. ``mx``: tasas ``(n, 2, 101)``; ``tfr``: ``(n,)``; ``pattern``: ``(101,)`` con suma 1.
+    def step(self, mx, tfr, pattern, srb=1.05):
+        """Avanza ``dt``. ``mx``: tasas ``(n, 2, 101)``; ``tfr``: ``(n,)``; ``pattern``: ``(101,)`` o ``(n, 101)``
+        con suma 1; ``srb``: razón de sexos al nacer, escalar o ``(n,)``.
         Devuelve ``(nacimientos, muertes)`` del paso, en personas, forma ``(n,)``."""
         dt = self.dt
         mx = np.broadcast_to(np.asarray(mx, float), (self.n, 2, A))
@@ -70,7 +71,8 @@ class Cohorts:
         pattern = np.asarray(pattern, float)
         surv = np.exp(-self._along(mx) * dt)
         births = dt * tfr * (self.N[:, 1] * self._along(pattern)).sum(1)
-        born = births[:, None] * np.array([srb, 1.0]) / (1 + srb)
+        srb = np.broadcast_to(np.asarray(srb, float), (self.n,))
+        born = births[:, None] * np.stack([srb, np.ones(self.n)], 1) / (1 + srb)[:, None]
         infant = born * np.exp(-mx[:, :, 0] * dt / 2)
         alive = self.N * surv
         deaths = (self.N - alive).sum((1, 2)) + (born - infant).sum(1)
@@ -80,3 +82,12 @@ class Cohorts:
         new[:, :, -1] += alive[:, :, -1]                                     # la casilla abierta retiene a los suyos
         self.N = new
         return births, deaths
+
+    def migrate(self, net, profile):
+        """Suma ``net`` migrantes netos ``(n,)`` (negativo: salen), mitad de cada sexo, repartidos por edad con
+        ``profile`` ``(101,)`` de suma 1. Una casilla no baja de cero: devuelve lo realmente sumado ``(n,)``."""
+        net = np.broadcast_to(np.asarray(net, float), (self.n,))
+        per_bin = np.asarray(profile, float)[self.age] / np.r_[np.full((A - 1) * self.k, self.k), 1.0]
+        before = self.total()
+        self.N = np.maximum(self.N + 0.5 * net[:, None, None] * per_bin, 0.0)
+        return self.total() - before

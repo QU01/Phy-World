@@ -21,6 +21,8 @@ dependencies = [
 test = ["pytest"]
 # F1: convertir los .rda de WPP 2024 por edad y sexo (--install-wpp); leer el .npz no lo necesita
 wpp = ["rdata==1.1.0"]
+# V1/V2: las series mundiales y el panel de países del L0 vigente (--install-world)
+world = ["rdata==1.1.0", "pycountry==26.2.16"]
 # F4: el modelo de clima FaIR (Apache-2.0); con su conjunto calibrado 1.6.0 (--install-climate)
 climate = ["fair==2.2.4"]
 # F8 (opcional): EMA Workbench (BSD-3, verificada en su LICENSE) como referencia de PRIM; World4 trae el suyo

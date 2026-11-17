@@ -86,12 +86,13 @@ def wpp_family() -> Family:
                d["mxF"][:, est].reshape(-1, d["mxF"].shape[-1]).astype(float))
 
 
-def world_family(base: Family, mxM5, mxF5, e0_official) -> Family:
-    """Familia del agregado mundial. ``mxM5``, ``mxF5``: tasas quinquenales del mundo ``(P, 22)``;
-    ``e0_official``: la e0 de ambos sexos que WPP publica para cada uno de esos periodos."""
-    lm = np.log(np.maximum(np.stack([single_age(np.asarray(mxM5, float)), single_age(np.asarray(mxF5, float))], 1),
-                           1e-9))                                              # (P, 2, 101)
-    lab = np.asarray(e0_official, float)
+def aggregate_family(base: Family, logmx, labels) -> Family:
+    """Familia de un AGREGADO de países (el mundo o un grupo). ``logmx``: log de sus tasas por periodo, sexo y
+    edad simple ``(P, 2, 101)``; ``labels``: la e0 con la que se pedirá cada periodo. Dentro del rango de
+    ``labels`` devuelve las tablas del agregado; fuera, las prolonga con la forma de ``base`` y el residuo del
+    borde."""
+    lm = np.asarray(logmx, float)
+    lab = np.asarray(labels, float)
     order = np.argsort(lab)
     lab, lm = lab[order], lm[order]
     keep = np.r_[True, np.diff(np.maximum.accumulate(lab)) > 1e-6]              # un año de crisis no hace retroceder
@@ -108,6 +109,14 @@ def world_family(base: Family, mxM5, mxF5, e0_official) -> Family:
             j = 0 if lev < lo else -1                                           # borde: residuo constante
             out[k] = lm[j] + np.log(base.mx(lev + (own[j] - lab[j]))) - np.log(base.mx(own[j]))
     return Family(levels=levels, logmx=out, e0=levels)
+
+
+def world_family(base: Family, mxM5, mxF5, e0_official) -> Family:
+    """Familia del agregado mundial. ``mxM5``, ``mxF5``: tasas quinquenales del mundo ``(P, 22)``;
+    ``e0_official``: la e0 de ambos sexos que WPP publica para cada uno de esos periodos."""
+    lm = np.log(np.maximum(np.stack([single_age(np.asarray(mxM5, float)), single_age(np.asarray(mxF5, float))], 1),
+                           1e-9))                                              # (P, 2, 101)
+    return aggregate_family(base, lm, e0_official)
 
 
 @lru_cache(maxsize=1)
