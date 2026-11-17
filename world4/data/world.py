@@ -28,6 +28,12 @@ fecundidad por edad por quinquenio (``asfr7``, ``asfr_periods``), la razón de s
 tasas de mortalidad por edad y sexo por quinquenio (``mxM``, ``mxF``, ``mx_periods``; grupos de ``wpp.MX_GROUPS``).
 Salen de los ficheros crudos de ``world4.data.wpp`` (``--install-wpp``), que ``install`` trae si faltan.
 
+**Recursos fósiles** (para ``world4.core.l0v.resources``; se leen crudos, son pequeños): las curvas de oferta de
+GCAM (``gcam-fos-curves.csv``: EJ disponibles y coste de extracción por región, combustible y grado, derivadas de
+Rogner 1997), sus coeficientes de carbono (``gcam-primary-fuel-ccoef.csv``), la relación reservas/producción de
+BP 2016 y la producción por combustible. En ``world_obs.npz`` van además las emisiones acumuladas por
+combustible (``cum_coal_co2``, ``cum_oil_co2``, ``cum_gas_co2``) y las anuales (``coal_co2``, ``oil_co2``, ``gas_co2``).
+
 **Panel de países** (``world_countries.npz``, para los grupos de países de ``world4.core.l0v``): por país de
 WPP (236) y año 1950-2023, fecundidad total, esperanza de vida, nacimientos y muertes (WPP), PIB (Maddison vía
 OWID, 164 países, 95-99 % de la población mundial) y kilocalorías por persona (FAO, 1961-2013), con el código
@@ -60,11 +66,15 @@ WPP_COMMIT = "2da7768ae64fc74105d3f9e98f9a74d37b62f99a"
 CO2_COMMIT = "22d9a01321ddec951b36f2bfc66e05dc6ad50ad8"
 MLO_COMMIT = "52f2be52ee6145eaad67367959af9b1b0a0bd83e"
 TEMP_COMMIT = "b90e8a349acb508d382d40d1cfa393c723bd82ef"
+GCAM_COMMIT = "11e128fb7ce3e14e9c4daf3903ba73123046a7aa"
 OWIDDS_COMMIT = "6155d4ca1ea14ef30e753010a25521eeb416e8a2"
 _RAW = "https://raw.githubusercontent.com/"
+_GCAM = f"{_RAW}JGCRI/gcam-core/{GCAM_COMMIT}/input/gcamdata/inst/extdata/"
 _FOOD = "Food supply (FAO, 2020)"
 _YIELD = "Cereal yield index - (World Bank (2017) & OWID)"
 _LAND = "Land Use Data - HYDE (2017)"
+_RP = "Reserves-Production Ratio - BP Statistics (2016)"
+_PROD = "Fossil fuel production BP & Shift (2022)"
 
 
 def _owidds(name: str) -> str:
@@ -82,6 +92,10 @@ URLS = {
     "food-supply-fao-2020.csv": _owidds(_FOOD),
     "cereal-yield-index.csv": _owidds(_YIELD),
     "land-use-hyde-2017.csv": _owidds(_LAND),
+    "bp-reserves-production-ratio-2016.csv": _owidds(_RP),
+    "fossil-fuel-production-2022.csv": _owidds(_PROD),
+    "gcam-fos-curves.csv": _GCAM + "energy/A11.fos_curves.csv",
+    "gcam-primary-fuel-ccoef.csv": _GCAM + "emissions/A_PrimaryFuelCCoef.csv",
     "UNlocations.txt": f"{_RAW}PPgp/wpp2024/{WPP_COMMIT}/data/UNlocations.txt",
 }
 # nombres de OWID/FAO que no están en la tabla de países de co2-data, y el código de Kosovo (sin ISO oficial)
@@ -99,7 +113,8 @@ YEAR0, YEAR1 = 1900, 2025
 WORLD = 900                                   # código de la ONU para el agregado mundial
 GMST_LAST = 2024                              # el espejo trae años en curso: sólo años completos
 SERIES = ("pop", "le", "tfr", "cbr", "cdr", "births", "deaths", "gdp", "fossil_co2", "primary_energy", "co2_fi", "luc_co2",
-          "cum_co2_fi", "cum_luc_co2", "co2_ppm", "gmst", "kcal",
+          "cum_co2_fi", "cum_luc_co2", "coal_co2", "oil_co2", "gas_co2", "cum_coal_co2", "cum_oil_co2", "cum_gas_co2",
+          "co2_ppm", "gmst", "kcal",
           "food_veq", "cereal_yield", "cropland")
 UNITS = {"pop": "million persons", "le": "years", "tfr": "children per woman", "cbr": "per 1000", "cdr": "per 1000",
          "births": "million per year", "deaths": "million per year",
@@ -107,12 +122,16 @@ UNITS = {"pop": "million persons", "le": "years", "tfr": "children per woman", "
          "co2_ppm": "ppm", "kcal": "kcal per person per day", "cereal_yield": "index, 1961 = 100",
          "cropland": "million hectares", "food_veq": "vegetal-equivalent kcal per person per day",
          "co2_fi": "Mt CO2 per year", "luc_co2": "Mt CO2 per year", "cum_co2_fi": "Mt CO2", "cum_luc_co2": "Mt CO2",
-         "gmst": "degC above 1951-1980"}
+         "gmst": "degC above 1951-1980",
+         **{k: "Mt CO2 per year" for k in ("coal_co2", "oil_co2", "gas_co2")},
+         **{k: "Mt CO2" for k in ("cum_coal_co2", "cum_oil_co2", "cum_gas_co2")}}
 SOURCE_OF = {"pop": "owid_co2_world", "le": "wpp", "tfr": "wpp", "cbr": "wpp", "cdr": "wpp", "births": "wpp", "deaths": "wpp", "gdp": "owid_co2_world",
              "fossil_co2": "owid_co2_world", "primary_energy": "owid_co2_world", "co2_ppm": "noaa_mlo",
              "kcal": "owid_food_supply", "food_veq": "owid_food_supply", "cereal_yield": "owid_cereal_yield", "cropland": "owid_hyde_land",
              "co2_fi": "owid_co2_world", "luc_co2": "owid_co2_world", "cum_co2_fi": "owid_co2_world",
-             "cum_luc_co2": "owid_co2_world", "gmst": "gistemp"}
+             "cum_luc_co2": "owid_co2_world", "gmst": "gistemp",
+             **{k: "owid_co2_world" for k in ("coal_co2", "oil_co2", "gas_co2", "cum_coal_co2", "cum_oil_co2",
+                                              "cum_gas_co2")}}
 
 
 class WorldDataError(RuntimeError):
@@ -224,7 +243,9 @@ def convert() -> Path:
     fossil = w[["coal_co2", "oil_co2", "gas_co2", "flaring_co2"]].fillna(0.0).sum(axis=1)
     put("fossil_co2", w.year[fossil > 0], fossil[fossil > 0])
     for name, col in (("co2_fi", "co2"), ("luc_co2", "land_use_change_co2"), ("cum_co2_fi", "cumulative_co2"),
-                      ("cum_luc_co2", "cumulative_luc_co2")):
+                      ("cum_luc_co2", "cumulative_luc_co2"), ("coal_co2", "coal_co2"), ("oil_co2", "oil_co2"),
+                      ("gas_co2", "gas_co2"), ("cum_coal_co2", "cumulative_coal_co2"),
+                      ("cum_oil_co2", "cumulative_oil_co2"), ("cum_gas_co2", "cumulative_gas_co2")):
         put(name, w.year, w[col])
     g = pd.read_csv(raw / "global-temp-annual.csv")
     g = g[(g.Source == "GISTEMP") & (g.Year <= GMST_LAST)]

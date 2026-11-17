@@ -1,5 +1,5 @@
 {
- "source": "UN WPP 2024 (R package PPgp/wpp2024 at commit 2da7768ae64fc74105d3f9e98f9a74d37b62f99a); OWID co2-data at commit 22d9a01321ddec951b36f2bfc66e05dc6ad50ad8 (Global Carbon Budget, Maddison Project, Energy Institute); NOAA GML Mauna Loa annual mean CO2 (mirror datasets/co2-ppm at commit 52f2be52ee6145eaad67367959af9b1b0a0bd83e); OWID owid-datasets at commit 6155d4ca1ea14ef30e753010a25521eeb416e8a2 (FAO Food Balance Sheets, World Bank WDI cereal yield, HYDE 3.2 land use); NASA GISTEMP v4 global annual means (mirror datasets/global-temp at commit b90e8a349acb508d382d40d1cfa393c723bd82ef)",
+ "source": "UN WPP 2024 (R package PPgp/wpp2024 at commit 2da7768ae64fc74105d3f9e98f9a74d37b62f99a); OWID co2-data at commit 22d9a01321ddec951b36f2bfc66e05dc6ad50ad8 (Global Carbon Budget, Maddison Project, Energy Institute); NOAA GML Mauna Loa annual mean CO2 (mirror datasets/co2-ppm at commit 52f2be52ee6145eaad67367959af9b1b0a0bd83e); OWID owid-datasets at commit 6155d4ca1ea14ef30e753010a25521eeb416e8a2 (FAO Food Balance Sheets, World Bank WDI cereal yield, HYDE 3.2 land use); NASA GISTEMP v4 global annual means (mirror datasets/global-temp at commit b90e8a349acb508d382d40d1cfa393c723bd82ef); GCAM fossil resource supply curves and carbon coefficients (JGCRI/gcam-core at commit 11e128fb7ce3e14e9c4daf3903ba73123046a7aa, ECL-2.0; curves derived from Rogner 1997); BP Statistical Review 2016 reserves-to-production ratios and BP & Shift fossil production (owid-datasets)",
  "downloaded": "2026-11-16",
  "files": {
   "e01dt.rda": {
@@ -31,6 +31,18 @@
   },
   "global-temp-annual.csv": {
    "sha256": "68ac8e86aee9fd9d01e6269c6a9eb3ce81dcc3cba7220842ff6e2c4e42e102e1"
+  },
+  "bp-reserves-production-ratio-2016.csv": {
+   "sha256": "5f4327df3229c8428e68cebac60e02af2ab78577f9a23247da6b221ad9409e96"
+  },
+  "fossil-fuel-production-2022.csv": {
+   "sha256": "88997d9b62989c617e9e6ce509d604f16ec9bdcfc0b0e7787e4fb383f91319cd"
+  },
+  "gcam-fos-curves.csv": {
+   "sha256": "a484bb8a760da5f4e7effb617e284b08ad1a13a6c837d051d82e3d4e7d81e6d0"
+  },
+  "gcam-primary-fuel-ccoef.csv": {
+   "sha256": "8b77b0fa4365165694aa6c107a98a04f6f6452849bc25c2cbfccf4644f598101"
   }
  }
 }

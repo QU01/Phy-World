@@ -327,7 +327,7 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
         dt: float = 0.5, n: int = 1, start: int = 1950, fertility: str = "model", mortality: str = "model",
         groups=None, origin: int | None = None, migration: bool = True, equations: str = "estimated",
         cutoff: int | None = None, par: dict | None = None, economy: str = "model", technology=None,
-        climate=None, rules=None, record=None, inputs: WorldInputs | None = None):
+        climate=None, rules=None, resources=None, record=None, inputs: WorldInputs | None = None):
     """World3-03 con cohortes desde ``start``. Devuelve ``(World3Run, CohortRun)``, o ``(World3Run, GroupRun)``
     si ``groups`` nombra una partición (``"regions"``, ``"income"``, ``"world"``) o trae un ``GroupInputs``.
 
@@ -343,14 +343,23 @@ def run(*, scenario: int = 1, constants: dict | None = None, tables: dict | None
     ``climate``: None, ``"estimated"`` o un ``Carbon`` (``world4.core.l0v.carbon``): el calentamiento desde el
     origen que causan las emisiones del modelo resta rendimiento agrícola. Necesita ``technology``.
 
+    ``resources``: None deja el stock fijo de recursos no renovables de World3; ``"estimated"`` o un ``Resources``
+    (``world4.core.l0v.resources``) lo sustituyen por la curva de coste de los fósiles. Con ``technology="estimated"``
+    se usan las curvas de tecnología estimadas con esos mismos recursos.
+
     ``rules``: las reglas de las ecuaciones estimadas para la escasez (``equations.Rules``; por defecto, todas).
 
     La corrida devuelta lleva ``origin`` y ``cutoff`` como atributos, para que el marcador sepa qué es historia."""
     from world4.core import l0
     from world4.core.l0v import technology as _tech
+    if resources is not None:
+        from world4.core.l0v import resources as _res
+        res = _res.params(resources, cutoff)
+        constants = {**res.constants(), **(constants or {})}
+        tables = {**res.tables(), **(tables or {})}
     tech = None
     if technology is not None:
-        tech = _tech.params(cutoff) if isinstance(technology, str) else technology
+        tech = _tech.params(cutoff, resources=resources is not None) if isinstance(technology, str) else technology
         sc_t0 = l0.SCENARIOS[scenario][1]
         tables = {**tech.tables({**l0.TABLES, **sc_t0, **(tables or {})}), **(tables or {})}
         constants = {**tech.constants({**l0.CONSTANTS, **l0.SCENARIOS[scenario][0]}), **(constants or {})}

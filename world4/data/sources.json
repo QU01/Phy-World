@@ -408,7 +408,7 @@
     "world series of the L0 (V1)",
     "carbon and climate of the L0 (V4)"
    ],
-   "note": "World population, GDP (single years before 2015: 1950, 1960, ..., 2010), fossil CO2 by fuel and primary energy. V2 also reads GDP by country (164 countries). Pinned by commit and SHA-256 (world_manifest.json). Not vendored. V4 also reads total fossil and industry CO2, land-use-change CO2 and their cumulative sums."
+   "note": "World population, GDP (single years before 2015: 1950, 1960, ..., 2010), fossil CO2 by fuel and primary energy. V2 also reads GDP by country (164 countries). Pinned by commit and SHA-256 (world_manifest.json). Not vendored. V4 also reads total fossil and industry CO2, land-use-change CO2 and their cumulative sums. V6 also reads emissions by fuel and their cumulative sums."
   },
   "noaa_mlo": {
    "name": "NOAA GML Mauna Loa annual mean CO2 (mirror datasets/co2-ppm on GitHub)",
@@ -469,6 +469,30 @@
     "carbon and climate of the L0 (V4)"
    ],
    "note": "Anomaly over 1951-1980. HadCRUT5 (the truth of F4) was not reachable in the V4 session. Not vendored."
+  },
+  "gcam_fossil_curves": {
+   "name": "GCAM fossil resource supply curves (A11.fos_curves.csv) and primary fuel carbon coefficients (A_PrimaryFuelCCoef.csv), JGCRI/gcam-core",
+   "license": "ECL-2.0 (read in the repository's LICENSE.md)",
+   "mark": "[V]",
+   "redistributable": true,
+   "vintage": "commit 11e128f; curves from GCAM 3.0, derived from Rogner (1997)",
+   "lag_years": 0,
+   "used_in": [
+    "fossil resources of the L0 (V6)"
+   ],
+   "note": "World fossil occurrences by fuel and cost grade (EJ, 1975 USD per GJ) and kg C per GJ. An assessment from 1997, not a measurement: the unconventional grades are speculative. Not vendored."
+  },
+  "bp_reserves_2016": {
+   "name": "OWID owid-datasets: Reserves-Production Ratio - BP Statistics (2016) and Fossil fuel production BP & Shift (2022), World rows",
+   "license": "CC BY 4.0 (OWID's); BP's and The Shift Project's for the underlying data",
+   "mark": "[S]",
+   "redistributable": true,
+   "vintage": "commit 6155d4c (R/P of 2015)",
+   "lag_years": 1,
+   "used_in": [
+    "fossil resources of the L0 (V6)"
+   ],
+   "note": "Proved reserves of 2015 = reserves-to-production ratio x production. A check, not an input of the model. Not vendored."
   }
  },
  "reference_models": {

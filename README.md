@@ -65,6 +65,12 @@ error measured on the previous split. The industrial peak falls in 2037 / 2071 /
 is decided by the initial non-renewable resources, which history barely pins down; the population peak (2055-2066,
 9.2-10.0 billion) is robust. From 2000 the bands cover what happened in 11 of 12 indicators but are too wide
 ([docs/V5-informe.md](docs/V5-informe.md)).
+Phase **V6** bounds the non-renewable resources with data. Proved fossil reserves plus what has already been
+burnt (4,310 GtCO2) are almost exactly World3's fixed stock (4,296): the stock is what is already proved, a floor.
+It is replaced by the fossil supply curves of GCAM (47,588 GtCO2 at rising extraction cost), which history fits
+as well as the stock. With the curve 90 % of the ensemble has no industrial peak before 2100; the limit moves to
+persistent pollution and food (life expectancy falls before 2100 in 66 % of the members), which rests on World3
+tables no data pin down. The population peak does not move ([docs/V6-informe.md](docs/V6-informe.md)).
 
 | Layer | What it is in F0 | Pinned against | Result |
 |---|---|---|---|
@@ -110,8 +116,8 @@ The Atlas data are not shipped here: several derive from sources that cannot be 
 python world4_cli.py --info                 # environment, observables, sources and licences
 python world4_cli.py --campaign             # acceptance criteria W1-W12
 python world4_cli.py --l0 --scenario 2      # World3-03 behaviour mode
-python world4_cli.py --world3-score         # V1-V4: World3-03, cohorts, regions, technology and climate against the observed world; out-of-sample tests
-python world4_cli.py --world3-bands --members 100   # V5: uncertainty bands to 2100 and their coverage test (~70 s)
+python world4_cli.py --world3-score         # V1-V6: World3-03, cohorts, regions, technology, climate and the resource cost curve against the observed world; out-of-sample tests
+python world4_cli.py --world3-bands --members 100   # V5, V6: uncertainty bands to 2100 and their coverage test (~70 s)
 python world4_cli.py --query gdp_pc --region MEX --as-of 2005 --target 2010
 python world4_cli.py --query population --region NGA --as-of 2005 --target 2015
 python world4_cli.py --query resource_rent_share_world --region WLD --as-of 2005 --target 2012
@@ -140,6 +146,7 @@ api.run_l0(scenario=1)
 w3, cohorts = api.run_l0v()                       # World3-03 with population cohorts by age and sex (V1)
 w3, regions = api.run_l0v(groups="regions", origin=2023)   # 10 regions, estimated equations, history to 2023 (V2)
 w3, regions = api.run_l0v(groups="regions", origin=2023, technology="estimated", climate="estimated")   # the whole current World3 (V3, V4)
+w3, regions = api.run_l0v(groups="regions", origin=2023, technology="estimated", climate="estimated", resources="estimated")   # with the fossil cost curve instead of World3's fixed stock (V6)
 api.world3_score()                                # error of each L0 variant against the observed world
 api.world3_bands(members=60)                      # p10/p50/p90 to 2100 from the ensemble history does not rule out (V5)
 ```

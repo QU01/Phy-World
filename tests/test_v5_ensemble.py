@@ -14,8 +14,8 @@ def test_sample_fills_the_declared_ranges():
     for j, name in enumerate(E.NAMES):
         assert box[name][0] <= th[:, j].min() and th[:, j].max() <= box[name][1], name
     assert len(np.unique(th[:, E.NAMES.index("kappa")])) == 5                       # una tabla por corrida vectorizada
-    nri = th[:, E.NAMES.index("nri_factor")]
-    assert np.median(nri) == pytest.approx(np.sqrt(0.7 * 3.0), rel=0.1)             # uniforme en el logaritmo
+    scale = th[:, E.NAMES.index("resource_scale")]
+    assert np.median(scale) == pytest.approx(1.0, rel=0.1)                          # uniforme en el logaritmo
     small = E.sample(per_level=20, levels=2, box={**box, "r_yield": (0.01, 0.02), "kappa": (-0.1, 0.1)})
     assert small[:, 0].min() >= 0.01 and small[:, 0].max() <= 0.02
     assert np.array_equal(E.sample(10, 2, seed=1), E.sample(10, 2, seed=1))
@@ -26,12 +26,14 @@ def test_members_become_technologies_and_resources():
     one, many = E.tech_of(th[0]), E.tech_of(th)
     assert isinstance(one, T.Tech) and one.erosion_control and one.delay == 1.0
     assert float(one.r_yield) == th[0, 0] and many.r_yield.shape == (4,) and isinstance(many.kappa, float)
-    assert E.nri_of(th).shape == (4,) and float(E.nri_of(th[0])) == pytest.approx(1e12 * th[0, E.NAMES.index("nri_factor")])
+    res = E.resources_of(th[0], 2000)
+    assert res.substitution == th[0, E.NAMES.index("substitution")] and res.scale == th[0, E.NAMES.index("resource_scale")]
+    assert res.cutoff == 2000 and 0.0 <= res.substitution <= 1.0 and 0.5 <= res.scale <= 2.0
     assert np.all(many.paths(2050.0)[0] <= many.yield_cap)
 
 
 def test_acceptance_needs_every_indicator_within_the_tolerance():
-    best = np.array([T.stored()["by_cutoff"]["2023"]["rms_pct"][f[0]] for f in T.FIT]) / 100.0
+    best = np.array([T.stored()["by_cutoff_curve"]["2023"]["rms_pct"][f[0]] for f in T.FIT]) / 100.0
     errors = np.array([best, 1.9 * best, 2.1 * best, best * np.array([1, 1, 1, 1, 2.5])])
     assert E.accept(errors, 2023).tolist() == [True, True, False, False]
     assert E.accept(errors, 2023, tolerance=3.0).tolist() == [True, True, True, True]
@@ -54,8 +56,8 @@ def test_stored_ensemble_is_inside_the_ranges_and_fits_history():
         box = {**E.KNOBS, **E.AXES}
         for j, name in enumerate(E.NAMES):
             assert box[name][0] <= post["theta"][:, j].min() and post["theta"][:, j].max() <= box[name][1], name
-    nri = E.posterior(2023)["theta"][:, E.NAMES.index("nri_factor")]
-    assert np.percentile(nri, 95) / np.percentile(nri, 5) > 2.5                     # la historia apenas fija los recursos
+    sub = E.posterior(2023)["theta"][:, E.NAMES.index("substitution")]
+    assert np.percentile(sub, 95) - np.percentile(sub, 5) > 0.7                     # la historia no fija la curva futura
     kappa = E.posterior(2023)["theta"][:, E.NAMES.index("kappa")]
     assert kappa.max() < 0.3                                                        # y sí descarta el recargo de World3
     with pytest.raises(ValueError):
@@ -108,7 +110,7 @@ def test_vectorised_history_errors_match_the_single_run_fit(ready):
     from world4.core.l0v import model
     for k in range(3):
         r, _ = model.run(technology=E.tech_of(th[k]), fertility="observed", mortality="observed", t1=2001.0,
-                         constants={"nri": float(E.nri_of(th[k]))})
+                         resources="estimated", cutoff=2000)
         y, mod = T._indices(r)
         oy, obs = T._observed()
         for j, f in enumerate(T.FIT):
@@ -117,14 +119,16 @@ def test_vectorised_history_errors_match_the_single_run_fit(ready):
             assert err[k, j] == pytest.approx(np.sqrt(np.mean(d ** 2)), rel=1e-6), (k, f[0])
 
 
-def test_history_rules_out_too_few_resources_and_keeps_the_best_fit(ready):
-    best = T.params(2023)
-    th = np.array([[best.r_yield, best.r_resource, best.r_pollution, best.kappa, best.land_restraint, 1.0,
-                    best.resource_floor, best.pollution_floor, best.yield_cap, 0.05]] * 3)
-    th[1, E.NAMES.index("nri_factor")] = 0.4
-    th[2, E.NAMES.index("nri_factor")] = 3.0
-    ok = E.accept(E.history_errors(th, 2023), 2023)
-    assert ok.tolist() == [True, False, True]            # con muchos más recursos la historia es la misma
+def test_history_keeps_the_best_fit_and_does_not_see_the_future_of_the_curve(ready):
+    from world4.core.l0v import model, resources
+    best = T.params(2023, resources=True)
+    th = np.array([[best.r_yield, best.r_resource, best.r_pollution, best.kappa, best.land_restraint, 0.5, 1.0,
+                    best.resource_floor, best.pollution_floor, best.yield_cap, 0.05]] * 2)
+    th[1, E.NAMES.index("kappa")] = 0.5                                       # con el recargo de World3, no pasa
+    assert E.accept(E.history_errors(th, 2023), 2023).tolist() == [True, False]
+    runs = [model.run(technology=best, fertility="observed", mortality="observed", t1=2024.0, cutoff=2023,
+                      resources=resources.Resources(s, k, 2023))[0] for s, k in ((0.0, 0.5), (1.0, 2.0))]
+    assert np.asarray(runs[0]["io"])[-1, 0] == pytest.approx(np.asarray(runs[1]["io"])[-1, 0], rel=0.01)
 
 
 def test_model_error_is_measured_on_the_previous_split(ready):
@@ -152,9 +156,12 @@ def test_projection_summary_and_what_drives_it(ready):
     i23 = int(np.where(proj["years"] == 2023)[0][0])
     assert np.ptp(proj["series"]["population"][:, i23]) < 1.0                 # la historia es la misma en todos
     s = E.summary(proj, E.discrepancy(2023))
-    lo, mid, hi = s["industrial_peak_year"]
-    assert 2030 <= lo < mid <= hi <= 2100 and hi - lo > 30                    # el máximo industrial no está fijado
-    assert s["drivers_of_industrial_peak"]["nri_factor"] > 0.7                # y lo mueven los recursos iniciales
+    assert s["industrial_peak_after_2100"] > 0.7                              # V6: con la curva de coste no hay máximo
+    assert s["at"][2100]["fcaor"][2] < 0.4 and s["at"][2100]["iopc_over_origin"][0] > 2.0     # industrial por recursos
+    for axis in ("substitution", "resource_scale"):                           # ni lo deciden los ejes de la curva
+        assert abs(s["drivers_of_industrial_peak"].get(axis, 0.0)) < 0.5
+    assert s["at"][2100]["ppolx"][1] > 15 and s["life_expectancy_falls"] > 0.4                # manda la contaminación
+    assert 2040 < s["food_peak_year"][1] < 2095 and set(s["drivers_of_food_2100"]) == set(E.NAMES)
     assert 2045 < s["population_peak_year"][1] < 2075 and 8800 < s["population_peak"][1] < 10200
     p10, p50, p90 = s["at"][2100]["population"]
     assert 6000 < p10 < p50 < p90 < 9500 and s["at"][2100]["gmst"][2] > s["at"][2050]["gmst"][2]
@@ -167,4 +174,5 @@ def test_api_and_cli_bands(ready, capsys):
     out = json.loads(capsys.readouterr().out)
     assert out["members"] == 12 and out["ensemble"]["tolerance"] == E.TOLERANCE
     assert out["bands"]["years"][0] == 2023 and len(out["bands"]["population"]["p50"]) == 78
-    assert set(out["coverage"]["indicators"]) == set(E.SCORED) and "nri_factor" in out["ensemble"]["ranges"]
+    assert set(out["coverage"]["indicators"]) == set(E.SCORED) and "substitution" in out["ensemble"]["ranges"]
+    assert len(out["bands"]["fcaor"]["p50"]) == 78 and out["summary"]["industrial_peak_after_2100"] > 0.5

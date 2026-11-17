@@ -137,7 +137,8 @@ def run_l0v(scenario: int = 1, **kw):
     Con ``groups="regions"`` (o ``"income"``) el mundo va por grupos de países con ecuaciones estimadas y la
     historia hasta ``origin`` es la observada: ``(World3Run, GroupRun)``; ``technology="estimated"`` añade la
     tecnología estimada con datos (``docs/V3-informe.md``) y ``climate="estimated"`` el daño del calentamiento al
-    rendimiento (``docs/V4-informe.md``). Necesita ``--install-world``. Es un modo
+    rendimiento (``docs/V4-informe.md``); ``resources="estimated"`` cambia el stock fijo de recursos no renovables
+    por la curva de coste de los fósiles (``docs/V6-informe.md``). Necesita ``--install-world``. Es un modo
     de comportamiento, no un pronóstico: el de 2100 con grupos depende de extrapolaciones (``docs/V2-informe.md``)."""
     from world4.core.l0v import model
     return model.run(scenario=scenario, **kw)

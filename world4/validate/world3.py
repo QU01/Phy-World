@@ -155,6 +155,9 @@ VARIANTS = {
     "groups": {"groups": "regions", "origin": 2000, "cutoff": 2000},
     # V3: lo mismo con la tecnología estimada (rendimientos, recursos, contaminación, coste de capital, tierra)
     "full": {"groups": "regions", "origin": 2000, "cutoff": 2000, "technology": "estimated", "climate": "estimated"},
+    # V6: lo mismo con los recursos no renovables como curva de coste de extracción en lugar de stock fijo
+    "bounded": {"groups": "regions", "origin": 2000, "cutoff": 2000, "technology": "estimated", "climate": "estimated",
+                "resources": "estimated"},
 }
 HINDCAST_KEYS = ("population", "life_expectancy", "fertility", "birth_rate", "death_rate")
 
@@ -240,10 +243,11 @@ def group_check(groups: str = "regions", start: int = 1950) -> dict:
 
 
 def technology_hindcast(origins=(1990, 2000, 2010), groups: str = "regions", scenario: int = 1,
-                        last: int = WINDOW[1]) -> dict:
+                        last: int = WINDOW[1], resources=None) -> dict:
     """Prueba fuera de muestra del modelo completo: demografía por grupos y tecnología, las dos estimadas con datos
     <= ``origin`` (los cortes guardados en ``l0v_technology.json``). Error medio de ``origin + 1`` a ``last`` de
-    todos los indicadores, con la tecnología estimada y con la de World3 (apagada en el escenario 1)."""
+    todos los indicadores, con la tecnología estimada y con la de World3 (apagada en el escenario 1).
+    ``resources="estimated"``: la variante estimada lleva además la curva de coste de los recursos (V6)."""
     from world4.core.l0v import model
     out = {"groups": groups, "last": last, "origins": {}}
     for origin in origins:
@@ -251,7 +255,7 @@ def technology_hindcast(origins=(1990, 2000, 2010), groups: str = "regions", sce
         from world4.core.l0v import carbon
         for name, tech in (("technology", "estimated"), ("world3", None)):
             r, _ = model.run(scenario=scenario, groups=groups, origin=origin, cutoff=origin, technology=tech,
-                             climate=tech, t1=float(last))
+                             climate=tech, resources=resources if tech else None, t1=float(last))
             sc = score(r, window=(origin + 1, last))
             res[name] = {k: {"mae_pct": v["mae_pct"], "model_last": v.get("model_last"),
                              "observed_last": v.get("observed_last")} for k, v in sc.items()}

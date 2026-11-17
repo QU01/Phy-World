@@ -5,6 +5,7 @@
   - **Resultado principal:** el máximo de la producción industrial por persona cae en 2037 / 2071 / después de 2100 (p10 / p50 / p90). Lo decide un solo número, los recursos no renovables iniciales, que la historia casi no fija.
   - **Lo que sí es firme:** la población toca techo entre 2055 y 2066, con 9.200 a 10.000 millones, en todos los miembros.
   - **La prueba de las bandas:** con datos hasta 2000, las bandas cubren lo ocurrido en 2001-2023 en 11 de 12 indicadores, pero son anchas de más (cubren entre el 91 % y el 100 %, cuando deberían rondar el 80 %). La de temperatura se queda corta (74 %).
+  - **Nota posterior (V6):** el eje de los recursos iniciales se sustituyó por una curva de coste acotada con datos, y el conjunto guardado es ahora el de V6; los números de este informe son los del commit de V5 y el resultado principal cambia (ver `docs/V6-informe.md`).
 - **El escenario 1 no cambia.** W1 sigue verde.
 - **Pruebas:** 136 pasan (12 nuevas, 6 de ellas necesitan los datos); 93 se saltan por datos del Atlas sin instalar, como antes.
 - **Reproducir:**

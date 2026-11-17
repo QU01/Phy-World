@@ -174,10 +174,14 @@ def stored() -> dict:
     return json.loads(PARAMS_FILE.read_text(encoding="utf-8"))
 
 
-def params(cutoff: int | None = None) -> Tech:
-    """La tecnología estimada con datos <= ``cutoff`` (None: la última guardada)."""
+BLOCKS = {False: "by_cutoff", True: "by_cutoff_curve"}     # con el stock de World3 / con la curva de ``resources``
+
+
+def params(cutoff: int | None = None, resources: bool = False) -> Tech:
+    """La tecnología estimada con datos <= ``cutoff`` (None: la última guardada). ``resources``: la estimada con la
+    curva de coste de los recursos (``resources``) en lugar de con el stock de World3."""
     st = stored()
-    d = st["by_cutoff"]
+    d = st[BLOCKS[bool(resources)]]
     key = str(max(int(k) for k in d) if cutoff is None else int(cutoff))
     if key not in d:
         raise ValueError(f"no stored technology for cutoff {cutoff}; available {sorted(d)} (technology.calibrate)")
@@ -207,10 +211,11 @@ def _observed():
     return w["years"], {name: w[obs] if name in LEVELS else w[obs] / w[obs][i70] for name, _, obs in FIT}
 
 
-def loss(tech: Tech, cutoff: int, first: int = 1971, detail: bool = False, inputs=None):
+def loss(tech: Tech, cutoff: int, first: int = 1971, detail: bool = False, inputs=None, resources=None):
     """Error cuadrático medio en logaritmos de los cuatro índices, de ``first`` a ``cutoff`` (suma de los cuatro)."""
     from world4.core.l0v import model
-    r, _ = model.run(technology=tech, fertility="observed", mortality="observed", t1=float(cutoff) + 1.0, inputs=inputs)
+    r, _ = model.run(technology=tech, fertility="observed", mortality="observed", t1=float(cutoff) + 1.0, inputs=inputs,
+                     resources=resources, cutoff=cutoff if resources is not None else None)
     years, mod = _indices(r)
     oy, obs = _observed()
     parts = {}
@@ -228,7 +233,7 @@ STARTS = ({"r_yield": 0.015, "r_resource": 0.05, "r_pollution": 0.035, "kappa": 
 ESTIMATED = {"erosion_control": True}     # lo que la variante estimada fija además de las perillas
 
 
-def calibrate(cutoff: int = 2023, fixed: dict | None = None, log=None) -> dict:
+def calibrate(cutoff: int = 2023, fixed: dict | None = None, log=None, resources=None) -> dict:
     """Estima las perillas con datos <= ``cutoff``; las de ``fixed`` se quedan en el valor dado.
     Devuelve ``{perilla: valor, "loss", "rms_pct", "fixed"}``."""
     from scipy.optimize import minimize
@@ -243,13 +248,13 @@ def calibrate(cutoff: int = 2023, fixed: dict | None = None, log=None) -> dict:
     def f(x):
         if any(not BOUNDS[k][0] <= v <= BOUNDS[k][1] for k, v in zip(free, x)):
             return 1e3
-        return loss(tech_of(x), cutoff, inputs=inputs)
+        return loss(tech_of(x), cutoff, inputs=inputs, resources=resources)
 
     runs = [minimize(f, [x0[k] for k in free], method="Nelder-Mead",
                      options={"xatol": 2e-4, "fatol": 1e-7, "maxiter": 900}) for x0 in STARTS]
     res = min(runs, key=lambda r: r.fun)                             # dos arranques: el simplex se queda en mínimos locales
     tech = tech_of(res.x)
-    parts = loss(tech, cutoff, detail=True, inputs=inputs)
+    parts = loss(tech, cutoff, detail=True, inputs=inputs, resources=resources)
     if log:
         log(f"cutoff {cutoff}: {sum(r.nfev for r in runs)} runs, loss {res.fun:.5f} (starts: "
             + ", ".join(f"{r.fun:.5f}" for r in runs) + ")")
@@ -257,13 +262,17 @@ def calibrate(cutoff: int = 2023, fixed: dict | None = None, log=None) -> dict:
             "rms_pct": {k: float(100 * np.sqrt(v)) for k, v in parts.items()}}
 
 
-def write(cutoffs=(1990, 2000, 2010, 2023), log=print) -> dict:
-    """Recalcula y guarda ``l0v_technology.json`` (unos minutos)."""
-    out = {"_doc": ["Technology curves of the current World3 (world4.core.l0v.technology), estimated with world series "
-                    "up to each cutoff year. Model parameters, no third-party data. Rebuild: python -m "
-                    "world4.core.l0v.technology"],
-           "fixed": {k: v for k, v in asdict(Tech(**ESTIMATED)).items() if k not in KNOBS and k != "freeze_at"},
-           "by_cutoff": {str(c): calibrate(c, log=log) for c in cutoffs}}
+def write(cutoffs=(1990, 2000, 2010, 2023), log=print, blocks=(False, True)) -> dict:
+    """Recalcula y guarda ``l0v_technology.json`` (unos minutos por bloque). ``blocks``: False, con el stock de
+    recursos de World3; True, con la curva de coste de ``resources``. Los bloques que no se piden se conservan."""
+    out = stored() if PARAMS_FILE.exists() else {}
+    out["_doc"] = ["Technology curves of the current World3 (world4.core.l0v.technology), estimated with world series "
+                   "up to each cutoff year: by_cutoff with the fixed resource stock of World3, by_cutoff_curve with "
+                   "the fossil cost curve of world4.core.l0v.resources. Model parameters, no third-party data. "
+                   "Rebuild: python -m world4.core.l0v.technology"]
+    out["fixed"] = {k: v for k, v in asdict(Tech(**ESTIMATED)).items() if k not in KNOBS and k != "freeze_at"}
+    for b in blocks:
+        out[BLOCKS[b]] = {str(c): calibrate(c, log=log, resources="estimated" if b else None) for c in cutoffs}
     PARAMS_FILE.write_text(json.dumps(out, indent=1) + "\n", encoding="utf-8")
     return out
 

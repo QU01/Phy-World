@@ -4,8 +4,8 @@ Una sola trayectoria dice poco cuando lo que decide el siglo no se pudo estimar.
 veces, y cada miembro del conjunto difiere en tres cosas:
 
 1. **Lo que la historia fija a medias** (las cinco perillas de ``technology``) y **lo que no fija** (los ejes de
-   ``AXES``: recursos no renovables iniciales, suelos de eficiencia y de contaminación, techo del rendimiento,
-   daño climático). Se muestrean de sus rangos declarados y se quedan los miembros cuyo ajuste a la historia, de
+   ``AXES``: los dos de la curva de coste de los recursos, suelos de eficiencia y de contaminación, techo del
+   rendimiento, daño climático). Se muestrean de sus rangos declarados y se quedan los miembros cuyo ajuste a la historia, de
    1971 al corte, no es peor que ``TOLERANCE`` veces (el doble) el mejor ajuste en NINGUNO de los cinco
    indicadores. Es descarte, no ponderación: un miembro o reproduce la historia o no. Como en diez dimensiones
    casi ningún punto de la caja inicial pasa (6 de 6.000 con 1,5 veces: medido), se muestrea por oleadas: cada
@@ -18,9 +18,11 @@ veces, y cada miembro del conjunto difiere en tres cosas:
 
 Las reglas de ``equations.Rules`` no se muestrean: son decisiones.
 
-Rangos de los ejes [S]: los recursos van de 0,7 a 3 veces los de World3, que en carbono es de 3.000 a 12.900
-GtCO2 (de «algo menos que las reservas probadas» a «todos los recursos fósiles»; órdenes de magnitud citados de
-memoria). El resto son cajas alrededor de los valores fijados en V3 y V4.
+Rangos de los ejes [S]. Los recursos no renovables ya no son un stock con un factor (V5: de 0,7 a 3 veces el de
+World3) sino la curva de coste de ``resources`` (V6), con dos ejes que la historia no puede fijar porque solo
+actúan después del último dato: ``substitution`` (de 0, los combustibles mantienen su cuota, a 1, se extrae
+siempre lo más barato) y ``resource_scale`` (lo que queda de cada grado, de la mitad al doble de lo evaluado).
+El resto son cajas alrededor de los valores fijados en V3 y V4.
 
 El conjunto aceptado viaja en ``world4/models/l0v_posterior.npz`` (parámetros del modelo, sin datos de terceros).
 Se reconstruye con ``python -m world4.core.l0v.ensemble``.
@@ -34,10 +36,10 @@ import numpy as np
 
 KNOBS = {"r_yield": (0.004, 0.045), "r_resource": (0.02, 0.09), "r_pollution": (0.01, 0.07), "kappa": (-0.8, 0.6),
          "land_restraint": (0.0, 0.6)}
-AXES = {"nri_factor": (0.7, 3.0), "resource_floor": (0.05, 0.35), "pollution_floor": (0.05, 0.35),
+AXES = {"substitution": (0.0, 1.0), "resource_scale": (0.5, 2.0), "resource_floor": (0.05, 0.35), "pollution_floor": (0.05, 0.35),
         "yield_cap": (1.6, 3.0), "yield_damage": (0.02, 0.08)}
 NAMES = tuple(KNOBS) + tuple(AXES)
-LOG_UNIFORM = ("nri_factor",)
+LOG_UNIFORM = ("resource_scale",)
 TOLERANCE = 2.0
 WAVES = (6.0, 3.5, 2.5, TOLERANCE)                 # listón de cada oleada, en veces el mejor ajuste
 MARGIN = 0.05                                      # holgura de la caja de una oleada, en fracción de su anchura
@@ -49,7 +51,7 @@ PREVIOUS = {2000: 1990, 2023: 2000}               # la partición con la que se 
 SCORED = ("population", "life_expectancy", "fertility", "birth_rate", "death_rate", "output", "food_pc", "land_yield",
           "arable_land", "resource_use", "co2", "gmst")
 ADDITIVE = ("gmst",)                               # error en sus unidades; el resto, relativo
-EXTRA = ("iopc", "sopc", "fpc", "nrfr", "emissions")   # series sin dato con el que medir su error
+EXTRA = ("iopc", "sopc", "fpc", "nrfr", "fcaor", "ppolx", "emissions")   # series sin dato con el que medir su error
 SUBSISTENCE = 230.0                                # ``sfpc`` de World3, kg de equivalente vegetal por persona y año
 
 
@@ -90,14 +92,18 @@ def tech_of(theta, base=None):
                    resource_floor=col("resource_floor"), pollution_floor=col("pollution_floor"))
 
 
-def nri_of(theta):
-    from world4.core import l0
-    return l0.CONSTANTS["nri"] * np.asarray(theta, float)[..., NAMES.index("nri_factor")]
+def resources_of(theta, cutoff: int | None = None):
+    """Los ``Resources`` de un miembro, con la mezcla de combustibles observada hasta ``cutoff``."""
+    from world4.core.l0v import resources
+    th = np.asarray(theta, float)
+    return resources.Resources(substitution=float(th[NAMES.index("substitution")]),
+                               scale=float(th[NAMES.index("resource_scale")]), cutoff=cutoff)
 
 
 def history_errors(theta, cutoff: int, first: int = 1971) -> np.ndarray:
     """Error cuadrático medio en logaritmos de los cinco indicadores de ``technology.FIT``, de ``first`` a
-    ``cutoff``, de cada miembro: ``(n, 5)``. La población es la observada. Una corrida vectorizada por ``kappa``."""
+    ``cutoff``, de cada miembro: ``(n, 5)``. La población es la observada. Una corrida vectorizada por ``kappa``.
+    Los recursos son la curva central: sus dos ejes solo actúan después del último dato."""
     from world4.core.l0v import model, technology
     theta = np.asarray(theta, float)
     inputs = model.world_inputs()
@@ -108,7 +114,7 @@ def history_errors(theta, cutoff: int, first: int = 1971) -> np.ndarray:
     for kappa in np.unique(kcol):
         m = np.where(kcol == kappa)[0]
         r, _ = model.run(technology=tech_of(theta[m]), n=len(m), fertility="observed", mortality="observed",
-                         t1=float(cutoff) + 1.0, inputs=inputs, constants={"nri": nri_of(theta[m])},
+                         t1=float(cutoff) + 1.0, inputs=inputs, resources="estimated", cutoff=cutoff,
                          record=("ly", "nr", "ppgr", "io", "so", "al", "pop"))
         t = np.asarray(r.time, float)
         ok = np.isclose(t, np.round(t))
@@ -134,7 +140,7 @@ def accept(errors: np.ndarray, cutoff: int, tolerance: float = TOLERANCE) -> np.
     """Los miembros que la historia no descarta: en cada indicador, error <= ``tolerance`` x el del mejor ajuste
     guardado para ese corte."""
     from world4.core.l0v import technology
-    best = technology.stored()["by_cutoff"][str(cutoff)]["rms_pct"]
+    best = technology.stored()[technology.BLOCKS[True]][str(cutoff)]["rms_pct"]
     limit = np.array([best[f[0]] for f in technology.FIT]) / 100.0 * tolerance
     return np.all(errors <= limit, axis=1)
 
@@ -195,7 +201,7 @@ def _member_series(run, carbon_par, origin):
     out["co2"] = np.interp(m["years"], d["years"], d["co2_ppm"]) - world3.PREINDUSTRIAL_PPM
     out["gmst"] = np.interp(m["years"], d["years"], d["gmst"])
     out["emissions"] = np.interp(m["years"], d["years"], d["emissions"])
-    for k in ("iopc", "sopc", "fpc", "nrfr"):
+    for k in ("iopc", "sopc", "fpc", "nrfr", "fcaor", "ppolx"):
         out[k] = np.asarray(run[k], float)[ok, 0]
     return m["years"], out
 
@@ -218,7 +224,7 @@ def discrepancy(cutoff: int = 2023, groups: str = "regions") -> dict:
     from world4.validate import world3
     prev = PREVIOUS[cutoff]
     r, _ = model.run(groups=groups, origin=prev, cutoff=prev, technology="estimated", climate="estimated",
-                     t1=float(cutoff))
+                     resources="estimated", t1=float(cutoff))
     years, mod = _member_series(r, carbon.params(prev), prev)
     obs = _observed_series()
     out = {"previous": prev, "cutoff": cutoff, "per_year": {}}
@@ -257,7 +263,7 @@ def project(origin: int = 2023, cutoff: int | None = None, members: int = 60, se
         th = post["theta"][i]
         cpar = replace(c_draws[j], yield_damage=float(th[NAMES.index("yield_damage")]))
         r, _ = model.run(groups=groups, origin=origin, cutoff=cutoff, par=eq_draws[j], technology=tech_of(th),
-                         climate=cpar, constants={"nri": float(nri_of(th))}, t1=t1)
+                         climate=cpar, resources=resources_of(th, cutoff), t1=t1)
         years, s = _member_series(r, cpar, origin)
         for k, v in s.items():
             series.setdefault(k, []).append(v)
@@ -325,8 +331,10 @@ def coverage(origin: int = 2000, members: int = 60, seed: int = 0, last: int = 2
 
 
 def summary(proj: dict, disc: dict | None = None, seed: int = 0) -> dict:
-    """Los números del conjunto: máximo industrial y de población, y varios indicadores en 2050 y 2100, como
-    p10/p50/p90; y qué eje mueve más el año del máximo industrial (correlación de rangos)."""
+    """Los números del conjunto: máximo industrial, de población, de alimentos por persona y de esperanza de vida,
+    y varios indicadores en 2050 y 2100, como p10/p50/p90; y qué ejes mueven más el año del máximo industrial y
+    los alimentos por persona de 2100 (correlación de rangos). ``life_expectancy_falls`` es la parte de los
+    miembros cuya esperanza de vida de 2100 queda más de dos años por debajo de su máximo."""
     from scipy.stats import spearmanr
     years, s = proj["years"], (proj["series"] if disc is None else with_model_error(proj, disc, seed))
     q = lambda v: [float(x) for x in np.percentile(v, (10, 50, 90))]  # noqa: E731
@@ -334,19 +342,27 @@ def summary(proj: dict, disc: dict | None = None, seed: int = 0) -> dict:
     after = years >= proj["origin"]
     ipeak = years[after][np.argmax(proj["series"]["iopc"][:, after], axis=1)]
     ppeak = years[after][np.argmax(s["population"][:, after], axis=1)]
+    raw = proj["series"]
+    fpeak = years[after][np.argmax(raw["fpc"][:, after], axis=1)]
+    lpeak = years[after][np.argmax(raw["life_expectancy"][:, after], axis=1)]
     out = {"members": int(len(proj["theta"])), "origin": proj["origin"],
            "industrial_peak_year": q(ipeak), "industrial_peak_after_2100": float(np.mean(ipeak >= years[-1])),
            "population_peak_year": q(ppeak), "population_peak": q(s["population"][:, after].max(1)),
-           "at": {}, "drivers_of_industrial_peak": {}}
+           "food_peak_year": q(fpeak), "life_expectancy_peak_year": q(lpeak),
+           "life_expectancy_falls": float(np.mean(raw["life_expectancy"][:, -1]
+                                                  < raw["life_expectancy"][:, after].max(1) - 2.0)),
+           "at": {}, "drivers_of_industrial_peak": {}, "drivers_of_food_2100": {}}
     for y in (2050, 2100):
         out["at"][y] = {k: q(at(k, y)) for k in ("population", "life_expectancy", "fertility", "food_pc", "co2", "gmst",
-                                                 "nrfr")}
+                                                 "nrfr", "fcaor", "ppolx")}
         out["at"][y]["iopc_over_origin"] = q(at("iopc", y) / at("iopc", proj["origin"]))
         out["at"][y]["food_below_subsistence"] = float(np.mean(at("fpc", y) < SUBSISTENCE))
     for j, name in enumerate(NAMES):
         col = proj["theta"][:, j]
         if np.ptp(col) > 0 and np.ptp(ipeak) > 0:
             out["drivers_of_industrial_peak"][name] = float(spearmanr(col, ipeak)[0])
+        if np.ptp(col) > 0:
+            out["drivers_of_food_2100"][name] = float(spearmanr(col, raw["fpc"][:, -1])[0])
     return out
 
 
@@ -355,7 +371,7 @@ if __name__ == "__main__":
 
 
 def report(origin: int = 2023, members: int = 60, seed: int = 0, test_origin: int = 2000,
-           series=("population", "life_expectancy", "fertility", "output", "food_pc", "co2", "gmst", "iopc", "nrfr")) -> dict:
+           series=("population", "life_expectancy", "fertility", "output", "food_pc", "co2", "gmst", "iopc", "fcaor", "ppolx")) -> dict:
     """Todo lo que se enseña de las bandas: el resumen de la proyección desde ``origin``, sus bandas por año, el
     error del modelo usado y la prueba de cobertura desde ``test_origin``."""
     proj = project(origin, origin, members, seed)

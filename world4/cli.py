@@ -324,7 +324,7 @@ def run_install_world(a) -> int:
 
 
 WORLD3_VARIANTS = (("original", "World3-03"), ("cohorts", "cohorts"), ("cohorts_obs_both", "+real rates"),
-                   ("groups", "regions"), ("full", "+technology"))
+                   ("groups", "regions"), ("full", "+technology"), ("bounded", "+cost curve"))
 
 
 def run_world3_score(a) -> int:
@@ -336,7 +336,7 @@ def run_world3_score(a) -> int:
     sb = world3.scoreboard(scenario=a.scenario)
     check = world3.cohort_check() if wpp.available() else None
     hind = world3.hindcast(scenario=a.scenario) if wpp.available() else None
-    tech = world3.technology_hindcast(scenario=a.scenario) if wpp.available() else None
+    tech = world3.technology_hindcast(scenario=a.scenario, resources="estimated") if wpp.available() else None
     if a.json:
         print(json.dumps({**sb, "cohort_engine_check": check, "hindcast": hind, "technology_hindcast": tech}, indent=1))
         return EXIT_OK
@@ -345,9 +345,9 @@ def run_world3_score(a) -> int:
     ui.title(f"L0 against the observed world, {sb['window'][0]}-{sb['window'][1]} - scenario {a.scenario}")
     print("  " + ui.dim("mean absolute error, % of the observed value; a fit to the past, not an out-of-sample test"))
     cols = [(k, lab) for k, lab in WORLD3_VARIANTS if k in sb["runs"]]
-    print("  " + " " * 30 + "".join(f"{lab:>11s}" for _, lab in cols))
+    print("  " + " " * 30 + "".join(f"{lab:>13s}" for _, lab in cols))
     for ind in sb["indicators"]:
-        row = "".join(f"{sb['runs'][k][ind['key']]['mae_pct']:11.1f}" for k, _ in cols)
+        row = "".join(f"{sb['runs'][k][ind['key']]['mae_pct']:13.1f}" for k, _ in cols)
         print(f"  {ind['label']:<30s}{row}" + ("  " + ui.dim("vs " + ind["proxy"]) if ind["proxy"] else ""))
     print()
     print("  " + ui.dim("cohorts: population by age and sex; fertility and life expectancy from World3's equations"))
@@ -356,6 +356,8 @@ def run_world3_score(a) -> int:
                         "data <= 2000"))
     print("  " + ui.dim("+technology: the same with yields, resource and pollution intensity, capital cost and land "
                         "estimated with data <= 2000, and climate damage to yields"))
+    print("  " + ui.dim("+cost curve: the same with non-renewable resources as a fossil extraction cost curve instead "
+                        "of World3's fixed stock"))
     if check is None:
         ui.degraded("L0 cohorts", "WPP age data not installed: only World3-03 as it is (python world4_cli.py --install-world)")
     else:
@@ -372,7 +374,7 @@ def run_world3_score(a) -> int:
             cells = "".join(f"{res['estimated'][k]['mae_pct']:9.1f} ({res['frozen'][k]['mae_pct']:5.1f})" for k, _ in labels)
             print(f"  {origin:<8d}{cells}")
         print()
-        ui.title(f"The whole model, out of sample: demography and technology with data <= origin, to {tech['last']}")
+        ui.title(f"The whole model, out of sample: demography, technology and cost curve with data <= origin, to {tech['last']}")
         print("  " + ui.dim("mean absolute error from origin + 1, %; in brackets, with World3's technology (off in scenario 1)"))
         labels = (("output", "output"), ("food_pc", "food/person"), ("land_yield", "yield"), ("arable_land", "land"),
                   ("resource_use", "resources"), ("population", "population"))
@@ -408,7 +410,7 @@ def run_world3_bands(a) -> int:
     ui.kv("population peak, million", fmt(s["population_peak"]), "", "")
     rows = (("population", "population, million", 0), ("life_expectancy", "life expectancy, years", 1),
             ("fertility", "children per woman", 2), ("food_pc", "food per person, kg", 0),
-            ("iopc_over_origin", "industrial output per person / 2023", 2), ("nrfr", "resources left, fraction", 2),
+            ("iopc_over_origin", "industrial output per person / 2023", 2), ("fcaor", "capital share spent on resources", 2),
             ("co2", "CO2 above 280 ppm", 0), ("gmst", "temperature over 1951-1980, degC", 2))
     for year in ("2050", "2100"):
         ui.section(f"In {year} (p10 / p50 / p90)")

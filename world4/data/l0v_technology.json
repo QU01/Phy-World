@@ -1,6 +1,6 @@
 {
  "_doc": [
-  "Technology curves of the current World3 (world4.core.l0v.technology), estimated with world series up to each cutoff year. Model parameters, no third-party data. Rebuild: python -m world4.core.l0v.technology"
+  "Technology curves of the current World3 (world4.core.l0v.technology), estimated with world series up to each cutoff year: by_cutoff with the fixed resource stock of World3, by_cutoff_curve with the fossil cost curve of world4.core.l0v.resources. Model parameters, no third-party data. Rebuild: python -m world4.core.l0v.technology"
  ],
  "fixed": {
   "t0": 1975.0,
@@ -69,6 +69,68 @@
     "pollution_generation": 5.49757702921279,
     "output": 2.7306821318146524,
     "arable_land": 2.2044168073165866
+   }
+  }
+ },
+ "by_cutoff_curve": {
+  "1990": {
+   "r_yield": 0.028652398818345238,
+   "r_resource": 0.05395240459419681,
+   "r_pollution": 0.03228424537980412,
+   "kappa": -0.017889799724808093,
+   "land_restraint": 0.39804194611236765,
+   "loss": 0.0067164966695985795,
+   "rms_pct": {
+    "land_yield": 4.8140528657266515,
+    "resource_use": 4.664483322583888,
+    "pollution_generation": 3.4640545726644443,
+    "output": 3.180531073400795,
+    "arable_land": 0.3420600006521013
+   }
+  },
+  "2000": {
+   "r_yield": 0.017878821210478804,
+   "r_resource": 0.049240358920052726,
+   "r_pollution": 0.029765571418671963,
+   "kappa": -0.2259070625857552,
+   "land_restraint": 0.11040940725088567,
+   "loss": 0.0071880360336362,
+   "rms_pct": {
+    "land_yield": 5.551870900606053,
+    "resource_use": 4.408773067424454,
+    "pollution_generation": 3.2985450557889546,
+    "output": 2.525212731691541,
+    "arable_land": 2.0887103805821674
+   }
+  },
+  "2010": {
+   "r_yield": 0.016348760621027213,
+   "r_resource": 0.04853443715515379,
+   "r_pollution": 0.02839466959783549,
+   "kappa": -0.3922157748395366,
+   "land_restraint": 0.06749952520475361,
+   "loss": 0.008480901833645334,
+   "rms_pct": {
+    "land_yield": 5.05078637239134,
+    "resource_use": 5.236551000963573,
+    "pollution_generation": 4.434564924350324,
+    "output": 3.0056868735736955,
+    "arable_land": 1.7825794010296576
+   }
+  },
+  "2023": {
+   "r_yield": 0.016821817348367525,
+   "r_resource": 0.04485833394402043,
+   "r_pollution": 0.026195286658220532,
+   "kappa": -0.4032124687588036,
+   "land_restraint": 0.06616044037442013,
+   "loss": 0.011304333187546154,
+   "rms_pct": {
+    "land_yield": 4.916671557126417,
+    "resource_use": 6.98258260615373,
+    "pollution_generation": 5.291725702789633,
+    "output": 2.7359780123180273,
+    "arable_land": 2.1506455369476556
    }
   }
  }
