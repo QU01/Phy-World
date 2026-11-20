@@ -36,6 +36,41 @@ line says nothing, `--help-numbers`, `--fidelity`, WALLS / TIGHT / THE LAST BLOC
 a self-contained HTML report (`--report`), the Atlas globe with World4 layers (`--dashboard`), an MCP server
 (`--mcp`), and honesty measured as a criterion (W11). The science is in
 [docs/Quasar_World4_Science.md](docs/Quasar_World4_Science.md).
+Phase **V1** starts a *current World3*: the L0 is scored against observed world series (population, life
+expectancy, GDP, food, fossil CO2, atmospheric CO2; `--world3-score`) and its population can run as cohorts by
+single age and sex instead of four boxes (`api.run_l0v()`). Measured: the cohort engine reproduces world
+population 1950-2023 within 1 % given the real fertility and life expectancy, and it shows that World3's own
+fertility equation, not its age structure, is what remains wrong ([docs/V1-informe.md](docs/V1-informe.md)).
+Phase **V2** splits the world into fixed groups of countries (10 regions by default, or 4 income groups), each with
+its own cohorts, and replaces World3's fertility and life-expectancy tables with two equations estimated on a
+236-country panel. History up to an origin year is data; the model runs from there. Out of sample (data up to
+the origin only), world population to 2023 is within 2.4 % from 1980, 1.8 % from 1990, 1.2 % from 2000 and 0.3 %
+from 2010. The behaviour to 2100 is not usable yet: it rests on extrapolations the data do not cover
+([docs/V2-informe.md](docs/V2-informe.md)).
+Phase **V3** estimates World3's technology with data instead of leaving it off: yield, resource use and pollution
+per unit of activity follow curves fitted to cereal yields and fossil CO2, the capital cost of technology is fitted
+to GDP (it comes out as zero or negative, not World3's surcharge), and arable land follows HYDE cropland. With data
+up to 2000 only, the 2000-2023 error falls from 26.7 % to 6.6 % in output, from 14.1 % to 2.2 % in food per person
+and from 106 % to 13.6 % in resource use. In the projection the famine of scenario 1 disappears and the limit
+becomes non-renewable resources; when it bites depends on assumptions history does not pin down
+([docs/V3-informe.md](docs/V3-informe.md)).
+Phase **V4** adds carbon and climate (emissions from the model's resource use, atmospheric CO2 and global
+temperature from two lines fitted to Mauna Loa and GISTEMP, a declared 5 % yield loss per degree of warming) and
+six explicit rules for what the data do not cover, such as life expectancy when services fall or fertility after a
+crisis. Out of sample from 2000, CO2 is within 3.4 ppm and temperature within 0.13 degC to 2023; the rules change
+no test against data and decide the scarcity scenarios ([docs/V4-informe.md](docs/V4-informe.md)).
+Phase **V5** replaces the single trajectory with the ensemble of models history does not rule out: ten uncertain
+parameters sampled from declared ranges and kept only if they fit 1971-2023, bootstrapped coefficients, and a model
+error measured on the previous split. The industrial peak falls in 2037 / 2071 / 2100 or later (p10 / p50 / p90) and
+is decided by the initial non-renewable resources, which history barely pins down; the population peak (2055-2066,
+9.2-10.0 billion) is robust. From 2000 the bands cover what happened in 11 of 12 indicators but are too wide
+([docs/V5-informe.md](docs/V5-informe.md)).
+Phase **V6** bounds the non-renewable resources with data. Proved fossil reserves plus what has already been
+burnt (4,310 GtCO2) are almost exactly World3's fixed stock (4,296): the stock is what is already proved, a floor.
+It is replaced by the fossil supply curves of GCAM (47,588 GtCO2 at rising extraction cost), which history fits
+as well as the stock. With the curve 90 % of the ensemble has no industrial peak before 2100; the limit moves to
+persistent pollution and food (life expectancy falls before 2100 in 66 % of the members), which rests on World3
+tables no data pin down. The population peak does not move ([docs/V6-informe.md](docs/V6-informe.md)).
 
 | Layer | What it is in F0 | Pinned against | Result |
 |---|---|---|---|
@@ -68,6 +103,8 @@ python -m venv .venv
 .venv/Scripts/python -m pip install -e .[climate]             # FaIR 2.2.4 (F4)
 .venv/Scripts/python world4_cli.py --install-climate          # FaIR calibration 1.6.0 + HadCRUT5, SHA-256 checked (F4)
 .venv/Scripts/python world4_cli.py --install-food             # FAOSTAT + WDI water, SHA-256 checked (F5)
+.venv/Scripts/python -m pip install -e .[world]                # rdata + pycountry (V1, V2)
+.venv/Scripts/python world4_cli.py --install-world            # observed world series and country panel for the L0 + WPP by age (V1, V2)
 ```
 
 The Atlas data are not shipped here: several derive from sources that cannot be redistributed
@@ -79,6 +116,8 @@ The Atlas data are not shipped here: several derive from sources that cannot be 
 python world4_cli.py --info                 # environment, observables, sources and licences
 python world4_cli.py --campaign             # acceptance criteria W1-W12
 python world4_cli.py --l0 --scenario 2      # World3-03 behaviour mode
+python world4_cli.py --world3-score         # V1-V6: World3-03, cohorts, regions, technology, climate and the resource cost curve against the observed world; out-of-sample tests
+python world4_cli.py --world3-bands --members 100   # V5, V6: uncertainty bands to 2100 and their coverage test (~70 s)
 python world4_cli.py --query gdp_pc --region MEX --as-of 2005 --target 2010
 python world4_cli.py --query population --region NGA --as-of 2005 --target 2015
 python world4_cli.py --query resource_rent_share_world --region WLD --as-of 2005 --target 2012
@@ -104,6 +143,12 @@ Exit codes: 0 ok, 2 spec error, 3 infeasible (for `--theta`: a declared limit is
 from world4 import api
 api.query("conflict_hazard", "COL", 2000, 2005)   # Distribution with p10/p50/p90, unit, caveats
 api.run_l0(scenario=1)
+w3, cohorts = api.run_l0v()                       # World3-03 with population cohorts by age and sex (V1)
+w3, regions = api.run_l0v(groups="regions", origin=2023)   # 10 regions, estimated equations, history to 2023 (V2)
+w3, regions = api.run_l0v(groups="regions", origin=2023, technology="estimated", climate="estimated")   # the whole current World3 (V3, V4)
+w3, regions = api.run_l0v(groups="regions", origin=2023, technology="estimated", climate="estimated", resources="estimated")   # with the fossil cost curve instead of World3's fixed stock (V6)
+api.world3_score()                                # error of each L0 variant against the observed world
+api.world3_bands(members=60)                      # p10/p50/p90 to 2100 from the ensemble history does not rule out (V5)
 ```
 
 ## Tests

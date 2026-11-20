@@ -132,6 +132,33 @@ def run_l0(scenario: int = 1, **kw):
     return l0.run(scenario=scenario, **kw)
 
 
+def run_l0v(scenario: int = 1, **kw):
+    """World3-03 con la población por cohortes de edad y sexo (``world4.core.l0v``): ``(World3Run, CohortRun)``.
+    Con ``groups="regions"`` (o ``"income"``) el mundo va por grupos de países con ecuaciones estimadas y la
+    historia hasta ``origin`` es la observada: ``(World3Run, GroupRun)``; ``technology="estimated"`` añade la
+    tecnología estimada con datos (``docs/V3-informe.md``) y ``climate="estimated"`` el daño del calentamiento al
+    rendimiento (``docs/V4-informe.md``); ``resources="estimated"`` cambia el stock fijo de recursos no renovables
+    por la curva de coste de los fósiles (``docs/V6-informe.md``). Necesita ``--install-world``. Es un modo
+    de comportamiento, no un pronóstico: el de 2100 con grupos depende de extrapolaciones (``docs/V2-informe.md``)."""
+    from world4.core.l0v import model
+    return model.run(scenario=scenario, **kw)
+
+
+def world3_score(scenario: int = 1, variants=None) -> dict:
+    """El marcador del L0: error de cada variante de World3 frente a las series mundiales observadas, 2000-2023
+    (``world4.validate.world3``). Necesita ``--install-world``."""
+    from world4.validate import world3
+    return world3.scoreboard(scenario=scenario, variants=variants)
+
+
+def world3_bands(origin: int = 2023, members: int = 60, seed: int = 0) -> dict:
+    """Bandas de incertidumbre del World3 vigente (``world4.core.l0v.ensemble``): el conjunto de modelos que la
+    historia no descarta, proyectado desde ``origin``, con el error del modelo medido en la partición anterior y la
+    prueba de cobertura desde 2000. Necesita ``--install-world``. Exploratorio: modos de comportamiento."""
+    from world4.core.l0v import ensemble
+    return ensemble.report(origin=origin, members=members, seed=seed)
+
+
 def _year(x) -> int:
     return x.year if isinstance(x, date) else int(x)
 

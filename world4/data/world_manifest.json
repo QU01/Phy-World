@@ -1,0 +1,48 @@
+{
+ "source": "UN WPP 2024 (R package PPgp/wpp2024 at commit 2da7768ae64fc74105d3f9e98f9a74d37b62f99a); OWID co2-data at commit 22d9a01321ddec951b36f2bfc66e05dc6ad50ad8 (Global Carbon Budget, Maddison Project, Energy Institute); NOAA GML Mauna Loa annual mean CO2 (mirror datasets/co2-ppm at commit 52f2be52ee6145eaad67367959af9b1b0a0bd83e); OWID owid-datasets at commit 6155d4ca1ea14ef30e753010a25521eeb416e8a2 (FAO Food Balance Sheets, World Bank WDI cereal yield, HYDE 3.2 land use); NASA GISTEMP v4 global annual means (mirror datasets/global-temp at commit b90e8a349acb508d382d40d1cfa393c723bd82ef); GCAM fossil resource supply curves and carbon coefficients (JGCRI/gcam-core at commit 11e128fb7ce3e14e9c4daf3903ba73123046a7aa, ECL-2.0; curves derived from Rogner 1997); BP Statistical Review 2016 reserves-to-production ratios and BP & Shift fossil production (owid-datasets)",
+ "downloaded": "2026-11-16",
+ "files": {
+  "e01dt.rda": {
+   "sha256": "dc4d15e14b734a3d208eb29ea0dabfdf4a900ef552acf7b41829a62cf862e2ba"
+  },
+  "tfr1dt.rda": {
+   "sha256": "b48ae026ccf489892c69564bc243a1535464085e5801eea13584c62ea7a89fa9"
+  },
+  "misc1dt.rda": {
+   "sha256": "bde4c18dd0d9e0d615745ea31100f4f9a19740e46c6fac167b0a385df8895252"
+  },
+  "owid-co2-data.csv": {
+   "sha256": "300fb68fe6b0d514ed7f5cf773df77d7e24a495438d84b76e2f39eba1584a0f7"
+  },
+  "co2-annmean-mlo.csv": {
+   "sha256": "b1548ededea6f9b7eecac370753de8d8da6e0afafe1041f749a11db78c2e33c4"
+  },
+  "food-supply-fao-2020.csv": {
+   "sha256": "e5bf24c869dc55dc583b4a7a58f8f947951e09927d5807cdbbcc5544be21a760"
+  },
+  "cereal-yield-index.csv": {
+   "sha256": "9fad57bef42628d75315c2216531d386c604b991795d748d003340cda81bc58f"
+  },
+  "UNlocations.txt": {
+   "sha256": "9d8cc77383c4dbd368a4c2cbbeeeff9dfc7037ace7c8ecb709ff17a0786be6eb"
+  },
+  "land-use-hyde-2017.csv": {
+   "sha256": "0e3d35d827a978b3936e8e1897491c0339e90e782e41b927b580cff382249e20"
+  },
+  "global-temp-annual.csv": {
+   "sha256": "68ac8e86aee9fd9d01e6269c6a9eb3ce81dcc3cba7220842ff6e2c4e42e102e1"
+  },
+  "bp-reserves-production-ratio-2016.csv": {
+   "sha256": "5f4327df3229c8428e68cebac60e02af2ab78577f9a23247da6b221ad9409e96"
+  },
+  "fossil-fuel-production-2022.csv": {
+   "sha256": "88997d9b62989c617e9e6ce509d604f16ec9bdcfc0b0e7787e4fb383f91319cd"
+  },
+  "gcam-fos-curves.csv": {
+   "sha256": "a484bb8a760da5f4e7effb617e284b08ad1a13a6c837d051d82e3d4e7d81e6d0"
+  },
+  "gcam-primary-fuel-ccoef.csv": {
+   "sha256": "8b77b0fa4365165694aa6c107a98a04f6f6452849bc25c2cbfccf4644f598101"
+  }
+ }
+}
