@@ -71,6 +71,13 @@ It is replaced by the fossil supply curves of GCAM (47,588 GtCO2 at rising extra
 as well as the stock. With the curve 90 % of the ensemble has no industrial peak before 2100; the limit moves to
 persistent pollution and food (life expectancy falls before 2100 in 66 % of the members), which rests on World3
 tables no data pin down. The population peak does not move ([docs/V6-informe.md](docs/V6-informe.md)).
+Phase **F12** adds the events layer (**L2**) for the whole world, in the five UCDP regions (Africa, Americas, Asia,
+Europe, Middle East; 191 countries, about 65 000 cells): monthly, on the 0.5° PRIO-GRID, estimated on the UCDP georeferenced
+events of 1989-2026. The Middle East came first and chose the form of the model; the other four regions took it as it was. Armed actors and their dyads decide each month whether and how much to
+fight, events land on a footprint that moves with the simulation, new dyads are born, and population blocks flee and
+return (UNHCR/IDMC stocks). It is scored against a persistence reference and a statistical hurdle model on rolling
+origins (W13) and **does not beat them** (see [docs/F12-informe.md](docs/F12-informe.md)): everything it gives is
+labelled `exploratory`, and the statistical reference travels next to it in every answer.
 
 | Layer | What it is in F0 | Pinned against | Result |
 |---|---|---|---|
@@ -105,7 +112,12 @@ python -m venv .venv
 .venv/Scripts/python world4_cli.py --install-food             # FAOSTAT + WDI water, SHA-256 checked (F5)
 .venv/Scripts/python -m pip install -e .[world]                # rdata + pycountry (V1, V2)
 .venv/Scripts/python world4_cli.py --install-world            # observed world series and country panel for the L0 + WPP by age (V1, V2)
+.venv/Scripts/python -m pip install -e .[l2]
+.venv/Scripts/python world4_cli.py --install-l2 --l2-region world   # UCDP GED + candidate, PRIO-GRID, UNHCR, WPP (F12, ~110 MB)
 ```
+
+On Linux and macOS the interpreter is `.venv/bin/python`. The Atlas manifest was written on Windows; its SHA-256
+check accepts the same text files with LF line endings.
 
 The Atlas data are not shipped here: several derive from sources that cannot be redistributed
 (EM-DAT) or whose licence is unverified. See `world4/data/sources.json` and `NOTICE`.
@@ -114,7 +126,7 @@ The Atlas data are not shipped here: several derive from sources that cannot be 
 
 ```bash
 python world4_cli.py --info                 # environment, observables, sources and licences
-python world4_cli.py --campaign             # acceptance criteria W1-W12
+python world4_cli.py --campaign             # acceptance criteria W1-W13
 python world4_cli.py --l0 --scenario 2      # World3-03 behaviour mode
 python world4_cli.py --world3-score         # V1-V6: World3-03, cohorts, regions, technology, climate and the resource cost curve against the observed world; out-of-sample tests
 python world4_cli.py --world3-bands --members 100   # V5, V6: uncertainty bands to 2100 and their coverage test (~70 s)
@@ -134,6 +146,9 @@ python world4_cli.py --levers               # F8: policy levers and narratives
 python world4_cli.py --theta "carbon_price=150,efficiency=0.01" --narrative ssp2   # one policy, robust objectives, PRIM
 python world4_cli.py --design               # F8: robust search, PRIM, regret, conduct (~10 min)
 python world4_cli.py --calibrate            # F7: posterior (models/posterior.npz), calibrated W4 hindcast, W8 (~1 h)
+python world4_cli.py --l2-forecast --l2-region world --horizon 12   # F12: deaths by country and cell, displacement (191 countries)
+python world4_cli.py --l2-forecast --l2-region africa --as-of-month 2023-04 --json   # one region, as it would have been made then
+OMP_NUM_THREADS=1 python world4_cli.py --l2-validate --l2-region world   # F12: W13, origins 2015-2024, five regions (~1 h on 4 cores)
 python world4_cli.py --validate             # W3/W5 rolling origin + hindcasts (population, psi, energy, CO2, GMST, cereals, cropland) + AR6 check (~50 min)
 ```
 
@@ -149,6 +164,8 @@ w3, regions = api.run_l0v(groups="regions", origin=2023, technology="estimated",
 w3, regions = api.run_l0v(groups="regions", origin=2023, technology="estimated", climate="estimated", resources="estimated")   # with the fossil cost curve instead of World3's fixed stock (V6)
 api.world3_score()                                # error of each L0 variant against the observed world
 api.world3_bands(members=60)                      # p10/p50/p90 to 2100 from the ensemble history does not rule out (V5)
+api.l2_forecast("world", horizon=12)              # F12: p10/p50/p90 by country, hotspots, displacement; exploratory
+api.l2_forecast("mideast", horizon=12)            # or one region: africa, americas, asia, europe, mideast
 ```
 
 ## Tests

@@ -1,0 +1,91 @@
+{
+ "source": "UCDP GED 26.1 and UCDP Candidate 26.0.X (ucdp.uu.se); PRIO-GRID 2.0 API (grid.prio.org); UNHCR 'refugees' R package at commit c7bd34a3de4fdfb8f46bf6345d7401247315906e; UN WPP 2024 (PPgp/wpp2024 at commit 2da7768ae64fc74105d3f9e98f9a74d37b62f99a)",
+ "downloaded": "2026-11-16",
+ "files": {
+  "ged261-csv.zip": {
+   "sha256": "8c941d84954e555ee2e54f40fa04d9203bf1e2f962203d0a9930966c4947c667",
+   "bytes": 39122522
+  },
+  "GEDEvent_v26_01_26_09.csv": {
+   "sha256": "134da9b3df08b65266802c4b662e572f396c70c92ab62297319be657540bcede",
+   "bytes": 13065779,
+   "optional": true
+  },
+  "unhcr_population.rda": {
+   "sha256": "66eb6872a5f34c82705be97759051703bc0f404e3ecadc9c72a5f61424a22cf8",
+   "bytes": 480360
+  },
+  "unhcr_flows.rda": {
+   "sha256": "d333f00d52f916341e5e9ce69d632906a40b207f35325c7ed7f4b39a87748aa8",
+   "bytes": 303531
+  },
+  "unhcr_idmc.rda": {
+   "sha256": "42134c45677d171f210a092f2f7a3cc8f5190f19d13ef2da4a13883a889da316",
+   "bytes": 5708
+  },
+  "popAge1dt.rda": {
+   "sha256": "232b0a9c2a5a5b524e95dd11353ad27fbfa82560a831b34525a59bf05523a2a8",
+   "bytes": 15514714
+  },
+  "popproj1dt.rda": {
+   "sha256": "6c9e4b97ee6bdbb9e704c0c7bc4f65e04bc71f9c91d7561d4021afa14bb5397e",
+   "bytes": 804230
+  },
+  "prio_gwno.json": {
+   "sha256": "15ef249b24f3de9acc40750ae7e827f69f7076d20e2993d5e00ed671232080f9",
+   "bytes": 2504001
+  },
+  "prio_pop_gpw_sum.json": {
+   "sha256": "d4eca54ca6b0c23195abbb85d859aeb0824900c49aa3c05bd3d70a3e80574103",
+   "bytes": 16434782
+  },
+  "prio_capdist.json": {
+   "sha256": "64ec9069f3fc41bbea649d633bd9d1d944467489e8b2af03a8b52d01a6845443",
+   "bytes": 3398452
+  },
+  "prio_bdist1.json": {
+   "sha256": "1ebea4af612717e4ac321a088eba46803c407024a378cd1654f1ae6913725060",
+   "bytes": 3193182
+  },
+  "prio_excluded.json": {
+   "sha256": "36df2404ff807c9158e4f5694c86e2e2b6939e8db363acf52d9502c465596362",
+   "bytes": 1897358
+  },
+  "prio_nlights_calib_mean.json": {
+   "sha256": "8543e88a5b202d07b49871ae9119ac3d6c2bb74e598b1e508b9c58b459d8e726",
+   "bytes": 3479526
+  },
+  "prio_mountains_mean.json": {
+   "sha256": "bc3afe33f376f3ec9428dc33a6f44084b18e0729228a2555d7338192b4d1a2c7",
+   "bytes": 2569753
+  },
+  "prio_ttime_mean.json": {
+   "sha256": "5508b8c90354f9b5ddf557f61ce6fd059509cf7f3bae3324f3d29ccc61a49748",
+   "bytes": 3213803
+  },
+  "prio_petroleum_s.json": {
+   "sha256": "c091723f9fba03ae85142dc882297601d658c02ceb8d56df12428a9285a756fc",
+   "bytes": 62355
+  },
+  "prio_urban_gc.json": {
+   "sha256": "549c6e6910d7a572461600eb8f0dc8249a68a130a48a068f1c01a18e0f53134a",
+   "bytes": 2442231
+  },
+  "prio_landarea.json": {
+   "sha256": "0f6baa50a4a3dd3158ed46baa1daefe3a29200ad3921d3f165cd1215520b7fd9",
+   "bytes": 3213131
+  },
+  "prio_imr_mean.json": {
+   "sha256": "e5763245ae8f361ea03f2f840cd5ebd96d45e1aa9b6cfde52a04b0ae00b955ef",
+   "bytes": 2435302
+  },
+  "prio_agri_gc.json": {
+   "sha256": "a504be1b9cd4f17d6abdd1b199e1a2a122ecd4c976bc9022a30a0e8758aa638d",
+   "bytes": 2831454
+  },
+  "prio_barren_gc.json": {
+   "sha256": "197c63bd5f928e456e138e9d7c045e931639395374d034a275a4b16b06943cdc",
+   "bytes": 2796992
+  }
+ }
+}

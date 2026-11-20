@@ -34,7 +34,8 @@ def _data_errors() -> tuple:
     out = [AtlasDataError, PosteriorMissing, StoreMissing, FileNotFoundError]
     for mod, name in (("world4.data.wpp", "WPPDataError"), ("world4.data.energy", "EnergyDataError"),
                       ("world4.data.climate", "ClimateDataError"), ("world4.data.food", "FoodDataError"),
-                      ("world4.data.world", "WorldDataError")):
+                      ("world4.data.world", "WorldDataError"),
+                      ("world4.data.conflict", "ConflictDataError")):
         try:
             out.append(getattr(__import__(mod, fromlist=[name]), name))
         except (ImportError, AttributeError):
@@ -49,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="world4_cli.py", description=__doc__.splitlines()[0])
     m = p.add_argument_group("what to do")
     m.add_argument("--info", action="store_true", help="environment, data sources, licences, campaign")
-    m.add_argument("--campaign", action="store_true", help="measure the acceptance criteria W1-W12")
+    m.add_argument("--campaign", action="store_true", help="measure the acceptance criteria W1-W13")
     m.add_argument("--install-atlas", action="store_true",
                    help="install the Atlas data (copied from its repo at the pinned commit, SHA-256 checked)")
     m.add_argument("--l0", action="store_true", help="run the L0 (World3-03) and print the main stocks")
@@ -76,6 +77,12 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--world3-bands", action="store_true",
                    help="V5: uncertainty bands of the current World3 to 2100 (the ensemble history does not rule out) "
                         "and their coverage test from 2000; --members sets the ensemble size")
+    m.add_argument("--install-l2", action="store_true",
+                   help="F12: download UCDP GED + Candidate, PRIO-GRID, UNHCR and WPP for the L2 region, SHA-256 checked")
+    m.add_argument("--l2-forecast", action="store_true",
+                   help="F12: L2 ensemble (monthly deaths by country and cell, displacement) from the last month of data")
+    m.add_argument("--l2-validate", action="store_true",
+                   help="F12: W13, rolling-origin score of the L2 against its references (~30 min)")
     m.add_argument("--validate", "--validate-f1", dest="validate", action="store_true",
                    help="F1-F5: rolling-origin W3/W5 (Atlas, F1 ... F1-F5) + free hindcasts of population, psi, "
                         "the energy mix, CO2, GMST, cereals and cropland + AR6 carbon-budget check")
@@ -110,6 +117,17 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("--target", type=int, default=None, help="target year for --query (1-10 years ahead)")
     n.add_argument("--members", type=int, default=32, help="ensemble members for --query")
     n.add_argument("--atlas-src", default=None, help="local Atlas clone for --install-atlas (else git clone)")
+    n.add_argument("--l2-region", default="mideast",
+                   help="F12: L2 region: africa, americas, asia, europe, mideast, or world (the five)")
+    n.add_argument("--l2-src", default=None, help="F12: directory with the L2 files already downloaded")
+    n.add_argument("--l2-period", default="test", choices=("dev", "test"),
+                   help="F12: origins of --l2-validate: dev 2005-2014 (model design) or test 2015-2024 (the verdict)")
+    n.add_argument("--horizon", type=int, default=12, help="F12: months ahead for --l2-forecast (1-36)")
+    n.add_argument("--as-of-month", default=None, metavar="YYYY-MM",
+                   help="F12: first forecast month for --l2-forecast (default: the month after the last data)")
+    n.add_argument("--l1", action="store_true", help="F12: feed the L1 conflict probability to the L2 (needs --build-store)")
+    n.add_argument("--no-displacement", action="store_true",
+                   help="F12: --l2-forecast without the displacement module (its first fit takes minutes per region)")
     o = p.add_argument_group("output")
     o.add_argument("--json", action="store_true", help="print the result as JSON and nothing else")
     o.add_argument("--strict", action="store_true", help="exit 4 if anything was degraded")
@@ -439,6 +457,89 @@ def run_install_climate(a) -> int:
     else:
         ui.kv("result", ui.status(v["ok"], "OK", "MISMATCH"), "", v["root"])
     return EXIT_OK if v["ok"] else EXIT_SPEC
+
+
+def run_install_l2(a) -> int:
+    from world4.data import conflict
+    log = (lambda *x: None) if a.json else (lambda m: ui.step(m))
+    if not a.json:
+        print(ui.banner())
+        ui.step("UCDP GED 26.1 + Candidate (CC BY 4.0), PRIO-GRID 2.0, UNHCR refugees (CC BY 4.0), UN WPP 2024")
+    v = conflict.install(src=a.l2_src, region=a.l2_region, log=log)
+    if a.json:
+        print(json.dumps(v, indent=1))
+    else:
+        for r, f in v["regions"].items():
+            ui.kv(r, ui.status(v["ok"], "OK", "MISMATCH"), "", f)
+        if v["absent_optional"]:
+            ui.degraded("candidate events", f"{v['absent_optional']} not on the server: the panel ends with the final GED")
+    return EXIT_OK if v["ok"] else EXIT_SPEC
+
+
+def run_l2_forecast(a) -> int:
+    from world4 import api
+    try:
+        r = api.l2_forecast(a.l2_region, a.horizon, as_of=a.as_of_month, members=max(a.members, 16), l1=a.l1,
+                            displacement=not a.no_displacement)
+    except api.QueryError as e:
+        raise SpecError(str(e)) from e
+    if a.json:
+        print(json.dumps(r, indent=1))
+        return EXIT_OK
+    print(ui.banner())
+    ui.title(f"L2 {r['region']}: {r['horizon']} months from {r['first_month']} (data to {r['as_of']})")
+    ui.warn("Exploratory. " + (f"W13 measured: forecast-grade at {', '.join(r['measured']['forecast_grade']) or 'no level'}"
+                               if r["measured"] else "W13 has not been run here (--l2-validate)"))
+    ui.section("Deaths in the first 12 months, by country" if r["horizon"] >= 12 else "Deaths per month, by country")
+    rows = []
+    for iso, c in r["by_country"].items():
+        d, h = c["deaths"], c["reference_hurdle"]
+        n = min(12, r["horizon"])
+        rows.append((sum(d["p50"][:n]), iso, sum(d["p10"][:n]), sum(d["p90"][:n]), c.get("conflict_12m", {}).get("p"),
+                     sum(h["p50"][:n])))
+    rows = sorted(rows, reverse=True)
+    shown = [x for x in rows if x[3] >= 1 or (x[4] or 0) >= 0.05]
+    for p50, iso, p10, p90, pc, ref in shown[:60]:
+        ui.kv(iso, f"{p50:9.0f}", "deaths (sum of monthly p50)",
+              f"sum of monthly p10-p90 {p10:.0f}-{p90:.0f}; reference {ref:.0f}"
+              + (f"; P(>= 25) {pc:.2f}" if pc is not None else ""))
+    if len(rows) > len(shown[:60]):
+        print("  " + ui.dim(f"{len(rows) - len(shown[:60])} more countries with no or almost no expected violence (--json has all)"))
+    if "displacement" in r:
+        ui.section("Displaced at the end of the horizon, by origin (p50, p10-p90)")
+        for iso, c in sorted(r["displacement"]["by_origin"].items(), key=lambda kv: -(
+                kv[1]["refugees_and_asylum_seekers"]["p50"][-1] + kv[1]["internally_displaced"]["p50"][-1]))[:40]:
+            a_, b_ = c["refugees_and_asylum_seekers"], c["internally_displaced"]
+            if a_["p50"][-1] + b_["p50"][-1] >= 1e5:
+                ui.kv(iso, f"{a_['p50'][-1] / 1e6:6.2f} M refugees", "",
+                      f"{a_['p10'][-1] / 1e6:.2f}-{a_['p90'][-1] / 1e6:.2f}; internal {b_['p50'][-1] / 1e6:.2f} M "
+                      f"({b_['p10'][-1] / 1e6:.2f}-{b_['p90'][-1] / 1e6:.2f})")
+    ui.section("Limits")
+    for c in r["caveats"]:
+        print("  " + ui.dim("- " + c))
+    return EXIT_OK
+
+
+def run_l2_validate(a) -> int:
+    from world4.validate import l2 as vl2
+    log = (lambda *x: None) if a.json else (lambda m: ui.step(m))
+    if not a.json:
+        print(ui.banner())
+        ui.step(f"W13: L2 {a.l2_region}, origins of the {a.l2_period} period, against zero, last12 and the hurdle model")
+    s = vl2.run(a.l2_region, period=a.l2_period, opt={"l1": bool(a.l1)}, log=log)
+    out = vl2.write(s, RUNS / (f"l2_w13_{a.l2_region}.json" if a.l2_period == "test" and not a.l1 else
+                               f"l2_{a.l2_period}{'_l1' if a.l1 else ''}_{a.l2_region}.json"))
+    if a.l2_period == "test" and not a.l1:
+        log("displacement: stocks 1-3 years ahead against persistence")
+        vl2.write(vl2.displacement_run(a.l2_region, log=log), RUNS / f"l2_displacement_{a.l2_region}.json")
+    if a.json:
+        print(json.dumps(s, indent=1))
+    else:
+        for k, v in s["verdict"].items():
+            ui.kv(k, ui.status(v["forecast_grade"], "BEATS ALL", "NO"), "",
+                  f"skill vs {v['best_reference']} {v['skill_vs_best']:+.3f}; loses to {v['loses_to'] or 'none'}")
+        ui.ok(f"wrote {out}")
+    return EXIT_OK
 
 
 def run_install_food(a) -> int:
@@ -889,6 +990,12 @@ def main(argv=None) -> int:
             code = run_world3_score(a)
         elif a.world3_bands:
             code = run_world3_bands(a)
+        elif a.install_l2:
+            code = run_install_l2(a)
+        elif a.l2_forecast:
+            code = run_l2_forecast(a)
+        elif a.l2_validate:
+            code = run_l2_validate(a)
         elif a.validate:
             code = run_validate(a)
         elif a.build_store:

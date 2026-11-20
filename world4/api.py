@@ -327,3 +327,152 @@ def loop_dominance(start: int = 2019, years: int = 81, top: int = 3, step: int =
     m = model.L0R(model.calibrate(W, min(start, 2019)), model.initial(W, start))
     out = m.run(years, keep_states=True)
     return loops.dominance_table(loops.analyse(*loops.l0_world_view(m, out)), top=top, step=step)
+
+
+# ------------------------------------------------------------------ F12: la capa de eventos (L2)
+L2_DEATHS_UNIT = "deaths per month (UCDP best estimate; state-based, non-state and one-sided violence together)"
+L2_CAVEATS = [
+    "exploratory: the L2 is a simulator of armed actors estimated on UCDP events; what W13 measured out of sample "
+    "is in 'measured', and nothing else is a forecast",
+    "'reference_hurdle' is the statistical reference (a direct hurdle model per horizon): where 'measured' does not "
+    "list a level/step as forecast-grade, the reference scored at least as well as the simulator and is the "
+    "number to prefer; the simulator adds what the reference cannot give (cells, actors and displacement in one "
+    "coherent world)",
+    "it knows what conflict has done (persistence, spread to nearby cells, new dyads at the historical rate); "
+    "it reads no news and cannot anticipate an outbreak without precedent",
+    "units follow UCDP and PRIO-GRID: ISR is Israel plus the Palestinian territories, MAR includes Western Sahara "
+    "and CHN includes Hong Kong and Macao",
+    "deaths are UCDP battle-related and one-sided deaths: indirect deaths (hunger, disease) are not counted",
+    "displacement: forced by organised violence only; a pooled response with one multiplier per country, fitted "
+    "to annual UNHCR/IDMC stocks; its cell-level allocation has no data behind it [M]",
+]
+
+
+def _band(a, axis=0) -> dict:
+    """p10/p50/p90 de un ensemble a lo largo de ``axis`` (listas)."""
+    q = np.percentile(np.asarray(a, float), [10, 50, 90], axis=axis)
+    return {"p10": q[0].tolist(), "p50": q[1].tolist(), "p90": q[2].tolist()}
+
+
+def _l2_measured(region: str = "mideast") -> dict | None:
+    """Lo que W13 midió fuera de muestra para ``region``, si se corrió: del fichero mundial
+    (``runs/l2_w13_world.json``) o del de la región."""
+    from world4 import home
+    runs = home.home() / "runs"
+    d = None
+    for name, key in ((f"l2_w13_{region}.json", None), ("l2_w13_world.json", region)):
+        f = runs / name
+        if f.is_file():
+            d = json.loads(f.read_text(encoding="utf-8"))
+            d = d if key is None or key == "world" else d.get("regions", {}).get(key)
+            if d:
+                break
+    if not d:
+        return None
+    return {"region": region, "period": d.get("period"), "n_origins": d.get("n_origins"),
+            "forecast_grade": sorted(k for k, v in d.get("verdict", {}).items() if v.get("forecast_grade")),
+            "not_better_than_reference": sorted(k for k, v in d.get("verdict", {}).items()
+                                                if not v.get("forecast_grade")),
+            "note": "level/step (months ahead) where the simulator beat every reference with a 95 % CI below zero, "
+                    "CRPS of ln(1 + deaths)"}
+
+
+def _l2_month(P, as_of) -> int:
+    if as_of is None:
+        return P.T
+    try:
+        y, m = (int(x) for x in str(as_of).split("-")[:2])
+    except ValueError:
+        raise QueryError(f"as_of must be 'YYYY-MM', got {as_of!r}") from None
+    t0 = P.month(y, m)
+    if not 60 <= t0 <= P.T:
+        raise QueryError(f"as_of {as_of} outside {P.label(60)}..{P.label(P.T)}")
+    return t0
+
+
+def _l2_one(region: str, horizon: int, as_of, members: int, seed: int, displacement: bool, l1: bool,
+            hotspots: int) -> dict:
+    """Las piezas de una región: países, celdas más expuestas, desplazamiento y lo que identifica la corrida."""
+    from world4.core.l2 import baseline, forecast, panel
+    P = panel.load(region)
+    t0 = _l2_month(P, as_of)
+    Q = P if t0 == P.T else P.truncated(t0)
+    f = forecast.run(Q, t0, horizon, members=members, seed=seed, l1=l1, displacement=displacement)
+    dk = f.deaths("country")
+    year = dk[:, :, :12].sum(2)
+    ref = baseline.forecast(Q, baseline.fit(Q, "country", t0), t0, horizon, members, seed)
+    by_country = {}
+    for k, iso in enumerate(P.iso3):
+        row = {"region": region, "deaths": _band(dk[:, k]), "reference_hurdle": _band(ref[:, k])}
+        row["any_death"] = {"unit": "probability of at least one death in the month",
+                            "band": "a probability from the ensemble; it has no band of its own",
+                            "p": np.mean(dk[:, k] >= 1, 0).tolist()}
+        if horizon >= 12:
+            row["conflict_12m"] = {"unit": "probability of 25 deaths or more in the first 12 months",
+                                   "band": "a probability from the ensemble; it has no band of its own",
+                                   "p": float(np.mean(year[:, k] >= 25))}
+        by_country[iso] = row
+    dc = f.deaths("cell").sum(2)                                              # (R, C) en todo el horizonte
+    top = np.argsort(-dc.mean(0))[:hotspots]
+    cells = [{"gid": int(P.gid[c]), "lon": float(P.lon[c]), "lat": float(P.lat[c]),
+              "country": P.iso3[P.cell_country[c]] if P.cell_country[c] >= 0 else None,
+              **{k: float(v) for k, v in zip(("p10", "p50", "p90"), np.percentile(dc[:, c], [10, 50, 90]))}}
+             for c in top]
+    out = {"as_of": P.label(t0 - 1), "first_month": P.label(t0), "months": f.months(), "by_country": by_country,
+           "cells": cells, "notes": f.notes,
+           "footprint": {k: f.model.foot[k] for k in ("decay", "diffuse", "floor", "mix")}}
+    if f.displaced is not None:
+        d = f.displaced
+        names = [str(P.asylum_iso3[j]) for j in d["asylum_top"]] + ["other"]
+        out["displaced"] = {iso: {"refugees_and_asylum_seekers": _band(d["ref"][:, k]),
+                                  "internally_displaced": _band(d["idp"][:, k])} for k, iso in enumerate(P.iso3)}
+        out["asylum"] = {iso: {n: float(v) for n, v in zip(names, d["asylum_share"][k]) if v > 0}
+                         for k, iso in enumerate(P.iso3)}
+    return out
+
+
+def l2_forecast(region: str = "mideast", horizon: int = 12, *, as_of: str | None = None, members: int = 64,
+                seed: int = 0, displacement: bool = True, l1: bool = False, hotspots: int = 20) -> dict:
+    """Ensemble del L2: muertes mensuales por país, celdas más expuestas y desplazamiento.
+
+    ``region`` es una de las cinco de UCDP (``africa``, ``americas``, ``asia``, ``europe``, ``mideast``) o
+    ``world``, que las corre todas y junta el resultado (cada país lleva su región). ``as_of`` es el primer
+    mes del pronóstico, ``"AAAA-MM"`` (por defecto, el mes siguiente al último dato): sólo se usa lo ocurrido
+    antes. Todo es ``exploratory``; ``measured`` dice qué midió W13."""
+    from world4.core.l2 import regions
+    if not 1 <= int(horizon) <= 36:
+        raise QueryError("horizon must be 1-36 months")
+    horizon, members, hotspots = int(horizon), int(members), int(hotspots)
+    try:
+        names = regions.names(region) if region.lower() in regions.WORLD + ("world",) else (region,)
+    except KeyError as e:
+        raise QueryError(str(e)) from None
+    parts = {r: _l2_one(r, horizon, as_of, members, seed, displacement, l1, hotspots) for r in names}
+    first = next(iter(parts.values()))
+    notes = sorted({n for q in parts.values() for n in q["notes"]})
+    out = {"region": region, "regions": list(names), "as_of": first["as_of"], "first_month": first["first_month"],
+           "horizon": horizon, "members": members, "exploratory": True, "unit": L2_DEATHS_UNIT,
+           "months": first["months"], "by_country": {iso: row for q in parts.values() for iso, row in q["by_country"].items()},
+           "caveats": L2_CAVEATS + notes, "measured": _l2_measured(region),
+           "provenance": {"data": "UCDP GED 26.1 + Candidate 26.0.X, PRIO-GRID 2.0, UNHCR refugees, UN WPP 2024",
+                          "model": {"footprint_by_region": {r: q["footprint"] for r, q in parts.items()},
+                                    "units": {"decay": "per month", "diffuse": "share", "floor": "share",
+                                              "mix": "share"}},
+                          "l1_coupled": bool(l1)}}
+    if len(names) > 1:
+        out["caveats"] = out["caveats"] + [
+            "world: the five regions are estimated and simulated separately; an actor does not see its fronts in "
+            "another region, and nothing is correlated across regions, so a world total has a band that is too narrow"]
+        out["measured_by_region"] = {r: _l2_measured(r) for r in names}
+    cells = sorted((c for q in parts.values() for c in q["cells"]), key=lambda c: -c["p50"])[:hotspots]
+    out["hotspots"] = {"unit": f"deaths over the {horizon} months", "band": "p10-p90 of the ensemble",
+                       "units": {"lon": "degrees east (cell centre)", "lat": "degrees north (cell centre)",
+                                 "gid": "PRIO-GRID cell id"}, "cells": cells}
+    if "displaced" in first:
+        out["displacement"] = {
+            "unit": "persons (stock at the end of each month)",
+            "by_origin": {iso: row for q in parts.values() for iso, row in q["displaced"].items()},
+            "asylum": {"unit": "share of the origin's refugees, by country of asylum",
+                       "band": "the last published UNHCR stock, not an ensemble",
+                       "by_origin": {iso: row for q in parts.values() for iso, row in q["asylum"].items()}}}
+    return out
