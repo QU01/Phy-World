@@ -52,7 +52,7 @@ Technology
     * Stochastic jumps: Poisson hazard rising with upgrading effort and asabiya;
       jump size rises with the distance to the frontier.
 """
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, replace as _dc_replace
 from pathlib import Path
 
 import numpy as np
@@ -391,11 +391,79 @@ class Simulator:
            "debt", "crisis", "demo", "coup", "temp", "dclim", "natcap", "co2", "eco_ue",
            "borrow", "squeeze", "adjcost"] + CHANNELS
 
-    def __init__(self, world: World, params: Params, R=8, seed=0):
+    _DEM_CACHE: dict = {}
+    _ELITE_CACHE: dict = {}
+
+    def __init__(self, world: World, params: Params, R=8, seed=0,
+                 democracy_model="auto", elites_model="auto", stress_model="default",
+                 legacy: bool = False):
         self.w, self.p, self.R = world, params, R
+        self._seed = seed
         self.rng = np.random.default_rng(seed)
         self.obs_until = world.T - 1
         self.psi_freeze = None
+        if legacy:
+            democracy_model = None
+            elites_model = None
+            stress_model = None
+        self._democracy_spec = democracy_model
+        self.democracy_model = None if democracy_model in (None, "auto") else democracy_model
+        self._dem_rng = np.random.default_rng(seed + 1009) if democracy_model is not None else None
+        self._elites_spec = elites_model
+        self.elites_model = None if elites_model in (None, "auto") else elites_model
+        self._elites_rng = np.random.default_rng(seed + 3037) if elites_model is not None else None
+        if stress_model == "default":
+            from .stress import StressConfig, StressModel
+            self.stress_model = StressModel(world, StressConfig())
+        elif stress_model is None:
+            self.stress_model = None
+        elif hasattr(stress_model, "post_step"):
+            self.stress_model = stress_model
+        else:
+            from .stress import StressModel
+            self.stress_model = StressModel(world, stress_model)
+        self._stress_rng = np.random.default_rng(seed + 2029) if self.stress_model is not None else None
+
+    def _resolve_elites(self, freeze_from):
+        if self._elites_spec != "auto":
+            return
+        # respetar la ablación sin_demografia_estructural (eps_r == 0 y beta_e == 0)
+        elites_ablated = (self.p.eps_r <= 0.0 and self.p.beta_e <= 0.0)
+        if elites_ablated:
+            self.elites_model = None
+            return
+        if freeze_from is None:
+            obs_cols = np.where(self.w.observed.any(axis=0))[0]
+            cutoff = int(obs_cols[-1]) if len(obs_cols) else (self.w.T - 1)
+        else:
+            cutoff = int(freeze_from)
+        key = (id(self.w), cutoff)
+        em = self._ELITE_CACHE.get(key)
+        if em is None:
+            from . import elites
+            ly_w = np.log(np.maximum(self.w.Y, 1e-9) / np.maximum(self.w.pop, 1e-9))
+            ly_w = np.where(self.w.observed, ly_w, np.nan)
+            em = elites.fit(self.w, ly_w, cutoff)
+            self._ELITE_CACHE[key] = em
+        self.elites_model = em
+
+    def _resolve_democracy(self, freeze_from):
+        if self._democracy_spec != "auto":
+            return
+        # si la ablación sin_instituciones desactivó las transiciones, mantener apagado
+        inst_ablated = (self.p.ad0 <= -20.0 and self.p.da0 <= -20.0)
+        if freeze_from is None or inst_ablated:
+            self.democracy_model = None
+            return
+        key = (id(self.w), int(freeze_from))
+        dm = self._DEM_CACHE.get(key)
+        if dm is None:
+            from . import democracy
+            ly_w = np.log(np.maximum(self.w.Y, 1e-9) / np.maximum(self.w.pop, 1e-9))
+            ly_w = np.where(self.w.observed, ly_w, np.nan)
+            dm = democracy.fit(self.w, ly_w, int(freeze_from), rho_u=0.25)
+            self._DEM_CACHE[key] = dm
+        self.democracy_model = dm
 
     # ------------------------------------------------------------------ exogenous inputs
     def te(self, t):
@@ -457,6 +525,15 @@ class Simulator:
         self.xdebt = z(0.0)          # foreign debt from spending above the reference path
         self.demo, self.poly = z(0.0), z(0.4)
         self.Bdem = z(0.0)
+        if self.democracy_model is not None:
+            self._poly_buf = np.full((R, N, 4), 0.35)
+            self._reg_age = np.ones((R, N))
+            self._poly_u = np.zeros((R, N))
+        if self.elites_model is not None:
+            self._e_u_reg = np.zeros((R, self.elites_model.K))
+            self._e_u_id = np.zeros((R, N))
+        if self.stress_model is not None:
+            self.stress_model.reset(R, t0, self.obs_until, self.p, seed=self._seed)
         self.coup_t, self.coup_trap = z(0.0), z(0.0)
         self.Dclim, self.Nnat = z(0.0), z(1.0)
         self.G_prev, self.g_prev = z(np.nan), z(0.0)
@@ -545,7 +622,10 @@ class Simulator:
         return num / np.maximum(den, 1e-12)
 
     def _effective_lnA(self):
-        return self.lnA + self.Bdem + self.Dclim + self.p.xi_N * np.log(np.maximum(self.Nnat, 0.05))
+        eff = self.lnA + self.Bdem + self.Dclim + self.p.xi_N * np.log(np.maximum(self.Nnat, 0.05))
+        if self.stress_model is not None:
+            eff = eff + self.stress_model.effective_lnA_shift(self.t)
+        return eff
 
     def _anchor(self, mask, t, G):
         """Set TFP so the model reproduces observed GDP G of countries in mask at the current price."""
@@ -579,6 +659,9 @@ class Simulator:
         self.K[:, m] = w.K[m, t]
         top10 = w.locf("top10_share_ptinc")[m, t]
         self.E[:, m] = np.where(np.isfinite(top10), np.clip(top10, 0.15, 0.85), self.E[:, m])
+        if self.elites_model is not None:
+            self._e_u_reg.fill(0.0)
+            self._e_u_id[:, m] = 0.0
         self.conf[:, m] = w.conflict[m, t]
         d = w.locf("debt_gdp")[m, t]
         self.debt[:, m] = np.where(np.isfinite(d), np.clip(d, 0, 3), self.debt[:, m])
@@ -633,6 +716,13 @@ class Simulator:
     # ------------------------------------------------------------------ dynamics
     def step(self, actions):
         """Advance one year. actions: dict channel -> (R, N) shares of GDP."""
+        orig_p = self.p
+        obs_mode = self.observed(self.t)
+        dclim_prev = self.Dclim.copy()
+        if self.stress_model is not None:
+            ov = self.stress_model.pre_step(self, self.t, obs_mode)
+            if ov:
+                self.p = _dc_replace(orig_p, **ov)
         w, p, R, t = self.w, self.p, self.R, self.t
         N = w.N
         act = self.active
@@ -642,7 +732,6 @@ class Simulator:
         dlt = np.nan_to_num(w.delta[:, te], nan=0.045)
         rng = self.rng
         psi = self._psi(t)
-        obs_mode = self.observed(t)
         # common random numbers: every draw has a fixed shape each year
         u_jump, e_jump, n_tfp = rng.random((R, N)), rng.exponential(1.0, (R, N)), rng.standard_normal((R, N))
         u_conf, u_coup, u_succ = rng.random((R, N)), rng.random((R, N)), rng.random((R, N))
@@ -847,9 +936,18 @@ class Simulator:
         sfd = (1.5 - self.asab) * (1 + _sigmoid(4 * (self.debt / dstar - 1)) + 0.5 * (self.crisis_t > 0))
         psi_idx = np.where(act, mmp * emp * sfd, np.nan)
         self.mass_ma = 0.9 * self.mass_ma + 0.1 * mass_pc
-        rent_share = (phi * rent_in + np.maximum(phiR - self.E, 0) * res_inc) / Gs
-        self.E = np.clip(self.E + p.eps_r * rent_share * 0.1 - p.eps_w * a["w"] * 0.1
-                         + p.eps_0 * (self.E0 - self.E) * 0.1 - 0.02 * self.conf, 0.05, 0.95)
+        if self.elites_model is not None:
+            self.E, self._e_u_reg, self._e_u_id = self.elites_model.step(
+                self.E, self._e_u_reg, self._e_u_id,
+                poly=self.poly, core=core, rstar=rstar, g_prev=self.g_prev,
+                res_share=np.clip(rev / Gs, 0.0, 0.8),
+                open_=np.broadcast_to(o, (R, N)), acc_w=a["w"], conf=self.conf,
+                act=act, year=1950 + t, obs_mode=obs_mode, rng=self._elites_rng,
+            )
+        else:
+            rent_share = (phi * rent_in + np.maximum(phiR - self.E, 0) * res_inc) / Gs
+            self.E = np.clip(self.E + p.eps_r * rent_share * 0.1 - p.eps_w * a["w"] * 0.1
+                             + p.eps_0 * (self.E0 - self.E) * 0.1 - 0.02 * self.conf, 0.05, 0.95)
 
         # ---------------------------------------------------------------- institutions (coups, regimes)
         lpsi = np.log(np.maximum(psi_idx, 1e-6))
@@ -860,20 +958,34 @@ class Simulator:
         if obs_mode:
             succ = np.broadcast_to(np.nan_to_num(w.extra.get("coup_success_any", np.zeros((N, w.T)))[:, t]) > 0, (R, N))
             att = np.broadcast_to(np.nan_to_num(w.extra.get("coup_any", np.zeros((N, w.T)))[:, t]) > 0, (R, N))
+            prev_demo = self.demo
             self.poly = np.broadcast_to(w.locf("vdem_polyarchy", 0.35)[:, t], (R, N)).copy()
             self.demo = np.broadcast_to((w.locf("regime_row", 1.0)[:, t] >= 2).astype(float), (R, N)).copy()
+            if self.democracy_model is not None:
+                self._reg_age = np.where(act & (self.demo == prev_demo), self._reg_age + 1.0, 1.0)
+                self._poly_buf[:, :, :-1] = self._poly_buf[:, :, 1:]
+                self._poly_buf[:, :, -1] = self.poly
+                self._poly_u.fill(0.0)
         else:
             lg = (p.cp0 + p.cp_l * ell + p.cp_g * self.g_prev + p.cp_T * (self.coup_trap > 0)
                   + p.cp_D * self.demo + p.cp_CW * cw + p.cp_psi * psi_z)
             att = (u_coup < _sigmoid(lg)) & act
             succ = att & (u_succ < 0.5)
-            WD = float(np.mean(self.demo[act]))
-            lad = p.ad0 + p.ad_l * ell + p.ad_g * self.g_prev + p.ad_W * WD
-            lda = p.da0 + p.da_l * ell + p.da_g * self.g_prev + p.da_W * WD
-            to_d = (self.demo == 0) & (u_reg < _sigmoid(lad)) & ~succ & act
-            to_a = ((self.demo == 1) & (u_reg < _sigmoid(lda)) | (succ & (self.demo == 1))) & act
-            self.demo = np.where(to_d, 1.0, np.where(to_a, 0.0, self.demo))
-            self.poly = np.where(to_d, np.maximum(self.poly, 0.6), np.where(to_a, np.minimum(self.poly, 0.3), self.poly))
+            if self.democracy_model is not None:
+                self.poly, self.demo, self._poly_buf, self._reg_age, self._poly_u = self.democracy_model.step(
+                    self.poly, self.demo, self._poly_buf, self._reg_age, self._poly_u,
+                    ell=ell, g_prev=self.g_prev, res_share=np.clip(rev / Gs, 0.0, 0.8),
+                    coup_trap=self.coup_trap, conf=self.conf, asab=self.asab,
+                    succ_coup=succ, act=act, rng=self._dem_rng,
+                )
+            else:
+                WD = float(np.mean(self.demo[act]))
+                lad = p.ad0 + p.ad_l * ell + p.ad_g * self.g_prev + p.ad_W * WD
+                lda = p.da0 + p.da_l * ell + p.da_g * self.g_prev + p.da_W * WD
+                to_d = (self.demo == 0) & (u_reg < _sigmoid(lad)) & ~succ & act
+                to_a = ((self.demo == 1) & (u_reg < _sigmoid(lda)) | (succ & (self.demo == 1))) & act
+                self.demo = np.where(to_d, 1.0, np.where(to_a, 0.0, self.demo))
+                self.poly = np.where(to_d, np.maximum(self.poly, 0.6), np.where(to_a, np.minimum(self.poly, 0.3), self.poly))
         self.coup_t = np.where(succ, 5.0, np.maximum(self.coup_t - 1, 0))
         self.coup_trap = np.where(att, 10.0, np.maximum(self.coup_trap - 1, 0))
         self.Bdem = np.where(act, p.dem_rho * self.Bdem + p.dem_b * self.demo, self.Bdem)
@@ -939,6 +1051,9 @@ class Simulator:
         self.last_price = price[:, 0].copy()
         self.last_Tg = self.Tg[:, 0].copy()
         self.conf = np.where(act, newconf, 0.0)
+        self.p = orig_p
+        if self.stress_model is not None:
+            self.stress_model.post_step(self, rec, t, obs_mode, dclim_prev, act, orig_p, self._stress_rng)
         self.t += 1
         if self.t < w.T:
             self._activate(self.t)
@@ -951,12 +1066,21 @@ class Simulator:
         w = self.w
         t1 = w.T if t1 is None else t1
         self.obs_until = w.T - 1 if freeze_from is None else freeze_from
+        self._resolve_democracy(freeze_from)
+        self._resolve_elites(freeze_from)
         self.reset(t0)
         self.psi_freeze = freeze_from
         out = {k: np.full((self.R, w.N, t1 - t0), np.nan) for k in self.REC}
         out["hazard"] = np.full((self.R, w.N, t1 - t0), np.nan)
         out["price"] = np.full((self.R, t1 - t0), np.nan)
         out["Tg"] = np.full((self.R, t1 - t0), np.nan)
+        if self.democracy_model is not None:
+            out["poly"] = np.full((self.R, w.N, t1 - t0), np.nan)
+        if self.stress_model is not None:
+            for k in ("kcal", "yield_idx", "excess_deaths", "pop_dyn"):
+                out[k] = np.full((self.R, w.N, t1 - t0), np.nan)
+            for k in ("p_food", "d_glob", "global_shock"):
+                out[k] = np.full((self.R, t1 - t0), np.nan)
         for t in range(t0, t1):
             if assimilate_at is not None and t == assimilate_at:
                 self.assimilate(t)
@@ -971,4 +1095,15 @@ class Simulator:
                 out["hazard"][:, :, t - t0] = self.hazard
                 out["price"][:, t - t0] = self.last_price
                 out["Tg"][:, t - t0] = self.last_Tg
+                if self.democracy_model is not None:
+                    out["poly"][:, :, t - t0] = np.where(self.active, self.poly, np.nan)
+                if self.stress_model is not None:
+                    sm = self.stress_model
+                    out["kcal"][:, :, t - t0] = np.where(self.active, sm.kcal, np.nan)
+                    out["yield_idx"][:, :, t - t0] = np.where(self.active, sm.yield_idx, np.nan)
+                    out["excess_deaths"][:, :, t - t0] = np.where(self.active, sm.excess_deaths, np.nan)
+                    out["pop_dyn"][:, :, t - t0] = np.where(self.active, sm.pop_dyn, np.nan)
+                    out["p_food"][:, t - t0] = sm.p_food[:, 0]
+                    out["d_glob"][:, t - t0] = sm.d_glob[:, 0]
+                    out["global_shock"][:, t - t0] = sm.global_shock_flag
         return out
